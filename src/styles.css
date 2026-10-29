@@ -195,3 +195,14 @@
  .mobile-nav button{min-height:48px}
 }
 @media(max-width:370px){.editor-history-bar button{font-size:9px}.map-selection-bar span{font-size:10px}}
+
+/* P018: mobile navigation respects safe areas and never covers scrolled panel actions. */
+@media(max-width:760px){
+ .workspace{padding-bottom:calc(98px + env(safe-area-inset-bottom,0px))}
+ .mobile-nav{gap:4px;padding:6px max(6px,env(safe-area-inset-right,0px)) calc(7px + env(safe-area-inset-bottom,0px)) max(6px,env(safe-area-inset-left,0px));overscroll-behavior:contain}
+ .mobile-nav button{min-width:0;min-height:48px;font-size:10px;padding:9px 2px;white-space:nowrap}
+ .editor-column,.map-frame,.library-panel,.details-panel,.project-panel{scroll-margin-top:8px}
+ .panel.mobile-active{min-width:0}
+ .map-surface{touch-action:none;-webkit-user-select:none;user-select:none}
+}
+@media(max-width:360px){.mobile-nav button{font-size:9px;letter-spacing:-.35px}}

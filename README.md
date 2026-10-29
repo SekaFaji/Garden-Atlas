@@ -1,3 +1,11 @@
+## P018 — Mobile navigation and gesture reliability
+
+- On phones, the bottom navigation now provides **MAP · OBJECTS · DETAILS · GARDENS**. Selecting a tab opens its corresponding section without long manual scrolling; choosing a preset jumps to the map ready for placement.
+- Map taps select objects only on release. Small finger jitter is ignored when moving objects, editing corners or resizing. To insert a path, terrain or boundary point, **tap** its edge; dragging that edge pans rather than inserting a point. Pinching zooms without committing a tap.
+- All garden records and old backups remain compatible (schema version 6). This is strictly a usability patch. Manual phone testing is recommended for touch behavior.
+
+---
+
 ## P017 — Existing editor usability polish (2026-10-29)
 
 - **Number fields:** edit line widths, rotation and tracing image dimensions/offsets without fields reverting as you type. Tap outside or press Enter to apply; Escape cancels. Invalid values keep the previous measurement and show a notice.

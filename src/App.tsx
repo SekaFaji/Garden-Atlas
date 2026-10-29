@@ -46,7 +46,7 @@ export default function App(){
   const [lineWidth,setLineWidth]=useState(1.5);
   const [selectedId,setSelectedId]=useState<string|null>('TREE-001');
   const [selectedGroupId,setSelectedGroupId]=useState<string|null>(null);
-  const [selectedPanel,setSelectedPanel]=useState<'tools'|'inspector'|'projects'>('tools');
+  const [selectedPanel,setSelectedPanel]=useState<'map'|'tools'|'inspector'|'projects'>('map');
   const [visibility,setVisibility]=useState<Visibility>({objects:false,regions:false,lines:false,boundary:false});
   const [locked,setLocked]=useState<LayerState>({objects:false,regions:false,lines:false,boundary:false});
   const [selectedFeature,setSelectedFeature]=useState<FeatureSelection|null>(null);
@@ -60,7 +60,25 @@ export default function App(){
   const [importingReference,setImportingReference]=useState(false);
   const referenceFile=useRef<HTMLInputElement>(null);
   const inspectorRef=useRef<HTMLElement>(null);
-  const showDetails=()=>{setSelectedPanel('inspector');requestAnimationFrame(()=>inspectorRef.current?.scrollIntoView({behavior:'smooth',block:'start'}));};
+  const toolsPanelRef=useRef<HTMLElement>(null);
+  const projectsPanelRef=useRef<HTMLElement>(null);
+  const mapFrameRef=useRef<HTMLDivElement>(null);
+  const editorRef=useRef<HTMLElement>(null);
+  /** Mobile tab navigation must scroll to the *visible* section after React renders it. */
+  const navigateTo=(section:'map'|'tools'|'inspector'|'projects')=>{
+    const mobile=window.matchMedia('(max-width:760px)').matches;
+    if(mobile){
+      const focused=document.activeElement;
+      if(focused instanceof HTMLElement&&focused.matches('input, textarea, select'))focused.blur();
+    }
+    setSelectedPanel(section);
+    window.requestAnimationFrame(()=>{
+      if(!mobile&&section!=='inspector')return;
+      const target=section==='map'?editorRef.current:section==='tools'?toolsPanelRef.current:section==='inspector'?inspectorRef.current:projectsPanelRef.current;
+      target?.scrollIntoView({behavior:'auto',block:'start'});
+    });
+  };
+  const showDetails=()=>navigateTo('inspector');
   const [dims,setDims]=useState({width:String(garden.width),height:String(garden.height)});
   const [mapSizeOpen,setMapSizeOpen]=useState(false);
   const [resizeMode,setResizeMode]=useState<'preserve'|'scale'>('preserve');
@@ -125,7 +143,7 @@ export default function App(){
     const updated=updateActiveGarden(libraryRef.current,next);libraryRef.current=updated;setLibrary(updated);
   };
   const replaceLibrary=(next:ProjectLibrary)=>{
-    libraryRef.current=next;setLibrary(next);setPast([]);setFuture([]);historyGroup.current=null;setSelectedId(null);setSelectedGroupId(null);setTool('select');setSelectedPanel('tools');setCheckedIds([]);setMultiSelect(false);setSelectedFeature(null);setSelectedVertex(null);
+    libraryRef.current=next;setLibrary(next);setPast([]);setFuture([]);historyGroup.current=null;setSelectedId(null);setSelectedGroupId(null);setTool('select');setSelectedPanel('map');setCheckedIds([]);setMultiSelect(false);setSelectedFeature(null);setSelectedVertex(null);
   };
   const undo=()=>{historyGroup.current=null;if(garden.linkMigration&&!garden.linkMigration.confirmed)return;if(!past.length)return;const prev=past[past.length-1];setPast(p=>p.slice(0,-1));setFuture(f=>[...f,garden]);applyGarden(prev,false);setNotice('Undid last edit.');};
   const redo=()=>{historyGroup.current=null;if(garden.linkMigration&&!garden.linkMigration.confirmed)return;if(!future.length)return;const next=future[future.length-1];setFuture(f=>f.slice(0,-1));setPast(p=>[...p,garden]);applyGarden(next,false);setNotice('Redid edit.');};
@@ -140,9 +158,10 @@ export default function App(){
     };
     window.addEventListener('keydown',listener);return ()=>window.removeEventListener('keydown',listener);
   });
-  const select=(id:string|null)=>{setSelectedId(id);setSelectedGroupId(null);if(id&&!multiSelect)setSelectedPanel('inspector');};
+  // Selecting on the map must not yank mobile focus away from the map. Details opens explicitly.
+  const select=(id:string|null)=>{setSelectedId(id);setSelectedGroupId(null);};
   const togglePick=(id:string)=>setCheckedIds(ids=>ids.includes(id)?ids.filter(x=>x!==id):[...ids,id]);
-  const selectGroup=(id:string)=>{setSelectedGroupId(id);setSelectedId(null);setTool('select');setSelectedPanel('inspector');};
+  const selectGroup=(id:string)=>{setSelectedGroupId(id);setSelectedId(null);setTool('select');showDetails();};
   const objectPatch=(id:string,patch:Partial<GardenObject>,key?:string)=>{if(locked.objects){setNotice('Unlock Plants & structures to edit this item.');return;}applyGarden({...garden,objects:garden.objects.map(o=>o.id===id?{...o,...patch}:o)},true,key?`object:${id}:${key}`:undefined);};
   const resizeSelected=(id:string,widthM:number,lengthM:number)=>{
     if(locked.objects){setNotice('Unlock Plants & structures before resizing.');return;}
@@ -287,13 +306,14 @@ export default function App(){
     setPresetId(preset.id);setNewTool(preset.kind);
     setNotice(`${preset.name}: tap the map to place, then drag to adjust.`);
     if(window.matchMedia('(max-width:760px)').matches){
-      window.requestAnimationFrame(()=>document.querySelector('.map-frame')?.scrollIntoView({behavior:'smooth',block:'start'}));
+      setSelectedPanel('map');
+      window.requestAnimationFrame(()=>mapFrameRef.current?.scrollIntoView({behavior:'auto',block:'start'}));
     }
   };
   if(!hydrated)return <div className="app-shell"><div className="status-message" role="status">Loading saved gardens…</div></div>;
   return <><div className="app-shell">
     <header className="topbar">
-      <div className="brand"><span className="brand-icon">✿</span><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL LANDSCAPE EDITOR · P015</div></div></div>
+      <div className="brand"><span className="brand-icon">✿</span><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL LANDSCAPE EDITOR · P018</div></div></div>
       <div className="top-actions"><span role="status" aria-live="polite" className={`save-status ${saveStatus==='failed'?'danger':''}`}>● {saveStatus==='saved'?(backend==='indexeddb'?'INDEXEDDB SAVED':'LOCAL SAVE'):saveStatus==='saving'?'SAVING…':saveStatus==='failed'?'SAVE FAILED':'LOADING…'}</span>
         <button className="btn btn-muted" onClick={()=>importFile.current?.click()}>IMPORT</button>
         <button className="btn btn-highlight" onClick={()=>download(`garden-atlas-${slug(garden.name)}-${date()}.json`,JSON.stringify(garden,null,2))}>↓ BACKUP</button><button className="btn btn-muted" onClick={()=>window.print()} title="Open your browser print dialog to save the garden book as a PDF">☷ PDF / PRINT</button>
@@ -302,10 +322,10 @@ export default function App(){
       </div>
     </header>
     <main className="workspace">
-      <aside className={`panel library-panel ${selectedPanel==='tools'?'mobile-active':''}`}>
+      <aside ref={toolsPanelRef} className={`panel library-panel ${selectedPanel==='tools'?'mobile-active':''}`}>
         <div className="section-heading">01 / OBJECT LIBRARY</div>
         <p className="panel-hint">Choose an item, then tap repeatedly to place. Switch to SELECT to drag it.</p>
-        <div className="palette-grid">{KINDS.map((k,i)=><button key={k.kind} className={`palette-item ${tool===k.kind?'active':''}`} onClick={()=>{setPresetId(defaultPreset(k.kind).id);setNewTool(k.kind);}}><Icon kind={k.kind} presetId={defaultPreset(k.kind).id}/><span>{k.label}</span><small>{ICONS[i]}</small></button>)}</div>
+        <div className="palette-grid">{KINDS.map((k,i)=><button key={k.kind} className={`palette-item ${tool===k.kind?'active':''}`} onClick={()=>activatePreset(defaultPreset(k.kind).id)}><Icon kind={k.kind} presetId={defaultPreset(k.kind).id}/><span>{k.label}</span><small>{ICONS[i]}</small></button>)}</div>
         <div className="section-heading list-heading">PIXEL-ART PRESETS <span className="pill">{PRESETS.length}</span></div>
         <div className="preset-filters">
           <input aria-label="Search garden objects" type="search" placeholder="Search trees, ponds, furniture…" value={presetSearch} onChange={e=>setPresetSearch(e.target.value)}/>
@@ -349,7 +369,7 @@ export default function App(){
         <div className="terrain-list">{garden.layout.regions.map(r=><div className="terrain-entry" key={r.id}><button className="feature-pick" onClick={()=>{setSelectedFeature({kind:'region',id:r.id});setSelectedVertex(null);setNewTool('feature-edit');}}>{r.name} · {r.id} · EDIT POINTS</button><button disabled={locked.regions} title="Delete terrain region" onClick={()=>applyGarden({...garden,layout:{...garden.layout,regions:garden.layout.regions.filter(x=>x.id!==r.id)}})}>×</button></div>)}</div>
         <div className="terrain-list">{garden.layout.lines.map(line=><div className="line-entry" key={line.id}><button className="feature-pick" onClick={()=>{setSelectedFeature({kind:'line',id:line.id});setSelectedVertex(null);setNewTool('feature-edit');}}>✎ EDIT POINTS</button><input disabled={locked.lines} aria-label={`Name of ${line.id}`} maxLength={120} value={line.name} onChange={e=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.map(x=>x.id===line.id?{...x,name:e.target.value}:x)}})}/><label>WIDTH M<MetricDraftInput key={line.id} disabled={locked.lines} label={`${line.name} width in metres`} min={0.2} max={12} value={line.widthM} onCommit={n=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.map(x=>x.id===line.id?{...x,widthM:n}:x)}})} onNotice={setNotice}/></label><button disabled={locked.lines} className="btn btn-danger" title="Delete path or fence" onClick={()=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.filter(x=>x.id!==line.id)}})}>×</button></div>)}</div>
       </aside>
-      <section className="editor-column">
+      <section ref={editorRef} className="editor-column">
         <div className="editor-top"><div><div className="eyebrow">CURRENT GARDEN</div><input className="garden-name" aria-label="Garden name" value={garden.name} maxLength={80} onChange={e=>applyGarden({...garden,name:e.target.value},true,'garden-name')}/></div>
           <div className="mode-switch"><button className={mode==='illustration'?'on':''} onClick={()=>{setMode('illustration');setNewTool('select');}}>✦ ILLUSTRATION</button><button className={mode==='scale'?'on':''} onClick={()=>{setMode('scale');setNewTool('select');}}>▦ SCALE</button></div>
         </div>
@@ -361,7 +381,7 @@ export default function App(){
           <button className="btn btn-muted" onClick={()=>download(`garden-atlas-pre-link-${slug(garden.name)}.json`,JSON.stringify(garden.linkMigration!.original,null,2))}>↓ DOWNLOAD ORIGINAL TWO-VIEW BACKUP</button>
           <p className="migration-note">Choose a source before editing. Your original P006 browser storage remains recoverable using the previous local recovery snapshot or a backup.</p>
         </section>}
-        <div className={`map-frame ${garden.linkMigration&&!garden.linkMigration.confirmed?'migration-locked':''}`}><div className="map-toolbar"><span>● {mode==='scale'?'MEASURED MAP':'PIXEL MAP'} · {garden.width} × {garden.height} m</span><button type="button" className="map-size-toggle" aria-expanded={mapSizeOpen} aria-controls="map-size-panel" onClick={()=>setMapSizeOpen(o=>!o)}>▣ MAP SIZE {mapSizeOpen?'▴':'▾'}</button></div>
+        <div ref={mapFrameRef} className={`map-frame ${garden.linkMigration&&!garden.linkMigration.confirmed?'migration-locked':''}`}><div className="map-toolbar"><span>● {mode==='scale'?'MEASURED MAP':'PIXEL MAP'} · {garden.width} × {garden.height} m</span><button type="button" className="map-size-toggle" aria-expanded={mapSizeOpen} aria-controls="map-size-panel" onClick={()=>setMapSizeOpen(o=>!o)}>▣ MAP SIZE {mapSizeOpen?'▴':'▾'}</button></div>
           {mapSizeOpen&&<section id="map-size-panel" className="map-size-panel" aria-label="Map size and surrounding workspace">
             <div className="map-size-heading"><strong>EDIT MAP SIZE</strong><span>Both map styles use the same dimensions</span></div>
             <p>Set the surrounding <b>workspace</b> size separately from the property boundary. You can enlarge the map without stretching trees, paths or land measurements.</p>
@@ -423,7 +443,7 @@ export default function App(){
           <div className="map-bottom"><span>{tool==='select'?(multiSelect?'MULTI MODE · TAP TO SELECT · DRAG SELECTED ITEMS TOGETHER':'DRAG ITEMS · PAN EMPTY SPACE · PINCH TO ZOOM'):tool==='pan'?'DRAG MAP · PINCH TO ZOOM':tool==='feature-edit'?'TAP PATH OR TERRAIN · DRAG HANDLES · TAP EDGE TO ADD POINT':tool==='outline-edit'?'DRAG CORNERS · TAP EDGE MIDPOINTS TO INSERT':tool==='outline-draw'?'TAP CORNERS · FINISH TO CLOSE OUTLINE':tool==='freehand'?'DRAW A CLOSED BORDER WITH ONE FINGER':tool==='terrain'?'TAP AREA CORNERS · FINISH TO ADD TERRAIN':tool==='path'||tool==='fence'?'TAP LINE POINTS · FINISH TO CREATE':`TAP TO PLACE ${tool.toUpperCase()}`}</span></div>
         </div>
         <div className="status-message" role="status">✦ {notice}</div>
-        <div className="feature-strip"><span>■ P017 EDITOR POLISH</span><span>■ TOUCH-FIRST</span><span>■ LINKED SCALE + PIXEL VIEWS</span><span>■ LOCAL BACKUPS</span></div>
+        <div className="feature-strip"><span>■ P018 MOBILE POLISH</span><span>■ TOUCH-FIRST</span><span>■ LINKED SCALE + PIXEL VIEWS</span><span>■ LOCAL BACKUPS</span></div>
       </section>
       <aside ref={inspectorRef} className={`panel details-panel ${selectedPanel==='inspector'?'mobile-active':''}`}>
         <div className="section-heading">06 / INSPECTOR</div>
@@ -460,7 +480,7 @@ export default function App(){
         <p className="panel-hint">Workspace: {garden.width} × {garden.height} m · Property outline: {polygonArea(garden.layout.boundary).toFixed(1)} m² (approximate). Map dimensions can now be changed above the map without stretching the garden.</p>
         <button className="btn btn-muted" onClick={()=>{setMapSizeOpen(true);window.scrollTo({top:0,behavior:'smooth'});}}>OPEN MAP SIZE SETTINGS ↑</button>
       </aside>
-      <aside className={`panel project-panel ${selectedPanel==='projects'?'mobile-active':''}`}>
+      <aside ref={projectsPanelRef} className={`panel project-panel ${selectedPanel==='projects'?'mobile-active':''}`}>
         <div className="section-heading">07 / MY GARDENS</div>
         <p className="panel-hint">Your projects are stored in this browser only. Download regular backups.</p>
         <div className="project-list">{library.projects.map(p=><button key={p.id} className={`project-entry ${p.id===library.activeId?'active':''}`} onClick={()=>{replaceLibrary({...library,activeId:p.id});setNotice(`Opened ${p.garden.name}.`);}}><span>▧ {p.garden.name}</span><small>{p.garden.objects.length} items · {p.garden.width}×{p.garden.height} m</small></button>)}</div>
@@ -474,7 +494,9 @@ export default function App(){
         <button className="btn btn-muted" onClick={()=>{void requestPersistentStorage().then(ok=>setNotice(ok?'Browser granted persistent storage for this site. Keep external backups too.':'Persistent storage was unavailable or declined. JSON backups are recommended.'));}}>PROTECT LOCAL STORAGE</button>
       </aside>
     </main>
-    <nav className="mobile-nav" aria-label="Editor panels"><button className={selectedPanel==='tools'?'active':''} onClick={()=>setSelectedPanel('tools')}>♣ OBJECTS</button><button className={selectedPanel==='inspector'?'active':''} onClick={()=>setSelectedPanel('inspector')}>✎ DETAILS</button><button className={selectedPanel==='projects'?'active':''} onClick={()=>setSelectedPanel('projects')}>▧ GARDENS</button></nav>
-    <footer className="footer">GARDEN ATLAS · P017 MOBILE UX POLISH <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
+    <nav className="mobile-nav" aria-label="Mobile garden navigation">
+      {([{id:'map',label:'⌖ MAP'},{id:'tools',label:'♣ OBJECTS'},{id:'inspector',label:'✎ DETAILS'},{id:'projects',label:'▧ GARDENS'}] as {id:'map'|'tools'|'inspector'|'projects';label:string}[]).map(item=><button key={item.id} type="button" className={selectedPanel===item.id?'active':''} aria-current={selectedPanel===item.id?'page':undefined} onClick={()=>navigateTo(item.id)}>{item.label}</button>)}
+    </nav>
+    <footer className="footer">GARDEN ATLAS · P018 TOUCH & NAVIGATION POLISH <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
   </div><GardenReport garden={garden}/></>;
 }

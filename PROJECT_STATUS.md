@@ -1,3 +1,14 @@
+# Garden Atlas — P018 Touch & Mobile Navigation Polish (2026-10-29)
+
+- Current patch: **P018**. No new garden functions, objects, storage formats or data fields.
+- Fixed three mobile UX problems: bottom tabs did not scroll to the selected panel, object selection happened on pointer-down even during a possible pinch, and drawing edges inserted vertices before a gesture was identified.
+- The bottom bar now has MAP / OBJECTS / DETAILS / GARDENS and scrolls to the chosen section. Object-library presets jump to the canvas, with the keyboard dismissed when changing tabs.
+- Movement thresholds in **screen pixels** filter touch jitter before committing moves or resizes; edges only insert points on confirmed taps and otherwise pan.
+- P017 saved gardens and backups remain valid; garden v6, IndexedDB, PWA, other tools and their semantics are preserved.
+- Validation: node regression tests and GitHub Pages production build. Android physical-device gesture quality still requires manual checks.
+
+---
+
 # Garden Atlas — P017 Editor UI/UX & Input Reliability (2026-10-29)
 
 **Current patch: P017. Existing-feature polish only; garden schema v6 is unchanged.**

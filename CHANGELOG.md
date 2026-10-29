@@ -1,3 +1,14 @@
+# P018 — Mobile navigation and safe touch gestures (2026-10-29)
+
+- Focused UI/UX patch only; no new garden data fields or gardening features.
+- Mobile navigation now includes MAP, OBJECTS, DETAILS and GARDENS. Switching a tab scrolls directly to its panel; the MAP tab restores the editor toolbar. Choosing a preset returns directly to the canvas for placement.
+- One-finger taps select objects on pointer release (not pointer down), avoiding incidental selection during two-finger pinch. Tiny finger movements no longer move objects, boundary corners, feature nodes, or resize handles.
+- Touching a path/terrain/property edge only inserts a point after a stationary tap. An edge swipe pans instead; pinch gestures never create points.
+- Mobile bottom navigation reserves device safe areas; mobile panels scroll clear of the bar. Original IndexedDB saves, offline caching, object IDs, and garden format v6 unchanged.
+- Automated intent tests supplement previous model tests; manual Android touch/scroll tests remain required.
+
+---
+
 ## P017 — Mobile Toolbars & Measurement Input Polish (2026-10-29)
 
 - Fixed per-keystroke reversion in existing path/fence width fields, new path/fence width, object rotation, and tracing image width/X/Y offsets; commit valid values on blur or Enter, Escape restores unchanged state.

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react';
 import { Sprite } from './Sprite';
 import { closestEdge, formatArea } from './geometry';
+import { deliberateTap, intentionalDrag, type ScreenPoint } from './touchIntent';
 import type { FeatureSelection, EditAction } from './featureEdit';
 import { fitCamera, panCamera, pinchCamera, zoomCamera, type Camera } from './camera';
 import { clampPoint, polygonArea, simplifyStroke, validPolygon, objectDimensions, WORLD, KINDS, type Garden, type Ground, type Kind, type Mode, type Point, type LineKind } from './model';
@@ -26,15 +27,16 @@ interface Props {
   onLine: (points:Point[],kind:LineKind,widthM:number) => void;
   onNotice: (text:string) => void;
 }
-type PointerInfo={x:number;y:number};
+type PointerInfo=ScreenPoint;
 type Activity =
   | {kind:'pan';x:number;y:number;camera:Camera}
-  | {kind:'object';id:string;start:Point;anchor:Point;together:boolean;moved:boolean;multiple:boolean}
-  | {kind:'corner';index:number;point:Point;moved:boolean}
+  | {kind:'object';id:string;start:Point;screenStart:ScreenPoint;pointerType:string;anchor:Point;together:boolean;moved:boolean;multiple:boolean}
+  | {kind:'corner';index:number;point:Point;screenStart:ScreenPoint;pointerType:string;moved:boolean}
   | {kind:'freehand';points:Point[]}
-  | {kind:'tap';start:PointerInfo}
-  | {kind:'feature-node';feature:FeatureSelection;index:number;point:Point;moved:boolean}
-  | {kind:'resize';id:string;origin:Point;widthM:number;lengthM:number;moved:boolean};
+  | {kind:'tap';start:PointerInfo;pointerType:string}
+  | {kind:'edge-tap';feature?:FeatureSelection;index:number;point:Point;screenStart:ScreenPoint;pointerType:string;camera:Camera;moved:boolean}
+  | {kind:'feature-node';feature:FeatureSelection;index:number;point:Point;screenStart:ScreenPoint;pointerType:string;moved:boolean}
+  | {kind:'resize';id:string;origin:Point;widthM:number;lengthM:number;screenStart:ScreenPoint;pointerType:string;moved:boolean};
 const ppu=WORLD.pixelsPerUnit;
 const color: Record<Ground,string>={grass:'#8ebc77',soil:'#a57c53',gravel:'#a8aca0',stone:'#bdb8a9',water:'#64a6bc'};
 const snap=(p:Point,mode:Mode,force=false):Point=>force?{x:Math.round(p.x*2)/2,y:Math.round(p.y*2)/2}:mode==='scale'?{x:Math.round(p.x*10)/10,y:Math.round(p.y*10)/10}:p;
@@ -117,25 +119,20 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
     const featureEdge=target.closest('[data-feature-edge]') as SVGElement|null;
     if(tool==='select'&&resizeHit&&!locked.objects){
       const obj=garden.objects.find(o=>o.id===resizeHit.dataset.resize);
-      if(obj?.position){activeRef.current={kind:'resize',id:obj.id,origin:obj.position,...objectDimensions(obj),moved:false};return;}
+      if(obj?.position){activeRef.current={kind:'resize',id:obj.id,origin:obj.position,...objectDimensions(obj),screenStart:{x:e.clientX,y:e.clientY},pointerType:e.pointerType,moved:false};return;}
     }
     if(tool==='feature-edit'&&featureHit){
       const feature={kind:featureHit.dataset.featureKind as FeatureSelection['kind'],id:featureHit.dataset.featureId!};
       if(locked[feature.kind==='region'?'regions':'lines'])return;
       onSelectFeature(feature);
       if(!featureNode)onSelectVertex(null);
-      if(featureNode){const index=Number(featureNode.dataset.featureNode);onSelectVertex(index);activeRef.current={kind:'feature-node',feature,index,point:start,moved:false};return;}
+      if(featureNode){const index=Number(featureNode.dataset.featureNode);onSelectVertex(index);activeRef.current={kind:'feature-node',feature,index,point:start,screenStart:{x:e.clientX,y:e.clientY},pointerType:e.pointerType,moved:false};return;}
       if(featureEdge){
-        const index=Number(featureEdge.dataset.featureEdge);
-        const f=feature.kind==='region'?garden.layout.regions.find(r=>r.id===feature.id):garden.layout.lines.find(l=>l.id===feature.id);
-        if(f){const a=f.points[index],b=f.points[(index+1)%f.points.length];
-          if(a&&b){const dx=b.x-a.x,dy=b.y-a.y,len=dx*dx+dy*dy;
-            const t=len?Math.max(.05,Math.min(.95,((start.x-a.x)*dx+(start.y-a.y)*dy)/len)):.5;
-            onEditFeature(feature,index,'insert',clampPoint({x:a.x+t*dx,y:a.y+t*dy},garden));
-          }
-        }
+        // Don't insert on pointer-down: the gesture might be a scroll, pan or pinch.
+        activeRef.current={kind:'edge-tap',feature,index:Number(featureEdge.dataset.featureEdge),point:start,
+          screenStart:{x:e.clientX,y:e.clientY},pointerType:e.pointerType,camera:cameraRef.current,moved:false};return;
       }
-      activeRef.current={kind:'tap',start:{x:e.clientX,y:e.clientY}};return;
+      activeRef.current={kind:'tap',start:{x:e.clientX,y:e.clientY},pointerType:e.pointerType};return;
     }
     const corner=target.closest('[data-corner]') as SVGElement|null;
     const edge=target.closest('[data-edge]') as SVGElement|null;
@@ -144,17 +141,12 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
     }
     if(tool==='outline-edit'&&!locked.boundary&&corner){
       const index=Number(corner.dataset.corner);
-      activeRef.current={kind:'corner',index,point:start,moved:false};return;
+      activeRef.current={kind:'corner',index,point:start,screenStart:{x:e.clientX,y:e.clientY},pointerType:e.pointerType,moved:false};return;
     }
     if(tool==='outline-edit'&&!locked.boundary&&edge){
       const index=Number(edge.dataset.edge);
-      const b=garden.layout.boundary;
-      const closest=closestEdge(b,start);
-      if(closest&&closest.index===index){
-        const next=[...b];next.splice(index+1,0,clampPoint(closest.point,garden));
-        if(validPolygon(next,garden)){onBoundary(next);onNotice('Boundary point added. Drag it to reshape.');}
-      }
-      activeRef.current={kind:'tap',start:{x:e.clientX,y:e.clientY}};return;
+      activeRef.current={kind:'edge-tap',index,point:start,screenStart:{x:e.clientX,y:e.clientY},
+        pointerType:e.pointerType,camera:cameraRef.current,moved:false};return;
     }
     if((tool==='select')&&hit&&!hidden.objects&&!locked.objects){
       const id=hit.dataset.object!;
@@ -162,12 +154,11 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
       if(obj?.position){
         const multiple=multiSelect&&selectedIds.includes(id);
         const together=Boolean(!multiSelect&&selectedGroupId&&obj.groupId===selectedGroupId);
-        if(!multiSelect&&!together)onPick(id);
-        activeRef.current={kind:'object',id,start:clampPoint(start,garden),anchor:obj.position!,together,multiple,moved:false};return;
+        activeRef.current={kind:'object',id,start:clampPoint(start,garden),screenStart:{x:e.clientX,y:e.clientY},pointerType:e.pointerType,anchor:obj.position!,together,multiple,moved:false};return;
       }
     }
     if(tool==='pan'||tool==='select'||tool==='outline-edit'||tool==='feature-edit')activeRef.current={kind:'pan',x:e.clientX,y:e.clientY,camera:cameraRef.current};
-    else activeRef.current={kind:'tap',start:{x:e.clientX,y:e.clientY}};
+    else activeRef.current={kind:'tap',start:{x:e.clientX,y:e.clientY},pointerType:e.pointerType};
   };
   const pointerMove=(e:ReactPointerEvent<SVGSVGElement>)=>{
     if(!pointsRef.current.has(e.pointerId))return;
@@ -180,19 +171,20 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
     const a=activeRef.current;if(!a)return;
     const p=pointFromEvent(e);
     if(a.kind==='pan')setCamera(panCamera(a.camera,e.clientX-a.x,e.clientY-a.y));
+    if(a.kind==='edge-tap'&&intentionalDrag(a.screenStart,{x:e.clientX,y:e.clientY},a.pointerType)){a.moved=true;setCamera(panCamera(a.camera,e.clientX-a.screenStart.x,e.clientY-a.screenStart.y));}
     if(a.kind==='object'&&p){
-      if(Math.hypot(p.x-a.start.x,p.y-a.start.y)>.16)a.moved=true;
+      if(intentionalDrag(a.screenStart,{x:e.clientX,y:e.clientY},a.pointerType))a.moved=true;
       if(a.moved)setPreview({id:a.id,point:clampPoint(snap({x:a.anchor.x+p.x-a.start.x,y:a.anchor.y+p.y-a.start.y},mode,snapEnabled),garden),together:a.together,many:a.multiple?selectedIds:undefined});
     }
-    if(a.kind==='corner'&&p){a.moved=true;setCornerPreview({index:a.index,point:clampPoint(snap(p,mode,snapEnabled),garden)});}
+    if(a.kind==='corner'&&p){if(intentionalDrag(a.screenStart,{x:e.clientX,y:e.clientY},a.pointerType))a.moved=true;if(a.moved)setCornerPreview({index:a.index,point:clampPoint(snap(p,mode,snapEnabled),garden)});}
     if(a.kind==='feature-node'&&p){
-      if(Math.hypot(p.x-a.point.x,p.y-a.point.y)>.08)a.moved=true;
+      if(intentionalDrag(a.screenStart,{x:e.clientX,y:e.clientY},a.pointerType))a.moved=true;
       if(a.moved)setFeaturePreview({...a.feature,index:a.index,point:clampPoint(snap(p,mode,snapEnabled),garden)});
     }
     if(a.kind==='resize'&&p){
       const widthM=Math.min(100,Math.max(0,2*Math.abs(p.x-a.origin.x)));
       const lengthM=Math.min(100,Math.max(0,2*Math.abs(p.y-a.origin.y)));
-      if(Math.abs(widthM-a.widthM)>.06||Math.abs(lengthM-a.lengthM)>.06)a.moved=true;
+      if(intentionalDrag(a.screenStart,{x:e.clientX,y:e.clientY},a.pointerType))a.moved=true;
       const round=(n:number)=>snapEnabled?Math.round(n*2)/2:Math.round(n*20)/20;
       if(a.moved)setResizePreview({id:a.id,widthM:round(widthM),lengthM:round(lengthM)});
     }
@@ -205,6 +197,26 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
     if(wasPinch){if(pointsRef.current.size<2){pinchRef.current=null;activeRef.current=null;setPinching(false);}return;}
     activeRef.current=null;
     if(!a||!p)return;
+    if(a.kind==='edge-tap'){
+      // Only deliberate taps insert vertices. Swiping an edge pans instead.
+      if(!deliberateTap(a.screenStart,{x:e.clientX,y:e.clientY},a.pointerType,a.moved))return;
+      if(a.feature){
+        const f=a.feature.kind==='region'?garden.layout.regions.find(r=>r.id===a.feature!.id):garden.layout.lines.find(l=>l.id===a.feature!.id);
+        if(!f)return;
+        const start=f.points[a.index],end=f.points[(a.index+1)%f.points.length];
+        if(!start||!end)return;
+        const dx=end.x-start.x,dy=end.y-start.y,len=dx*dx+dy*dy;
+        const t=len?Math.max(.05,Math.min(.95,((a.point.x-start.x)*dx+(a.point.y-start.y)*dy)/len)):.5;
+        onEditFeature(a.feature,a.index,'insert',clampPoint({x:start.x+t*dx,y:start.y+t*dy},garden));
+      }else{
+        const closest=closestEdge(garden.layout.boundary,a.point);
+        if(closest&&closest.index===a.index){
+          const next=[...garden.layout.boundary];next.splice(a.index+1,0,clampPoint(closest.point,garden));
+          if(validPolygon(next,garden)){onBoundary(next);onNotice('Boundary point added. Drag it to reshape.');}
+        }
+      }
+      return;
+    }
     if(a.kind==='feature-node'){
       if(a.moved)onEditFeature(a.feature,a.index,'move',clampPoint(snap(p,mode,snapEnabled),garden));
       setFeaturePreview(null);return;
@@ -219,8 +231,9 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
       if(a.moved){const final=clampPoint(snap({x:a.anchor.x+p.x-a.start.x,y:a.anchor.y+p.y-a.start.y},mode,snapEnabled),garden);
         if(a.multiple)onMoveSelection(a.id,final);
         else if(multiSelect)onTogglePick(a.id);
-        else onMove(a.id,final,a.together);
+        else {onMove(a.id,final,a.together);if(!a.together)onPick(a.id);}
       }else if(multiSelect)onTogglePick(a.id);
+      else if(!a.together)onPick(a.id);
       setPreview(null);return;
     }
     if(a.kind==='corner'){
@@ -234,7 +247,7 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
       return;
     }
     if(a.kind==='pan')return;
-    if(a.kind==='tap'&&Math.hypot(e.clientX-a.start.x,e.clientY-a.start.y)>12)return;
+    if(a.kind==='tap'&&!deliberateTap(a.start,{x:e.clientX,y:e.clientY},a.pointerType))return;
     if(!inside(p))return;
     if(tool==='outline-draw'||tool==='terrain'||tool==='path'||tool==='fence'){setDraft(d=>d.length<100?[...d,snap(p,mode,snapEnabled)]:d);return;}
     if(KINDS.some(k=>k.kind===tool))onPlace(tool as Kind,snap(p,mode,snapEnabled));
