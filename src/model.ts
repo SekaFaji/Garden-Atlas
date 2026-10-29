@@ -6,8 +6,10 @@ export interface Point { x: number; y: number }
 export interface GardenGroup { id: string; name: string; notes: string }
 export interface GardenObject { id: string; kind: Kind; name: string; species: string; groupId: string | null; notes: string; diameterM: number; placements: Partial<Record<Mode, Point>> }
 export interface Region { id: string; name: string; ground: Ground; points: Point[] }
-export interface MapLayout { boundary: Point[]; ground: Ground; regions: Region[] }
-export interface Garden { version: 4; name: string; width: number; height: number; groups: GardenGroup[]; objects: GardenObject[]; layouts: Record<Mode, MapLayout> }
+export type LineKind = 'path' | 'fence';
+export interface LineFeature { id:string; kind:LineKind; name:string; points:Point[]; widthM:number }
+export interface MapLayout { boundary: Point[]; ground: Ground; regions: Region[]; lines: LineFeature[] }
+export interface Garden { version: 5; name: string; width: number; height: number; groups: GardenGroup[]; objects: GardenObject[]; layouts: Record<Mode, MapLayout> }
 export const WORLD = { width: 40, height: 26, pixelsPerUnit: 20 } as const;
 export const GROUNDS: { value: Ground; label: string }[] = [
   {value:'grass',label:'Grass'}, {value:'soil',label:'Soil'}, {value:'gravel',label:'Gravel'}, {value:'stone',label:'Stone'}, {value:'water',label:'Water'}
@@ -28,12 +30,12 @@ export function clampPoint(p:Point, g:Pick<Garden,'width'|'height'> = WORLD):Poi
 }
 export function defaultLayouts(width=40,height=26):Record<Mode,MapLayout> {
   const boundary=()=>[{x:1,y:1},{x:width-1,y:1},{x:width-1,y:height-1},{x:1,y:height-1}];
-  return { scale:{boundary:boundary(),ground:'grass',regions:[]}, illustration:{boundary:boundary(),ground:'grass',regions:[]} };
+  return { scale:{boundary:boundary(),ground:'grass',regions:[],lines:[]}, illustration:{boundary:boundary(),ground:'grass',regions:[],lines:[]} };
 }
-export function emptyGarden():Garden {return {version:4,name:'My Garden',width:40,height:26,groups:[],objects:[],layouts:defaultLayouts()};}
+export function emptyGarden():Garden {return {version:5,name:'My Garden',width:40,height:26,groups:[],objects:[],layouts:defaultLayouts()};}
 export function demoGarden():Garden {
   return {
-    version:4,name:'Sample Garden',width:40,height:26,layouts:defaultLayouts(),
+    version:5,name:'Sample Garden',width:40,height:26,layouts:defaultLayouts(),
     groups:[
       {id:'GROUP-001',name:'Back garden',notes:'An example garden zone.'},
       {id:'GROUP-002',name:'Orchard',notes:''},
@@ -82,7 +84,7 @@ export function validPolygon(v:unknown,g:Pick<Garden,'width'|'height'>,maxPoints
 }
 export function validBoundary(v:unknown,g:Pick<Garden,'width'|'height'>=WORLD):v is Point[]{return validPolygon(v,g,100);}
 export function isGarden(value:unknown):value is Garden {
-  if(!isObj(value)||value.version!==4||!isText(value.name)||!validSize(value.width)||!validSize(value.height))return false;
+  if(!isObj(value)||value.version!==5||!isText(value.name)||!validSize(value.width)||!validSize(value.height))return false;
   const g=value as unknown as Garden;
   if(!Array.isArray(g.groups)||g.groups.length>1000||!Array.isArray(g.objects)||g.objects.length>3000||!isObj(g.layouts))return false;
   const groupIds=new Set<string>(),objectIds=new Set<string>();
@@ -94,9 +96,14 @@ export function isGarden(value:unknown):value is Garden {
   }
   for(const mode of ['scale','illustration'] as const){
     const layout=g.layouts[mode];
-    if(!isObj(layout)||!GROUNDS.some(gr=>gr.value===layout.ground)||!validPolygon(layout.boundary,g)||!Array.isArray(layout.regions)||layout.regions.length>200)return false;
+    if(!isObj(layout)||!GROUNDS.some(gr=>gr.value===layout.ground)||!validPolygon(layout.boundary,g)||!Array.isArray(layout.regions)||layout.regions.length>200||!Array.isArray(layout.lines)||layout.lines.length>200)return false;
     const ids=new Set<string>();
     for(const rg of layout.regions){if(!isObj(rg)||!isText(rg.id,80)||!rg.id||ids.has(rg.id)||!isText(rg.name,120)||!GROUNDS.some(ground=>ground.value===rg.ground)||!validPolygon(rg.points,g))return false;ids.add(rg.id);}
+    for(const line of layout.lines){
+      if(!isObj(line)||!isText(line.id,80)||!line.id||ids.has(line.id)||!isText(line.name,120)||!(line.kind==='path'||line.kind==='fence')||!Number.isFinite(line.widthM)||line.widthM<.2||line.widthM>12||!Array.isArray(line.points)||line.points.length<2||line.points.length>100||!line.points.every(p=>isPoint(p,g)))return false;
+      if(!line.points.some((p,i)=>i&&Math.hypot(p.x-line.points[0].x,p.y-line.points[0].y)>.1))return false;
+      ids.add(line.id);
+    }
   }
   return true;
 }
@@ -105,6 +112,14 @@ export function parseGarden(value:unknown):Garden|null {
   if(isGarden(value))return value;
   if(!isObj(value)||!isText(value.name)||!Array.isArray(value.objects))return null;
   const v=value.version;
+  if(v===4){
+    const old=value as Record<string,unknown>,layouts=old.layouts as Record<Mode,MapLayout>;
+    if(!isObj(layouts)||!isObj(layouts.scale)||!isObj(layouts.illustration))return null;
+    const upgraded={...old,version:5,layouts:{
+      scale:{...layouts.scale,lines:[]},illustration:{...layouts.illustration,lines:[]}
+    }};
+    return isGarden(upgraded)?upgraded:null;
+  }
   if(v!==1&&v!==2&&v!==3)return null;
   const groups:GardenGroup[]=[];
   let objects:GardenObject[]=[];
@@ -126,9 +141,9 @@ export function parseGarden(value:unknown):Garden|null {
   const defaults=defaultLayouts();
   const layouts:Record<Mode,MapLayout>={scale:defaults.scale,illustration:defaults.illustration};
   if(v===3){if(!isObj(oldLayouts))return null;
-    for(const mode of ['scale','illustration'] as const){const l=oldLayouts[mode];if(!isObj(l))return null;layouts[mode]={boundary:l.boundary as Point[],ground:l.ground as Ground,regions:[]};}
+    for(const mode of ['scale','illustration'] as const){const l=oldLayouts[mode];if(!isObj(l))return null;layouts[mode]={boundary:l.boundary as Point[],ground:l.ground as Ground,regions:[],lines:[]};}
   }
-  const upgraded:Garden={version:4,name:value.name,width:40,height:26,groups,objects,layouts};
+  const upgraded:Garden={version:5,name:value.name,width:40,height:26,groups,objects,layouts};
   return isGarden(upgraded)?upgraded:null;
 }
 export function movePlaced(g:Garden,id:string,mode:Mode,requested:Point,together:boolean):Garden {
@@ -145,6 +160,12 @@ export function movePlaced(g:Garden,id:string,mode:Mode,requested:Point,together
 }
 export function nextGroupId(g:Garden):string {let n=1;const existing=new Set(g.groups.map(x=>x.id));while(existing.has('GROUP-'+String(n).padStart(3,'0')))n++;return 'GROUP-'+String(n).padStart(3,'0');}
 export function nextObjectId(g:Garden,kind:Kind):string {let n=1,prefix=kind.toUpperCase()+'-';const ids=new Set(g.objects.map(o=>o.id));while(ids.has(prefix+String(n).padStart(3,'0')))n++;return prefix+String(n).padStart(3,'0');}
+export function nextLineId(g:Garden,mode:Mode):string {let n=1;const ids=new Set(g.layouts[mode].lines.map(o=>o.id));while(ids.has('LINE-'+String(n).padStart(3,'0')))n++;return 'LINE-'+String(n).padStart(3,'0');}
+export function addLine(g:Garden,mode:Mode,points:Point[],kind:LineKind,widthM:number):Garden|null {
+  if(g.layouts[mode].lines.length>=200||points.length<2||points.length>100||!points.every(p=>isPoint(p,g))||!points.some((p,i)=>i&&Math.hypot(p.x-points[0].x,p.y-points[0].y)>.1)||!Number.isFinite(widthM)||widthM<.2||widthM>12)return null;
+  const line:LineFeature={id:nextLineId(g,mode),kind,name:kind==='path'?'Garden path':'Fence',points,widthM};
+  return {...g,layouts:{...g.layouts,[mode]:{...g.layouts[mode],lines:[...g.layouts[mode].lines,line]}}};
+}
 export function nextRegionId(g:Garden,mode:Mode):string {let n=1;const ids=new Set(g.layouts[mode].regions.map(o=>o.id));while(ids.has('REGION-'+String(n).padStart(3,'0')))n++;return 'REGION-'+String(n).padStart(3,'0');}
 export function removeGroup(g:Garden,id:string):Garden{return {...g,groups:g.groups.filter(x=>x.id!==id),objects:g.objects.map(x=>x.groupId===id?{...x,groupId:null}:x)};}
 export function setBoundary(g:Garden,mode:Mode,points:Point[]):Garden|null {if(!validPolygon(points,g))return null;return {...g,layouts:{...g.layouts,[mode]:{...g.layouts[mode],boundary:points}}};}
@@ -180,7 +201,7 @@ export function resizeGarden(g:Garden,width:number,height:number):Garden|null {
   const fx=width/g.width,fy=height/g.height;
   const transform=(p:Point)=>({x:Number((p.x*fx).toFixed(5)),y:Number((p.y*fy).toFixed(5))});
   const layouts={...g.layouts};
-  for(const mode of ['scale','illustration'] as const){const l=g.layouts[mode];layouts[mode]={...l,boundary:l.boundary.map(transform),regions:l.regions.map(r=>({...r,points:r.points.map(transform)}))};}
+  for(const mode of ['scale','illustration'] as const){const l=g.layouts[mode];layouts[mode]={...l,boundary:l.boundary.map(transform),regions:l.regions.map(r=>({...r,points:r.points.map(transform)})),lines:l.lines.map(line=>({...line,points:line.points.map(transform)}))};}
   const updated:Garden={...g,width,height,layouts,objects:g.objects.map(o=>({...o,placements:Object.fromEntries(Object.entries(o.placements).map(([mode,p])=>[mode,transform(p!)]))}))};
   return isGarden(updated)?updated:null;
 }

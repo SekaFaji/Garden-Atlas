@@ -61,3 +61,9 @@
 - Kept a quick-add pixel object palette next to the mobile map so users can place trees without scrolling the full toolbox.
 - Added safe batch group assignment from a checkbox object list.
 - Added a local print-ready garden report showing both map layouts, group notes, specimen records, measurements and IDs; browser print provides Save as PDF.
+
+## P006 — Editable paths and fences
+- Added path and fence waypoint tools to both maps, with configurable width and saved line records.
+- Added feature management controls and printable report representation.
+- Upgraded garden files to schema v5 and automatically migrates P001–P004 gardens and v4 browser libraries without changing stable IDs.
+- Expanded model and migration tests to 27 checks.

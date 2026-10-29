@@ -3,17 +3,18 @@ import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent }
 import { Sprite } from './Sprite';
 import { closestEdge, formatArea } from './geometry';
 import { fitCamera, panCamera, pinchCamera, zoomCamera, type Camera } from './camera';
-import { clampPoint, polygonArea, simplifyStroke, validPolygon, WORLD, type Garden, type Ground, type Kind, type Mode, type Point } from './model';
+import { clampPoint, polygonArea, simplifyStroke, validPolygon, WORLD, type Garden, type Ground, type Kind, type Mode, type Point, type LineKind } from './model';
 
-export type Tool = 'select' | 'pan' | 'outline-edit' | 'outline-draw' | 'freehand' | 'terrain' | Kind;
+export type Tool = 'select' | 'pan' | 'outline-edit' | 'outline-draw' | 'freehand' | 'terrain' | LineKind | Kind;
 interface Props {
   garden: Garden; mode: Mode; tool: Tool; selectedId: string | null; selectedGroupId: string | null;
-  terrain: Ground; hidden: { objects: boolean; regions: boolean; boundary: boolean };
+  terrain: Ground; lineWidth: number; hidden: { objects: boolean; regions: boolean; boundary: boolean };
   onPick: (id: string|null) => void;
   onPlace: (kind:Kind,point:Point) => void;
   onMove: (id:string,point:Point,together:boolean) => void;
   onBoundary: (points:Point[]) => void;
   onTerrain: (points:Point[],ground:Ground) => void;
+  onLine: (points:Point[],kind:LineKind,widthM:number) => void;
   onNotice: (text:string) => void;
 }
 type PointerInfo={x:number;y:number};
@@ -30,7 +31,7 @@ const px=(p:Point)=>`${p.x*ppu},${p.y*ppu}`;
 const polygon=(pts:Point[])=>pts.map(px).join(' ');
 const midpoint=(a:PointerInfo,b:PointerInfo)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
 const distance=(a:PointerInfo,b:PointerInfo)=>Math.hypot(a.x-b.x,a.y-b.y);
-export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,hidden,onPick,onPlace,onMove,onBoundary,onTerrain,onNotice}:Props){
+export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,lineWidth,hidden,onPick,onPlace,onMove,onBoundary,onTerrain,onLine,onNotice}:Props){
   const svgRef=useRef<SVGSVGElement>(null);
   const pointsRef=useRef(new Map<number,PointerInfo>());
   const activeRef=useRef<Activity|null>(null);
@@ -64,6 +65,10 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,hid
   const inside=(p:Point)=>p.x>=0&&p.y>=0&&p.x<=garden.width&&p.y<=garden.height;
   const finishDraft=()=>{
     const clean=draft.length>1&&distance(draft[0],draft[draft.length-1])<.15?draft.slice(0,-1):draft;
+    if(tool==='path'||tool==='fence'){
+      if(clean.length<2){onNotice('Tap at least two points for a path or fence.');return;}
+      onLine(clean,tool,lineWidth);setDraft([]);return;
+    }
     if(!validPolygon(clean,garden)){onNotice('Shape must have 3+ non-crossing corners inside the workspace.');return;}
     if(tool==='outline-draw'){onBoundary(clean);onNotice('Property outline updated.');}
     if(tool==='terrain'){onTerrain(clean,terrain);onNotice('Terrain area added.');}
@@ -156,7 +161,7 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,hid
     if(a.kind==='pan')return;
     if(a.kind==='tap'&&Math.hypot(e.clientX-a.start.x,e.clientY-a.start.y)>12)return;
     if(!inside(p))return;
-    if(tool==='outline-draw'||tool==='terrain'){setDraft(d=>d.length<100?[...d,snap(p,mode)]:d);return;}
+    if(tool==='outline-draw'||tool==='terrain'||tool==='path'||tool==='fence'){setDraft(d=>d.length<100?[...d,snap(p,mode)]:d);return;}
     if(tool==='tree'||tool==='shrub'||tool==='flower'||tool==='bed'||tool==='house')onPlace(tool,snap(p,mode));
   };
   const cancelPointer=(e:ReactPointerEvent<SVGSVGElement>)=>{
@@ -189,6 +194,10 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,hid
         {Array.from({length:Math.floor(garden.height)+1},(_,i)=><line key={'y'+i} x1="0" x2={garden.width*ppu} y1={i*ppu} y2={i*ppu} stroke="#3f6950" strokeWidth={i%5===0?1.6:.7} opacity={i%5===0?.55:.3}/>)}
       </g>}
       {!hidden.regions&&layout.regions.map(reg=><polygon key={reg.id} points={shape(reg.points)} fill={color[reg.ground]} stroke="#3d634b" strokeWidth="2" opacity=".96"/>)}
+      {!hidden.regions&&layout.lines.map(line=><g key={line.id} pointerEvents="none">
+        <polyline points={shape(line.points)} stroke={line.kind==='fence'?'#4f3e31':'#6c614d'} strokeWidth={line.widthM*ppu+4} fill="none" strokeLinecap="square" strokeLinejoin="bevel" />
+        <polyline points={shape(line.points)} stroke={line.kind==='fence'?'#bc9564':'#c9c0a8'} strokeWidth={line.widthM*ppu} strokeDasharray={line.kind==='fence'?'9 10':undefined} fill="none" strokeLinecap="square" strokeLinejoin="bevel" />
+      </g>)}
       {!hidden.boundary&&<polygon points={shape(outline)} fill="none" stroke="#fff3c1" strokeWidth={Math.max(1.5,3/camera.z)} strokeDasharray={mode==='scale'?'10 6':undefined} pointerEvents="none" />}
       {!hidden.objects&&garden.objects.map(item=>{
         const original=item.placements[mode];if(!original)return null;
@@ -223,7 +232,7 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,hid
       <button onClick={()=>fit(true)} title="Show surrounding workspace">AREA</button>
     </div>
     <div className="viewport-status"><span>{mode==='scale'?formatArea(polygonArea(layout.boundary)):'ILLUSTRATION'}</span><span>ZOOM {Math.round(camera.z*100)}%</span></div>
-    {(tool==='outline-draw'||tool==='terrain')&&draft.length>0&&<div className="drawing-controls"><span>{draft.length} points</span><button onClick={finishDraft} disabled={draft.length<3}>✓ FINISH</button><button onClick={()=>setDraft([])}>✕ CLEAR</button></div>}
+    {(tool==='outline-draw'||tool==='terrain'||tool==='path'||tool==='fence')&&draft.length>0&&<div className="drawing-controls"><span>{draft.length} points</span><button onClick={finishDraft} disabled={draft.length<(tool==='path'||tool==='fence'?2:3)}>✓ FINISH</button><button onClick={()=>setDraft([])}>✕ CLEAR</button></div>}
     {pinching&&<div className="gesture-hint">PINCH TO ZOOM</div>}
   </div>;
 }

@@ -1,4 +1,4 @@
-import { demoGarden, isGarden, loadGarden, parseGarden, type Garden } from './model.ts';
+import { demoGarden, loadGarden, parseGarden, type Garden } from './model.ts';
 
 export interface GardenProject { id: string; garden: Garden; modifiedAt: string }
 export interface ProjectLibrary { version: 1; activeId: string; projects: GardenProject[] }
@@ -11,13 +11,15 @@ export function parseLibrary(value:unknown):ProjectLibrary|null {
   if(!value||typeof value!=='object')return null;
   const v=value as Partial<ProjectLibrary>;
   if(v.version!==1||!Array.isArray(v.projects)||v.projects.length<1||v.projects.length>20||typeof v.activeId!=='string')return null;
-  const seen=new Set<string>();
+  const seen=new Set<string>(),projects:GardenProject[]=[];
   for(const p of v.projects){
-    if(!p||typeof p.id!=='string'||!p.id||p.id.length>120||seen.has(p.id)||!isGarden(p.garden)||typeof p.modifiedAt!=='string'||Number.isNaN(Date.parse(p.modifiedAt)))return null;
-    seen.add(p.id);
+    if(!p||typeof p.id!=='string'||!p.id||p.id.length>120||seen.has(p.id)||typeof p.modifiedAt!=='string'||Number.isNaN(Date.parse(p.modifiedAt)))return null;
+    const garden=parseGarden(p.garden);
+    if(!garden)return null;
+    projects.push({...p,garden});seen.add(p.id);
   }
   if(!seen.has(v.activeId))return null;
-  return v as ProjectLibrary;
+  return {version:1,activeId:v.activeId,projects};
 }
 export function loadLibrary():ProjectLibrary {
   try {

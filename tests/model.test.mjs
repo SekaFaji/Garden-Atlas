@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  addBoundaryCorner, addRegion, clampPoint, demoGarden, emptyGarden, isGarden,
+  addBoundaryCorner, addRegion, addLine, nextLineId, clampPoint, demoGarden, emptyGarden, isGarden,
   moveBoundaryCorner, movePlaced, nextGroupId, nextObjectId, parseGarden, polygonArea,
   removeBoundaryCorner, removeGroup, resizeGarden, setBoundary, simplifyStroke, validPolygon
 } from '../src/model.ts';
@@ -17,11 +17,11 @@ const v3=()=>{const old=parseGarden(makeV1());return {version:3,name:old.name,ob
 function mockStorage(){const map=new Map();globalThis.localStorage={getItem:k=>map.get(k)??null,setItem:(k,v)=>map.set(k,v),removeItem:k=>map.delete(k)};return map;}
 
 test('demo and new empty garden are valid and distinct',()=>{
-  assert.ok(isGarden(demoGarden()));assert.equal(demoGarden().version,4);
+  assert.ok(isGarden(demoGarden()));assert.equal(demoGarden().version,5);
   assert.equal(emptyGarden().objects.length,0);assert.ok(isGarden(emptyGarden()));
 });
 test('migrate P001 without altering IDs, notes, both placements and distinct groups',()=>{
-  const g=parseGarden(makeV1());assert.ok(g);assert.equal(g.version,4);assert.equal(g.objects[0].id,'TREE-123');
+  const g=parseGarden(makeV1());assert.ok(g);assert.equal(g.version,5);assert.equal(g.objects[0].id,'TREE-123');
   assert.equal(g.objects[0].notes,'Keep this');assert.deepEqual(g.objects[0].placements,makeV1().objects[0].placements);
   assert.equal(g.objects[0].groupId,g.objects[1].groupId);assert.equal(g.groups.length,1);
 });
@@ -126,12 +126,12 @@ test('saved library restores and recovery survives corrupt primary',()=>{
 });
 test('first launch imports P003 locally without overwriting its original key',()=>{
   const store=mockStorage(),old=v3();store.set('garden-atlas:p003:v3',JSON.stringify(old));
-  const l=loadLibrary();assert.equal(l.projects[0].garden.version,4);
+  const l=loadLibrary();assert.equal(l.projects[0].garden.version,5);
   assert.deepEqual(l.projects[0].garden.objects[0].placements,old.objects[0].placements);
   assert.equal(store.get('garden-atlas:p003:v3'),JSON.stringify(old));delete globalThis.localStorage;
 });
 test('importGarden migrates legacy JSON while invalid library files are rejected',()=>{
-  assert.equal(importGarden(JSON.stringify(makeV1())).version,4);
+  assert.equal(importGarden(JSON.stringify(makeV1())).version,5);
   assert.equal(importGarden('{bad'),null);assert.equal(importLibrary('{bad'),null);
   assert.equal(importLibrary(JSON.stringify(newLibrary())).version,1);
 });
@@ -154,4 +154,37 @@ test('map camera fit and anchor-point zoom works on narrow mobile viewports',asy
   assert.equal(pinch.z,initial.z*2);
   assert.ok(pinch.cx<initial.cx);assert.ok(pinch.cy<initial.cy);
   assert.ok(p.x>0);
+});
+
+test('P004 garden backup upgrades to v5 and retains plots, terrain, groups and species',()=>{
+  const original=demoGarden(),region=addRegion(original,'scale',[{x:3,y:3},{x:7,y:3},{x:7,y:8},{x:3,y:8}],'soil');
+  const old={...region,version:4,layouts:{scale:{...region.layouts.scale,lines:undefined},illustration:{...region.layouts.illustration,lines:undefined}}};
+  const converted=parseGarden(old);assert.ok(converted);assert.equal(converted.version,5);
+  assert.deepEqual(converted.groups,old.groups);assert.deepEqual(converted.objects,old.objects);
+  assert.deepEqual(converted.layouts.scale.regions,old.layouts.scale.regions);
+  assert.equal(converted.layouts.scale.lines.length,0);
+});
+test('path and fence geometry survive saving and do not affect other layout',()=>{
+  const g=emptyGarden(),path=[{x:2,y:5},{x:8,y:5},{x:14,y:11}];
+  const withPath=addLine(g,'scale',path,'path',2.5);assert.ok(withPath);
+  const withFence=addLine(withPath,'scale',[{x:1,y:1},{x:1,y:12}],'fence',.4);assert.ok(withFence);
+  assert.equal(withFence.layouts.scale.lines.length,2);
+  assert.equal(withFence.layouts.illustration.lines.length,0);
+  assert.equal(nextLineId(withFence,'scale'),'LINE-003');
+  assert.ok(isGarden(withFence));
+  assert.deepEqual(parseGarden(JSON.parse(JSON.stringify(withFence))),withFence);
+});
+test('invalid paths are rejected and cannot corrupt the garden',()=>{
+  const g=emptyGarden();
+  assert.equal(addLine(g,'scale',[{x:1,y:1}],'path',1),null);
+  assert.equal(addLine(g,'scale',[{x:1,y:1},{x:1,y:1}],'fence',1),null);
+  assert.equal(addLine(g,'scale',[{x:1,y:1},{x:600,y:10}],'fence',1),null);
+  assert.equal(addLine(g,'scale',[{x:1,y:1},{x:12,y:10}],'path',13),null);
+  assert.equal(isGarden({...g,layouts:{...g.layouts,scale:{...g.layouts.scale,lines:[{id:'X',kind:'invalid',name:'A',widthM:1,points:[{x:1,y:1},{x:2,y:2}]}]}}}),false);
+});
+test('library of saved P004 projects migrates without discarding unrelated gardens',()=>{
+  const current=newLibrary(),extended=addProject(current,emptyGarden());
+  const old={...extended,projects:extended.projects.map(p=>({...p,garden:{...p.garden,version:4,layouts:{scale:{...p.garden.layouts.scale,lines:undefined},illustration:{...p.garden.layouts.illustration,lines:undefined}}}}))};
+  const loaded=parseLibrary(old);assert.ok(loaded);assert.equal(loaded.projects.length,2);
+  assert.equal(loaded.projects[1].garden.version,5);assert.equal(loaded.activeId,old.activeId);
 });

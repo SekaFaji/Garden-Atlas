@@ -1,6 +1,6 @@
 # Garden Atlas — Project status
 
-Current release: **P005 — Faster mobile placement, batch grouping and printable report**
+Current release: **P006 — Paths & fences with versioned data migration**
 
 ## Confirmed design
 - TypeScript / React / SVG, pixel-art UI hosted on GitHub Pages; works on desktop and phone.
@@ -21,9 +21,15 @@ Current release: **P005 — Faster mobile placement, batch grouping and printabl
 - Batch selection of multiple records in the object list and group assignment.
 - Printable HTML garden book with two vector maps, group list and full specimen inventory. PDF uses browser Print → Save as PDF (not an automatic PDF download).
 
+## P006 implemented
+- Interactive path and fence polylines on either map. Tap waypoints, finish, rename, adjust width or delete a feature.
+- Path/fence strokes render under garden objects and appear in printed garden reports.
+- Garden data format v5, safe imports from v1–v4, automatic migration of saved browser library entries.
+- 27 automated tests covering safety, migration, geometry and camera behavior.
+
 ## Not implemented yet
 - IndexedDB/media storage and photo attachments; real geospatial/altitude data.
-- Existing/Planned layers, on-map multi-select, fences with width, custom object symbols, plant encyclopedia and rich/automatic PDF exporting.
+- Existing/Planned layers, on-map multi-select, fence posts/segment editing, custom object symbols, plant encyclopedia and rich/automatic PDF exporting.
 - Full phone-device touch regression testing; release automation build alone cannot guarantee gesture quality.
 
 ## Testing

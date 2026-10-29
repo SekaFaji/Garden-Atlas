@@ -10,6 +10,7 @@ function ReportMap({garden,mode}:{garden:Garden;mode:Mode}){
     <rect width={garden.width*20} height={garden.height*20} fill="#e3e9d8"/>
     <polygon points={points(layout.boundary)} fill={palette[layout.ground]} stroke="#365a3a" strokeWidth="4"/>
     {layout.regions.map(reg=><polygon key={reg.id} points={points(reg.points)} fill={palette[reg.ground]} stroke="#667661" strokeWidth="2"/>)}
+    {layout.lines.map(line=><g key={line.id}><polyline points={points(line.points)} fill="none" stroke={line.kind==='path'?'#665a45':'#463325'} strokeWidth={line.widthM*20+3}/><polyline points={points(line.points)} fill="none" stroke={line.kind==='path'?'#d9ceb1':'#b99b74'} strokeWidth={line.widthM*20} strokeDasharray={line.kind==='fence'?'9 10':undefined}/></g>)}
     {garden.objects.map(item=>{
       const p=item.placements[mode];if(!p)return null;
       const d=Math.max(20,item.diameterM*20);
@@ -34,9 +35,11 @@ export function GardenReport({garden}:{garden:Garden}){
     <p>Workspace {garden.width} × {garden.height} metres. Scale boundary area: {formatArea(polygonArea(garden.layouts.scale.boundary))}. All measurements are approximate and not a legal land survey.</p>
     <h3>Measured garden map</h3><ReportMap garden={garden} mode="scale"/>
     <h3>Illustrated garden map</h3><ReportMap garden={garden} mode="illustration"/>
-    <h2>02 / Groups</h2>
+    <h2>02 / Paths & fences</h2>
+    {(['scale','illustration'] as const).map(mode=><section key={mode}><h3>{mode==='scale'?'Measured layout':'Illustrated layout'}</h3>{garden.layouts[mode].lines.length===0?<p>No paths or fences added.</p>:garden.layouts[mode].lines.map(line=><p key={line.id}>{line.name||line.kind} ({line.id}) · {line.kind} · {line.widthM.toFixed(1)} m wide</p>)}</section>)}
+    <h2>03 / Groups</h2>
     {garden.groups.length===0?<p>No groups added.</p>:garden.groups.map(g=><section key={g.id} className="report-group"><h3>{g.name} <small>{g.id}</small></h3><p>{g.notes||'No shared notes.'}</p><p>Specimens: {garden.objects.filter(o=>o.groupId===g.id).length}</p></section>)}
-    <h2>03 / Plant & feature inventory</h2>
+    <h2>04 / Plant & feature inventory</h2>
     {garden.objects.length===0?<p>No garden objects recorded yet.</p>:garden.objects.map(o=><section key={o.id} className="report-specimen">
       <div className="report-specimen-icon"><svg width="50" height="50" viewBox="0 0 64 64"><Sprite kind={o.kind}/></svg></div>
       <div><h3>{o.name||'Unnamed'} <small>{o.id}</small></h3>
