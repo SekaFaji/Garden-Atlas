@@ -1,6 +1,6 @@
 # Garden Atlas — Project status
 
-Current patch: **P009 — Advanced multi-selection and tracing-image reference**.
+Current patch: **P011 — Pixel-art preset catalog**.
 
 ## Source-of-truth decision
 - Scale and Illustration now display **the same** objects, coordinates, property boundary, ground regions, paths and fences.
@@ -57,3 +57,12 @@ Current patch: **P009 — Advanced multi-selection and tracing-image reference**
 - Reuse v6 data with optional validated fields, avoiding destructive conversion of existing gardens.
 - Reference image is a tracing aid only, not an authenticated survey or GPS georeference.
 - Remaining: direct reference image reposition gestures; photo galleries/IndexedDB; resizing handles, editable vertices on paths/fences/terrain, drawing layer lock/order and existing/planned garden variants.
+
+## P011 — Pixel-art preset catalog
+- Added 24 original vector-pixel object presets; category filtering and search in the mobile/desktop object toolbox.
+- Added three object categories: rocks, ponds and garden furniture, retaining all five original object categories and their old default artwork.
+- Preset placement and per-object appearance changes preserve ID, location, grouping, user-entered measurements and notes.
+- Optional `presetId` extends v6 garden JSON without changing the schema version or requiring save migration.
+- Both map modes and printable overview now render the selected preset artwork.
+- 39 automated model tests pass locally; CI production build and physical-device interactions still require verification.
+- Remaining priorities: user-customized sprite imports, higher-detail asset library, real/planned plans, planting/species encyclopedia, photos, maintenance history, IndexedDB storage and PWA offline support.

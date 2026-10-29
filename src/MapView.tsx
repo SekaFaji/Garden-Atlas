@@ -4,7 +4,7 @@ import { Sprite } from './Sprite';
 import { closestEdge, formatArea } from './geometry';
 import type { FeatureSelection, EditAction } from './featureEdit';
 import { fitCamera, panCamera, pinchCamera, zoomCamera, type Camera } from './camera';
-import { clampPoint, polygonArea, simplifyStroke, validPolygon, WORLD, type Garden, type Ground, type Kind, type Mode, type Point, type LineKind } from './model';
+import { clampPoint, polygonArea, simplifyStroke, validPolygon, WORLD, KINDS, type Garden, type Ground, type Kind, type Mode, type Point, type LineKind } from './model';
 
 export type Tool = 'select' | 'feature-edit' | 'pan' | 'outline-edit' | 'outline-draw' | 'freehand' | 'terrain' | LineKind | Kind;
 interface Props {
@@ -234,7 +234,7 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
     if(a.kind==='tap'&&Math.hypot(e.clientX-a.start.x,e.clientY-a.start.y)>12)return;
     if(!inside(p))return;
     if(tool==='outline-draw'||tool==='terrain'||tool==='path'||tool==='fence'){setDraft(d=>d.length<100?[...d,snap(p,mode,snapEnabled)]:d);return;}
-    if(tool==='tree'||tool==='shrub'||tool==='flower'||tool==='bed'||tool==='house')onPlace(tool,snap(p,mode,snapEnabled));
+    if(KINDS.some(k=>k.kind===tool))onPlace(tool as Kind,snap(p,mode,snapEnabled));
   };
   const cancelPointer=(e:ReactPointerEvent<SVGSVGElement>)=>{
     pointsRef.current.delete(e.pointerId);activeRef.current=null;pinchRef.current=null;setPreview(null);setCornerPreview(null);setFeaturePreview(null);setResizePreview(null);setPinching(false);
@@ -288,7 +288,7 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
         const hit=Math.max(diameter,48/Math.max(.06,camera.z));
         return <g data-object={item.id} key={item.id} className="map-object" transform={`translate(${p.x*ppu} ${p.y*ppu})`}>
           {active&&<rect x={-diameter/2-7} y={-diameter/2-7} width={diameter+14} height={diameter+14} fill="none" stroke="#fff3ac" strokeWidth="3" strokeDasharray="7 4" pointerEvents="none" />}
-          <svg x={-diameter/2} y={-diameter/2} width={diameter} height={diameter} viewBox="0 0 64 64" pointerEvents="none"><g transform={`rotate(${item.rotation??0} 32 32)`}><Sprite kind={item.kind}/></g></svg>
+          <svg x={-diameter/2} y={-diameter/2} width={diameter} height={diameter} viewBox="0 0 64 64" pointerEvents="none"><g transform={`rotate(${item.rotation??0} 32 32)`}><Sprite kind={item.kind} presetId={item.presetId}/></g></svg>
           <rect x={-hit/2} y={-hit/2} width={hit} height={hit} fill="transparent" />
           {tool==='select'&&!multiSelect&&selectedId===item.id&&!locked.objects&&<g>
             <line x1="0" y1="0" x2={diameter/2+12/camera.z} y2={diameter/2+12/camera.z} stroke="#fff3ac" strokeWidth={2/camera.z} pointerEvents="none"/>

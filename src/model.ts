@@ -1,14 +1,15 @@
 /** Garden Atlas P007. One source of truth for geometry; Scale/Illustration are render styles. */
+import { getPreset, defaultPreset } from './catalog.ts';
 import {
   parseGarden as parseLegacyGarden, isGarden as isLegacyGarden,
   type Garden as LegacyGarden,
 } from './legacy.ts';
 export type Mode = 'scale' | 'illustration';
-export type Kind = 'tree' | 'shrub' | 'flower' | 'bed' | 'house';
+export type Kind = 'tree' | 'shrub' | 'flower' | 'bed' | 'house' | 'rock' | 'pond' | 'furniture';
 export type Ground = 'grass' | 'soil' | 'gravel' | 'stone' | 'water';
 export interface Point { x:number; y:number }
 export interface GardenGroup { id:string; name:string; notes:string }
-export interface GardenObject { id:string; kind:Kind; name:string; species:string; groupId:string|null; notes:string; diameterM:number; position?:Point; rotation?:number }
+export interface GardenObject { id:string; kind:Kind; name:string; species:string; groupId:string|null; notes:string; diameterM:number; position?:Point; rotation?:number; presetId?:string }
 export interface Region { id:string; name:string; ground:Ground; points:Point[] }
 export type LineKind = 'path'|'fence';
 export interface LineFeature { id:string; kind:LineKind; name:string; points:Point[]; widthM:number }
@@ -29,6 +30,9 @@ export const KINDS:{kind:Kind;label:string;initialName:string;diameterM:number}[
  {kind:'flower',label:'Flowers',initialName:'Flower patch',diameterM:1.6},
  {kind:'bed',label:'Garden bed',initialName:'Garden bed',diameterM:4},
  {kind:'house',label:'Structure',initialName:'Structure',diameterM:5},
+ {kind:'rock',label:'Rocks',initialName:'Rock',diameterM:1.5},
+ {kind:'pond',label:'Ponds',initialName:'Garden pond',diameterM:4},
+ {kind:'furniture',label:'Furniture',initialName:'Garden furniture',diameterM:2},
 ];
 export const info=(kind:Kind)=>KINDS.find(x=>x.kind===kind)!;
 const validSize=(n:unknown)=>typeof n==='number'&&Number.isFinite(n)&&n>=10&&n<=500;
@@ -90,7 +94,7 @@ export function isGarden(value:unknown):value is Garden {
  const gids=new Set<string>(),oids=new Set<string>();
  for(const gr of g.groups){if(!isObj(gr)||!isText(gr.id,80)||!gr.id||gids.has(gr.id)||!isText(gr.name)||!gr.name.trim()||!isText(gr.notes))return false;gids.add(gr.id);}
  for(const o of g.objects){
-  if(!isObj(o)||!isText(o.id,80)||!o.id||oids.has(o.id)||!KINDS.some(k=>k.kind===o.kind)||!isText(o.name)||!isText(o.species)||!isText(o.notes)||!Number.isFinite(o.diameterM)||o.diameterM<.5||o.diameterM>100||!(o.groupId===null||typeof o.groupId==='string'&&gids.has(o.groupId))||!(o.position===undefined||isPoint(o.position,g))||!(o.rotation===undefined||typeof o.rotation==='number'&&Number.isFinite(o.rotation)&&o.rotation>=0&&o.rotation<360))return false;
+  if(!isObj(o)||!isText(o.id,80)||!o.id||oids.has(o.id)||!KINDS.some(k=>k.kind===o.kind)||!isText(o.name)||!isText(o.species)||!isText(o.notes)||!Number.isFinite(o.diameterM)||o.diameterM<.5||o.diameterM>100||!(o.groupId===null||typeof o.groupId==='string'&&gids.has(o.groupId))||!(o.presetId===undefined||typeof o.presetId==='string'&&getPreset(o.presetId)?.kind===o.kind)||!(o.position===undefined||isPoint(o.position,g))||!(o.rotation===undefined||typeof o.rotation==='number'&&Number.isFinite(o.rotation)&&o.rotation>=0&&o.rotation<360))return false;
   oids.add(o.id);
  }
  if(g.reference!==undefined&&!validReference(g.reference,g))return false;
@@ -184,6 +188,24 @@ export function setReferenceWidth(g:Garden,widthM:number):Garden|null {
  return isGarden(next)?next:null;
 }
 
+/** Create a shared record from an editable pixel-art preset; no identifying claim is made. */
+export function createPresetObject(g:Garden,presetId:string,position:Point):Garden|null {
+ const preset=getPreset(presetId);
+ if(!preset||g.objects.length>=3000)return null;
+ const obj:GardenObject={id:nextObjectId(g,preset.kind),kind:preset.kind,name:preset.name,
+   species:preset.species,groupId:null,notes:'',diameterM:preset.diameterM,
+   presetId:preset.id,position:clampPoint(position,g)};
+ const next={...g,objects:[...g.objects,obj]};
+ return isGarden(next)?next:null;
+}
+/** Update just the appearance preset, retaining record identity, notes and location. */
+export function changeObjectPreset(g:Garden,id:string,presetId:string):Garden|null {
+ const preset=getPreset(presetId),item=g.objects.find(o=>o.id===id);
+ if(!preset||!item||preset.kind!==item.kind)return null;
+ const next={...g,objects:g.objects.map(o=>o.id===id?{...o,presetId}:o)};
+ return isGarden(next)?next:null;
+}
+export function presetForKind(kind:Kind):string {return defaultPreset(kind).id;}
 export function nextGroupId(g:Garden):string {let n=1;const ids=new Set(g.groups.map(x=>x.id));while(ids.has('GROUP-'+String(n).padStart(3,'0')))n++;return 'GROUP-'+String(n).padStart(3,'0');}
 export function nextObjectId(g:Garden,kind:Kind):string {let n=1;const ids=new Set(g.objects.map(x=>x.id)),prefix=kind.toUpperCase()+'-';while(ids.has(prefix+String(n).padStart(3,'0')))n++;return prefix+String(n).padStart(3,'0');}
 export function nextLineId(g:Garden,_mode:Mode):string {let n=1;const ids=new Set(g.layout.lines.map(x=>x.id));while(ids.has('LINE-'+String(n).padStart(3,'0')))n++;return 'LINE-'+String(n).padStart(3,'0');}

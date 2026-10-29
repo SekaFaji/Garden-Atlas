@@ -1,3 +1,4 @@
+import { VariantSprite, hasVariantArt } from './VariantSprites';
 import type { Kind } from './model';
 
 type Block = [number, number, number, number];
@@ -6,7 +7,9 @@ const blocks = (color: string, rects: Block[]) => rects.map(([x, y, width, heigh
 ));
 
 /** Original 64x64 vector sprites built from square pixel blocks, without external images. */
-export function Sprite({ kind }: { kind: Kind }) {
+export function Sprite({ kind, presetId }: { kind: Kind; presetId?: string }) {
+  if(hasVariantArt(presetId))return <VariantSprite presetId={presetId}/>;
+  if(kind==='rock'||kind==='pond'||kind==='furniture')return <VariantSprite presetId={{rock:'rock-boulder',pond:'pond-small',furniture:'furniture-bench'}[kind]}/>;
   return <g shapeRendering="crispEdges">
     {kind === 'tree' && <>
       {blocks('#244e40', [[24,48,16,12],[20,40,24,12],[12,20,40,24],[20,12,24,40],[12,28,8,16],[44,28,8,16]])}

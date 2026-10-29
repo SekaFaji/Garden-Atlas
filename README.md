@@ -116,3 +116,11 @@ P001–P006 garden JSON is migrated without discarding specimen IDs, notes, grou
 ## License
 
 MIT. The pixel-block SVG art and sample data are original to this project.
+
+## P011 — Expanded pixel-art garden object library
+
+The **OBJECTS** panel contains a searchable **PIXEL-ART PRESETS** catalog. Filter by category or search for a name (e.g. pine, greenhouse, pond, bench). Choose a preset and tap the map to place multiple copies; the selected preset supplies an editable starting name, size and original pixel-art sprite. You can still move, resize, rotate, group and annotate the object normally. The top quick palette offers category shortcuts using each category's default preset.
+
+Currently there are **24 presets across eight categories**: trees, shrubs, flowers, beds, structures, rocks, ponds and furniture. In an existing object's Inspector, the **PIXEL-ART APPEARANCE** dropdown changes its sprite without changing the object's stable ID, name, species field, notes, diameter or position. Existing objects without a `presetId` keep their previous P010 art until you choose a variant.
+
+The `presetId` field is optional in the existing v6 Garden JSON schema; old P001–P010 JSON backups remain readable. Saved garden backups now include preset selections. The same sprite appears on both linked map styles and printable maps. These are **stylized visual presets**, not verified species identifications or exact-to-scale models. Custom user-uploaded sprite images, species profiles, care histories and photo galleries are not yet implemented.

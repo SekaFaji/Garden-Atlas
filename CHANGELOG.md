@@ -110,3 +110,12 @@
 - Reference photos are capped after compression and stored in localStorage; monitor the NOT SAVED indicator and download backups.
 - Tracing alignment is manual, not GPS calibrated; this is not a land survey.
 - No object rotation handles or on-map image-transform gestures yet; image sizing and offsets are edited numerically.
+
+## P011 — Original Pixel-Art Object Catalog
+- Added a searchable, category-filtered library of 24 reusable presets across eight object categories: trees, shrubs, flowers, beds, structures, rocks, ponds and furniture.
+- Added original 64×64 pixel-block SVG variants for conifers, flowering trees, fruit trees, hedges, flowers, raised beds, sheds, greenhouses, stones, ponds and garden furniture.
+- Extended the existing garden v6 records with an **optional** `presetId`; old objects without a preset remain valid and retain their original art.
+- Added reusable preset placement, names and starting diameters, plus a non-destructive appearance selector for existing objects.
+- Updated editor thumbnails, both linked map styles and printable maps to use the same selected sprite.
+- Added model tests covering catalog uniqueness, filtering, saved IDs, old backups, linked placement and bad preset rejection (39 tests in total).
+- These art presets are visual templates, not botanical identifications; no downloaded images, cloud accounts or external assets were added.
