@@ -56,3 +56,8 @@
 - Added boundary tracing, corner drag, arbitrary edge points, editable independent terrain regions, resizable canvas and a separate map camera.
 - Introduced a multi-garden browser library, backup-all/restore-all, safe legacy migrations and local recovery.
 - Added undo/redo, duplicate/repeat-place and mobile panel navigation; no fabricated survey or private sample data.
+
+## P005 — Mobile quick tools, batch grouping and printable garden book
+- Kept a quick-add pixel object palette next to the mobile map so users can place trees without scrolling the full toolbox.
+- Added safe batch group assignment from a checkbox object list.
+- Added a local print-ready garden report showing both map layouts, group notes, specimen records, measurements and IDs; browser print provides Save as PDF.

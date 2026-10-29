@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { MapView, type Tool } from './MapView';
 import { Sprite } from './Sprite';
+import { GardenReport } from './Report';
 import {
   GROUNDS, KINDS, addRegion, clampPoint, demoGarden, emptyGarden, info, isGarden,
   movePlaced, nextGroupId, nextObjectId, polygonArea, removeGroup, resizeGarden, setBoundary,
@@ -33,6 +34,7 @@ export default function App(){
   const [selectedPanel,setSelectedPanel]=useState<'tools'|'inspector'|'projects'>('tools');
   const [visibility,setVisibility]=useState<Visibility>({objects:false,regions:false,boundary:false});
   const [newGroupName,setNewGroupName]=useState('');
+  const [checkedIds,setCheckedIds]=useState<string[]>([]);
   const [dims,setDims]=useState({width:String(garden.width),height:String(garden.height)});
   const [notice,setNotice]=useState('Drag objects directly · pinch to zoom · pan on open ground.');
   const [saved,setSaved]=useState(true);
@@ -68,6 +70,12 @@ export default function App(){
   const move=(id:string,point:Point,together:boolean)=>applyGarden(movePlaced(garden,id,mode,point,together));
   const outline=(points:Point[])=>{const next=setBoundary(garden,mode,points);if(next)applyGarden(next);else setNotice('Invalid boundary. Previous outline kept.');};
   const addArea=(points:Point[],type:Ground)=>{const next=addRegion(garden,mode,points,type);if(next)applyGarden(next);else setNotice('Could not add this region.');};
+  const assignChecked=(groupId:string|null)=>{
+    if(!checkedIds.length){setNotice('Select some items in the object list first.');return;}
+    const ids=new Set(checkedIds);
+    applyGarden({...garden,objects:garden.objects.map(o=>ids.has(o.id)?{...o,groupId}:o)});
+    setCheckedIds([]);setNotice(`Assigned ${ids.size} selected item(s) to the group.`);
+  };
   const createGroup=()=>{
     const name=newGroupName.trim();if(!name)return;
     if(garden.groups.some(g=>g.name.toLowerCase()===name.toLowerCase())){setNotice('That group already exists.');return;}
@@ -122,12 +130,12 @@ export default function App(){
     }).catch(()=>setNotice('Could not read the file.'));
   };
   const setNewTool=(value:Tool)=>{setTool(value);if(value==='select'||value==='pan')setNotice(value==='select'?'Drag an object to move it, or drag empty ground to pan.':'Pan around the map; pinch with two fingers to zoom.');};
-  return <div className="app-shell">
+  return <><div className="app-shell">
     <header className="topbar">
-      <div className="brand"><span className="brand-icon">✿</span><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL LANDSCAPE EDITOR · P004</div></div></div>
+      <div className="brand"><span className="brand-icon">✿</span><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL LANDSCAPE EDITOR · P005</div></div></div>
       <div className="top-actions"><span className={`save-status ${saved?'':'danger'}`}>● {saved?'LOCAL SAVE':'NOT SAVED'}</span>
         <button className="btn btn-muted" onClick={()=>importFile.current?.click()}>IMPORT</button>
-        <button className="btn btn-highlight" onClick={()=>download(`garden-atlas-${slug(garden.name)}-${date()}.json`,JSON.stringify(garden,null,2))}>↓ BACKUP</button>
+        <button className="btn btn-highlight" onClick={()=>download(`garden-atlas-${slug(garden.name)}-${date()}.json`,JSON.stringify(garden,null,2))}>↓ BACKUP</button><button className="btn btn-muted" onClick={()=>window.print()} title="Open your browser print dialog to save the garden book as a PDF">☷ PDF / PRINT</button>
         <input hidden ref={importFile} type="file" accept=".json,application/json" onChange={e=>onImport(e,false)}/>
         <input hidden ref={importAllFile} type="file" accept=".json,application/json" onChange={e=>onImport(e,true)}/>
       </div>
@@ -138,9 +146,10 @@ export default function App(){
         <p className="panel-hint">Choose an item, then tap repeatedly to place. Switch to SELECT to drag it.</p>
         <div className="palette-grid">{KINDS.map((k,i)=><button key={k.kind} className={`palette-item ${tool===k.kind?'active':''}`} onClick={()=>setNewTool(k.kind)}><Icon kind={k.kind}/><span>{k.label}</span><small>{ICONS[i]}</small></button>)}</div>
         <div className="section-heading list-heading">02 / GARDEN ITEMS <span className="pill">{garden.objects.length}</span></div>
-        <div className="item-list">{garden.objects.map(o=><button key={o.id} className={`object-entry ${selectedId===o.id?'active':''}`} onClick={()=>{select(o.id);setNewTool('select');}}><Icon kind={o.kind} size={28}/><span>{o.name}<small>{o.id} {o.placements[mode]?'●':'○'}</small></span></button>)}</div>
+        <div className="item-list">{garden.objects.map(o=><div key={o.id} className="object-row"><button className={`object-entry ${selectedId===o.id?'active':''}`} onClick={()=>{select(o.id);setNewTool('select');}}><Icon kind={o.kind} size={28}/><span>{o.name}<small>{o.id} {o.placements[mode]?'●':'○'}</small></span></button><label title={`Select ${o.name} for grouping`} className="batch-check"><input type="checkbox" aria-label={`Batch-select ${o.name}`} checked={checkedIds.includes(o.id)} onChange={e=>setCheckedIds(ids=>e.target.checked?[...ids,o.id]:ids.filter(x=>x!==o.id))}/></label></div>)}</div>
         <div className="section-heading list-heading">03 / GROUPS <span className="pill">{garden.groups.length}</span></div>
         <div className="group-create"><input aria-label="New group name" value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} maxLength={120} placeholder="Group name" onKeyDown={e=>{if(e.key==='Enter')createGroup();}}/><button className="btn btn-highlight" onClick={createGroup}>+</button></div>
+        {checkedIds.length>0&&<div className="batch-actions"><span>{checkedIds.length} selected</span><select aria-label="Assign selected items to group" defaultValue="choose" onChange={e=>{if(e.target.value!=='choose')assignChecked(e.target.value==='none'?null:e.target.value);}}><option value="choose">ASSIGN TO...</option><option value="none">UNGROUP</option>{garden.groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select><button className="btn btn-muted" onClick={()=>setCheckedIds([])}>CLEAR</button></div>}
         <div className="group-list">{garden.groups.map(group=><button className={`group-entry ${selectedGroupId===group.id?'active':''}`} key={group.id} onClick={()=>selectGroup(group.id)}><span>▦</span><span>{group.name}<small>{garden.objects.filter(o=>o.groupId===group.id).length} members</small></span></button>)}</div>
         <div className="section-heading list-heading">04 / LAYERS</div>
         <div className="layer-list">{([{key:'objects',label:'Plants & structures'},{key:'regions',label:'Terrain regions'},{key:'boundary',label:'Property outline'}] as const).map(x=><label key={x.key}><input type="checkbox" checked={!visibility[x.key]} onChange={e=>setVisibility(v=>({...v,[x.key]:!e.target.checked}))}/>{x.label}</label>)}</div>
@@ -156,6 +165,7 @@ export default function App(){
             {([{id:'select',label:'↖ SELECT'},{id:'pan',label:'✋ PAN'},{id:'outline-edit',label:'◇ EDIT BORDER'},{id:'outline-draw',label:'✎ DRAW BORDER'},{id:'freehand',label:'〰 FREEHAND'},{id:'terrain',label:'▧ TERRAIN'}] as {id:Tool;label:string}[]).map(x=><button key={x.id} className={tool===x.id?'active':''} onClick={()=>setNewTool(x.id)}>{x.label}</button>)}
           </div>
           {tool==='terrain'&&<div className="terrain-chooser"><span>NEW REGION</span><select aria-label="Terrain brush" value={ground} onChange={e=>setGround(e.target.value as Ground)}>{GROUNDS.map(g=><option key={g.value} value={g.value}>{g.label}</option>)}</select></div>}
+          <div className="quick-palette" aria-label="Quick add garden objects">{KINDS.map(k=><button key={k.kind} className={tool===k.kind?'active':''} onClick={()=>setNewTool(k.kind)} title={`Place ${k.label}`}><Icon kind={k.kind} size={29}/><span>{k.label}</span></button>)}<button className={tool==='select'?'active':''} onClick={()=>setNewTool('select')} title="Select and drag">↖<span>Move</span></button></div>
           <MapView garden={garden} mode={mode} tool={tool} terrain={ground} selectedId={selectedId} selectedGroupId={selectedGroupId} hidden={visibility}
             onPick={select} onPlace={place} onMove={move} onBoundary={outline} onTerrain={addArea} onNotice={setNotice}/>
           <div className="map-bottom"><span>{tool==='select'?'DRAG ITEMS · PAN EMPTY SPACE · PINCH TO ZOOM':tool==='pan'?'DRAG MAP · PINCH TO ZOOM':tool==='outline-edit'?'DRAG CORNERS · TAP EDGE MIDPOINTS TO INSERT':tool==='outline-draw'?'TAP CORNERS · FINISH TO CLOSE OUTLINE':tool==='freehand'?'DRAW A CLOSED BORDER WITH ONE FINGER':tool==='terrain'?'TAP AREA CORNERS · FINISH TO ADD TERRAIN':`TAP TO PLACE ${tool.toUpperCase()}`}</span><div className="history"><button disabled={!past.length} onClick={undo}>↶ UNDO</button><button disabled={!future.length} onClick={redo}>↷ REDO</button></div></div>
@@ -201,6 +211,6 @@ export default function App(){
       </aside>
     </main>
     <nav className="mobile-nav" aria-label="Editor panels"><button className={selectedPanel==='tools'?'active':''} onClick={()=>setSelectedPanel('tools')}>♣ OBJECTS</button><button className={selectedPanel==='inspector'?'active':''} onClick={()=>setSelectedPanel('inspector')}>✎ DETAILS</button><button className={selectedPanel==='projects'?'active':''} onClick={()=>setSelectedPanel('projects')}>▧ GARDENS</button></nav>
-    <footer className="footer">GARDEN ATLAS · P004 TOUCH-FIRST EDITOR <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
-  </div>;
+    <footer className="footer">GARDEN ATLAS · P005 GARDEN REPORT <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
+  </div><GardenReport garden={garden}/></>;
 }

@@ -6,7 +6,7 @@
 
 Garden Atlas lets people illustrate their garden, maintain shared records for plants and structures, and create a separate dimensioned Scale map. The included example contains **synthetic data only**—not a real address or parcel plan.
 
-## P004 — Editor interaction and workspace overhaul
+## P004–P005 — Touch editor, garden reports and faster object placement
 
 ### Mobile-first map
 - **Drag an item directly** using one finger or mouse. The item follows your finger; coordinates are committed once on release.
@@ -25,8 +25,10 @@ Garden Atlas lets people illustrate their garden, maintain shared records for pl
 - **TERRAIN:** draw independent, fillable polygons using grass, soil, gravel, stone or water. These are 2D visual regions, not elevation contours or terrain simulation.
 - Show/hide object, boundary and terrain layers. The two maps can have independent placements, boundaries and terrain regions.
 
-### Faster editing and multiple gardens
-- Place many objects without reselecting the toolbox item; duplicate an existing record for fast reuse.
+### Faster editing, garden reports and multiple gardens
+- Place many objects without reselecting the toolbox item; duplicate an existing record for fast reuse. A mobile quick-palette stays directly above the map.
+- Select several objects in the object list and assign them to a group in one action.
+- **PDF / PRINT** opens the browser print dialog for a detailed garden book with both garden maps, group descriptions, and all specimen records. Choose **Save as PDF** in your browser to generate a PDF locally; this is not a separate binary PDF download service.
 - Move grouped objects together by selecting the group and dragging a member.
 - Keep **up to 20 garden projects** in this browser, and switch between them.
 - Automatic browser-local saving, periodic previous-save recovery, JSON export/import of a garden **as a new project**, plus whole-library JSON backup/restore.
@@ -38,14 +40,15 @@ Garden Atlas lets people illustrate their garden, maintain shared records for pl
 2. Drag an object; drag empty space to navigate. Pinch the map or use **AREA** to see beyond your property's outline.
 3. Select **EDIT BORDER**, and drag corners or touch a border edge to add a corner; for a completely new border use **DRAW BORDER** or **FREEHAND**.
 4. Use **TERRAIN**, select a ground type, then draw the corners of a region and press **FINISH**.
-5. Go to **DETAILS** to rename the selected tree, set species and notes, duplicate it or change map dimensions.
-6. Export regular **BACKUP** files from the top bar, or go to GARDENS to export **all** projects.
+5. Go to **DETAILS** to rename the selected tree, set species and notes, duplicate it or change map dimensions. Use the quick palette above the map for rapid planting.
+6. Use the top bar **PDF / PRINT** button, then select **Save as PDF** in the browser print dialog.
+7. Export regular **BACKUP** files from the top bar, or go to GARDENS to export **all** projects.
 
 ### Important limitations
 
 - The library is stored in **browser `localStorage`**. It has no cloud backend or cross-device synchronization. Clearing site data may delete it; backups are essential. The app warns when saving fails.
 - Project import **adds** a garden; whole-library import requires confirmation because it replaces the local library.
-- PDF book export, plant photo attachments/encyclopedia, real elevation, freehand paths with width, fence components, planned-vs-existing scenarios and richer multi-select/group tools are **not yet implemented**.
+- Advanced paginated PDF layout and automated PDF download, plant photo attachments/encyclopedia, real elevation, freehand paths with width, fence components, planned-vs-existing scenarios and richer multi-select/group tools are **not yet implemented**.
 - Undo history is scoped to the open garden editing session, not saved after a browser reload.
 - Neither map should be used as a legally accurate land survey without additional calibration and authoritative measurements.
 

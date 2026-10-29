@@ -1,6 +1,6 @@
 # Garden Atlas — Project status
 
-Current release: **P004 — Touch-first editor and workspace overhaul**
+Current release: **P005 — Faster mobile placement, batch grouping and printable report**
 
 ## Confirmed design
 - TypeScript / React / SVG, pixel-art UI hosted on GitHub Pages; works on desktop and phone.
@@ -16,9 +16,14 @@ Current release: **P004 — Touch-first editor and workspace overhaul**
 - Up to 20 saved local garden projects, JSON garden or library import/export and a recovery snapshot.
 - V1/V2/V3 garden migration; preserves old browser keys.
 
+## P005 implemented
+- Quick sprite palette adjacent to the map for mobile placing and selection.
+- Batch selection of multiple records in the object list and group assignment.
+- Printable HTML garden book with two vector maps, group list and full specimen inventory. PDF uses browser Print → Save as PDF (not an automatic PDF download).
+
 ## Not implemented yet
 - IndexedDB/media storage and photo attachments; real geospatial/altitude data.
-- Existing/Planned layers, multi-select, fences with width, custom object symbols, plant encyclopedia and PDF garden book.
+- Existing/Planned layers, on-map multi-select, fences with width, custom object symbols, plant encyclopedia and rich/automatic PDF exporting.
 - Full phone-device touch regression testing; release automation build alone cannot guarantee gesture quality.
 
 ## Testing
