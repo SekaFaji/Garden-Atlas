@@ -2,13 +2,20 @@ import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react';
 import { Sprite } from './Sprite';
 import { closestEdge, formatArea } from './geometry';
+import type { FeatureSelection, EditAction } from './featureEdit';
 import { fitCamera, panCamera, pinchCamera, zoomCamera, type Camera } from './camera';
 import { clampPoint, polygonArea, simplifyStroke, validPolygon, WORLD, type Garden, type Ground, type Kind, type Mode, type Point, type LineKind } from './model';
 
-export type Tool = 'select' | 'pan' | 'outline-edit' | 'outline-draw' | 'freehand' | 'terrain' | LineKind | Kind;
+export type Tool = 'select' | 'feature-edit' | 'pan' | 'outline-edit' | 'outline-draw' | 'freehand' | 'terrain' | LineKind | Kind;
 interface Props {
   garden: Garden; mode: Mode; tool: Tool; selectedId: string | null; selectedGroupId: string | null; selectedIds: readonly string[]; multiSelect:boolean; snapEnabled:boolean; showReference:boolean;
-  terrain: Ground; lineWidth: number; hidden: { objects: boolean; regions: boolean; boundary: boolean };
+  terrain: Ground; lineWidth: number; hidden: { objects: boolean; regions: boolean; boundary: boolean; lines: boolean };
+  locked: {objects:boolean;regions:boolean;lines:boolean;boundary:boolean};
+  selectedFeature: FeatureSelection|null;
+  onSelectFeature:(selected:FeatureSelection|null)=>void;
+  onSelectVertex:(index:number|null)=>void;
+  onEditFeature:(selected:FeatureSelection,index:number,action:EditAction,point?:Point)=>void;
+  onResizeObject:(id:string,diameterM:number)=>void;
   onPick: (id: string|null) => void;
   onTogglePick: (id:string)=>void;
   onMoveSelection: (anchorId:string,point:Point)=>void;
@@ -25,7 +32,9 @@ type Activity =
   | {kind:'object';id:string;start:Point;anchor:Point;together:boolean;moved:boolean;multiple:boolean}
   | {kind:'corner';index:number;point:Point;moved:boolean}
   | {kind:'freehand';points:Point[]}
-  | {kind:'tap';start:PointerInfo};
+  | {kind:'tap';start:PointerInfo}
+  | {kind:'feature-node';feature:FeatureSelection;index:number;point:Point;moved:boolean}
+  | {kind:'resize';id:string;origin:Point;diameter:number;moved:boolean};
 const ppu=WORLD.pixelsPerUnit;
 const color: Record<Ground,string>={grass:'#8ebc77',soil:'#a57c53',gravel:'#a8aca0',stone:'#bdb8a9',water:'#64a6bc'};
 const snap=(p:Point,mode:Mode,force=false):Point=>force?{x:Math.round(p.x*2)/2,y:Math.round(p.y*2)/2}:mode==='scale'?{x:Math.round(p.x*10)/10,y:Math.round(p.y*10)/10}:p;
@@ -33,7 +42,7 @@ const px=(p:Point)=>`${p.x*ppu},${p.y*ppu}`;
 const polygon=(pts:Point[])=>pts.map(px).join(' ');
 const midpoint=(a:PointerInfo,b:PointerInfo)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
 const distance=(a:PointerInfo,b:PointerInfo)=>Math.hypot(a.x-b.x,a.y-b.y);
-export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds,multiSelect,snapEnabled,showReference,terrain,lineWidth,hidden,onPick,onTogglePick,onMoveSelection,onPlace,onMove,onBoundary,onTerrain,onLine,onNotice}:Props){
+export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds,multiSelect,snapEnabled,showReference,terrain,lineWidth,hidden,locked,selectedFeature,onSelectFeature,onSelectVertex,onEditFeature,onResizeObject,onPick,onTogglePick,onMoveSelection,onPlace,onMove,onBoundary,onTerrain,onLine,onNotice}:Props){
   const svgRef=useRef<SVGSVGElement>(null);
   const pointsRef=useRef(new Map<number,PointerInfo>());
   const activeRef=useRef<Activity|null>(null);
@@ -43,6 +52,8 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
   const cameraRef=useRef(camera);cameraRef.current=camera;
   const [preview,setPreview]=useState<{id:string;point:Point;together:boolean;many?:readonly string[]}|null>(null);
   const [cornerPreview,setCornerPreview]=useState<{index:number;point:Point}|null>(null);
+  const [featurePreview,setFeaturePreview]=useState<{kind:FeatureSelection['kind'];id:string;index:number;point:Point}|null>(null);
+  const [resizePreview,setResizePreview]=useState<{id:string;diameter:number}|null>(null);
   const [draft,setDraft]=useState<Point[]>([]);
   const [pinching,setPinching]=useState(false);
   const initialFit=useRef(false);
@@ -64,7 +75,7 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
       if(size.width>2&&size.height>2)setCamera(fitCamera(garden,size,undefined,1.2));
     }
   },[garden.width,garden.height,size.width,size.height,garden]);
-  useEffect(()=>{setDraft([]);setPreview(null);setCornerPreview(null);activeRef.current=null;pointsRef.current.clear();pinchRef.current=null;},[mode,tool,garden.width,garden.height]);
+  useEffect(()=>{setDraft([]);setPreview(null);setCornerPreview(null);setFeaturePreview(null);setResizePreview(null);activeRef.current=null;pointsRef.current.clear();pinchRef.current=null;},[mode,tool,garden.width,garden.height]);
   const fit=(outer=false)=>{setCamera(fitCamera(garden,size,outer?undefined:garden.layout.boundary,outer?1.75:1.17));};
   const zoomAt=(factor:number,x:number,y:number)=>{
     setCamera(zoomCamera(cameraRef.current,size,factor,x,y));
@@ -100,16 +111,42 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
     const start=pointFromEvent(e);if(!start)return;
     const target=e.target as Element;
     const hit=target.closest('[data-object]') as SVGElement|null;
+    const resizeHit=target.closest('[data-resize]') as SVGElement|null;
+    const featureHit=target.closest('[data-feature-id]') as SVGElement|null;
+    const featureNode=target.closest('[data-feature-node]') as SVGElement|null;
+    const featureEdge=target.closest('[data-feature-edge]') as SVGElement|null;
+    if(tool==='select'&&resizeHit&&!locked.objects){
+      const obj=garden.objects.find(o=>o.id===resizeHit.dataset.resize);
+      if(obj?.position){activeRef.current={kind:'resize',id:obj.id,origin:obj.position,diameter:obj.diameterM,moved:false};return;}
+    }
+    if(tool==='feature-edit'&&featureHit){
+      const feature={kind:featureHit.dataset.featureKind as FeatureSelection['kind'],id:featureHit.dataset.featureId!};
+      if(locked[feature.kind==='region'?'regions':'lines'])return;
+      onSelectFeature(feature);
+      if(!featureNode)onSelectVertex(null);
+      if(featureNode){const index=Number(featureNode.dataset.featureNode);onSelectVertex(index);activeRef.current={kind:'feature-node',feature,index,point:start,moved:false};return;}
+      if(featureEdge){
+        const index=Number(featureEdge.dataset.featureEdge);
+        const f=feature.kind==='region'?garden.layout.regions.find(r=>r.id===feature.id):garden.layout.lines.find(l=>l.id===feature.id);
+        if(f){const a=f.points[index],b=f.points[(index+1)%f.points.length];
+          if(a&&b){const dx=b.x-a.x,dy=b.y-a.y,len=dx*dx+dy*dy;
+            const t=len?Math.max(.05,Math.min(.95,((start.x-a.x)*dx+(start.y-a.y)*dy)/len)):.5;
+            onEditFeature(feature,index,'insert',clampPoint({x:a.x+t*dx,y:a.y+t*dy},garden));
+          }
+        }
+      }
+      activeRef.current={kind:'tap',start:{x:e.clientX,y:e.clientY}};return;
+    }
     const corner=target.closest('[data-corner]') as SVGElement|null;
     const edge=target.closest('[data-edge]') as SVGElement|null;
     if(tool==='freehand'){
       activeRef.current={kind:'freehand',points:[clampPoint(start,garden)]};setDraft([clampPoint(start,garden)]);return;
     }
-    if(tool==='outline-edit'&&corner){
+    if(tool==='outline-edit'&&!locked.boundary&&corner){
       const index=Number(corner.dataset.corner);
       activeRef.current={kind:'corner',index,point:start,moved:false};return;
     }
-    if(tool==='outline-edit'&&edge){
+    if(tool==='outline-edit'&&!locked.boundary&&edge){
       const index=Number(edge.dataset.edge);
       const b=garden.layout.boundary;
       const closest=closestEdge(b,start);
@@ -119,7 +156,7 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
       }
       activeRef.current={kind:'tap',start:{x:e.clientX,y:e.clientY}};return;
     }
-    if((tool==='select')&&hit&&!hidden.objects){
+    if((tool==='select')&&hit&&!hidden.objects&&!locked.objects){
       const id=hit.dataset.object!;
       const obj=garden.objects.find(o=>o.id===id);
       if(obj?.position){
@@ -129,7 +166,7 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
         activeRef.current={kind:'object',id,start:clampPoint(start,garden),anchor:obj.position!,together,multiple,moved:false};return;
       }
     }
-    if(tool==='pan'||tool==='select'||tool==='outline-edit')activeRef.current={kind:'pan',x:e.clientX,y:e.clientY,camera:cameraRef.current};
+    if(tool==='pan'||tool==='select'||tool==='outline-edit'||tool==='feature-edit')activeRef.current={kind:'pan',x:e.clientX,y:e.clientY,camera:cameraRef.current};
     else activeRef.current={kind:'tap',start:{x:e.clientX,y:e.clientY}};
   };
   const pointerMove=(e:ReactPointerEvent<SVGSVGElement>)=>{
@@ -148,6 +185,15 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
       if(a.moved)setPreview({id:a.id,point:clampPoint(snap({x:a.anchor.x+p.x-a.start.x,y:a.anchor.y+p.y-a.start.y},mode,snapEnabled),garden),together:a.together,many:a.multiple?selectedIds:undefined});
     }
     if(a.kind==='corner'&&p){a.moved=true;setCornerPreview({index:a.index,point:clampPoint(snap(p,mode,snapEnabled),garden)});}
+    if(a.kind==='feature-node'&&p){
+      if(Math.hypot(p.x-a.point.x,p.y-a.point.y)>.08)a.moved=true;
+      if(a.moved)setFeaturePreview({...a.feature,index:a.index,point:clampPoint(snap(p,mode,snapEnabled),garden)});
+    }
+    if(a.kind==='resize'&&p){
+      const diameter=Math.max(.5,Math.min(100,Math.max(Math.abs(p.x-a.origin.x),Math.abs(p.y-a.origin.y))*2));
+      if(Math.abs(diameter-a.diameter)>.06)a.moved=true;
+      if(a.moved)setResizePreview({id:a.id,diameter:snapEnabled?Math.round(diameter*2)/2:Math.round(diameter*20)/20});
+    }
     if(a.kind==='freehand'&&p){const next=clampPoint(p,garden),prev=a.points[a.points.length-1];if(Math.hypot(prev.x-next.x,prev.y-next.y)>.16){a.points.push(next);if(a.points.length%3===0)setDraft([...a.points]);}}
   };
   const pointerUp=(e:ReactPointerEvent<SVGSVGElement>)=>{
@@ -157,6 +203,15 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
     if(wasPinch){if(pointsRef.current.size<2){pinchRef.current=null;activeRef.current=null;setPinching(false);}return;}
     activeRef.current=null;
     if(!a||!p)return;
+    if(a.kind==='feature-node'){
+      if(a.moved)onEditFeature(a.feature,a.index,'move',clampPoint(snap(p,mode,snapEnabled),garden));
+      setFeaturePreview(null);return;
+    }
+    if(a.kind==='resize'){
+      if(a.moved){const d=Math.max(.5,Math.min(100,Math.max(Math.abs(p.x-a.origin.x),Math.abs(p.y-a.origin.y))*2));
+        onResizeObject(a.id,snapEnabled?Math.round(d*2)/2:Math.round(d*20)/20);}
+      setResizePreview(null);return;
+    }
     if(a.kind==='object'){
       if(a.moved){const final=clampPoint(snap({x:a.anchor.x+p.x-a.start.x,y:a.anchor.y+p.y-a.start.y},mode,snapEnabled),garden);
         if(a.multiple)onMoveSelection(a.id,final);
@@ -182,7 +237,7 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
     if(tool==='tree'||tool==='shrub'||tool==='flower'||tool==='bed'||tool==='house')onPlace(tool,snap(p,mode,snapEnabled));
   };
   const cancelPointer=(e:ReactPointerEvent<SVGSVGElement>)=>{
-    pointsRef.current.delete(e.pointerId);activeRef.current=null;pinchRef.current=null;setPreview(null);setCornerPreview(null);setPinching(false);
+    pointsRef.current.delete(e.pointerId);activeRef.current=null;pinchRef.current=null;setPreview(null);setCornerPreview(null);setFeaturePreview(null);setResizePreview(null);setPinching(false);
   };
   const wheel=(event:ReactWheelEvent<SVGSVGElement>)=>{
     event.preventDefault();const r=event.currentTarget.getBoundingClientRect();zoomAt(Math.exp(-event.deltaY*.0012),event.clientX-r.left,event.clientY-r.top);
@@ -193,6 +248,7 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
   const vw=size.width/camera.z,vh=size.height/camera.z;
   const shape=(pts:Point[])=>polygon(pts);
   const outline=layout.boundary.map((p,i)=>cornerPreview?.index===i?cornerPreview.point:p);
+  const previewPoints=(feature:FeatureSelection,points:Point[])=>points.map((p,i)=>featurePreview&&featurePreview.kind===feature.kind&&featurePreview.id===feature.id&&featurePreview.index===i?featurePreview.point:p);
   return <div className="atlas-viewport">
     <svg ref={svgRef} className="map-surface" role="application" aria-label={`Interactive ${mode} garden map; drag objects with one finger, pan on empty land, pinch to zoom.`}
       viewBox={`${camera.cx*ppu-vw/2} ${camera.cy*ppu-vh/2} ${vw} ${vh}`} preserveAspectRatio="none"
@@ -210,16 +266,16 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
         {Array.from({length:Math.floor(garden.width)+1},(_,i)=><line key={'x'+i} x1={i*ppu} x2={i*ppu} y1="0" y2={garden.height*ppu} stroke="#3f6950" strokeWidth={i%5===0?1.6:.7} opacity={i%5===0?.55:.3}/>)}
         {Array.from({length:Math.floor(garden.height)+1},(_,i)=><line key={'y'+i} x1="0" x2={garden.width*ppu} y1={i*ppu} y2={i*ppu} stroke="#3f6950" strokeWidth={i%5===0?1.6:.7} opacity={i%5===0?.55:.3}/>)}
       </g>}
-      {!hidden.regions&&layout.regions.map(reg=><polygon key={reg.id} points={shape(reg.points)} fill={color[reg.ground]} stroke="#3d634b" strokeWidth="2" opacity=".96"/>)}
+      {!hidden.regions&&layout.regions.map(reg=><polygon key={reg.id} points={shape(previewPoints({kind:'region',id:reg.id},reg.points))} fill={color[reg.ground]} stroke="#3d634b" strokeWidth="2" opacity=".96"/>)}
       {garden.reference&&showReference&&<image
         href={garden.reference.dataUrl}
         x={garden.reference.x*ppu} y={garden.reference.y*ppu}
         width={garden.reference.widthM*ppu} height={garden.reference.heightM*ppu}
         opacity={garden.reference.opacity} preserveAspectRatio="none"
         pointerEvents="none" aria-label="Imported tracing reference" />}
-      {!hidden.regions&&layout.lines.map(line=><g key={line.id} pointerEvents="none">
-        <polyline points={shape(line.points)} stroke={line.kind==='fence'?'#4f3e31':'#6c614d'} strokeWidth={line.widthM*ppu+4} fill="none" strokeLinecap="square" strokeLinejoin="bevel" />
-        <polyline points={shape(line.points)} stroke={line.kind==='fence'?'#bc9564':'#c9c0a8'} strokeWidth={line.widthM*ppu} strokeDasharray={line.kind==='fence'?'9 10':undefined} fill="none" strokeLinecap="square" strokeLinejoin="bevel" />
+      {!hidden.lines&&layout.lines.map(line=><g key={line.id} pointerEvents="none">
+        <polyline points={shape(previewPoints({kind:'line',id:line.id},line.points))} stroke={line.kind==='fence'?'#4f3e31':'#6c614d'} strokeWidth={line.widthM*ppu+4} fill="none" strokeLinecap="square" strokeLinejoin="bevel" />
+        <polyline points={shape(previewPoints({kind:'line',id:line.id},line.points))} stroke={line.kind==='fence'?'#bc9564':'#c9c0a8'} strokeWidth={line.widthM*ppu} strokeDasharray={line.kind==='fence'?'9 10':undefined} fill="none" strokeLinecap="square" strokeLinejoin="bevel" />
       </g>)}
       {!hidden.boundary&&<polygon points={shape(outline)} fill="none" stroke="#fff3c1" strokeWidth={Math.max(1.5,3/camera.z)} strokeDasharray={mode==='scale'?'10 6':undefined} pointerEvents="none" />}
       {!hidden.objects&&garden.objects.map(item=>{
@@ -228,12 +284,16 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
         const dragged=Boolean(preview&&(item.id===preview.id||groupIds.includes(item.id)));
         const offset=dragged?{x:dx,y:dy}:{x:0,y:0};
         const p={x:original.x+offset.x,y:original.y+offset.y};
-        const diameter=item.diameterM*ppu*(mode==='illustration'?1.08:1);
+        const diameter=(resizePreview?.id===item.id?resizePreview.diameter:item.diameterM)*ppu*(mode==='illustration'?1.08:1);
         const hit=Math.max(diameter,48/Math.max(.06,camera.z));
         return <g data-object={item.id} key={item.id} className="map-object" transform={`translate(${p.x*ppu} ${p.y*ppu})`}>
           {active&&<rect x={-diameter/2-7} y={-diameter/2-7} width={diameter+14} height={diameter+14} fill="none" stroke="#fff3ac" strokeWidth="3" strokeDasharray="7 4" pointerEvents="none" />}
           <svg x={-diameter/2} y={-diameter/2} width={diameter} height={diameter} viewBox="0 0 64 64" pointerEvents="none"><g transform={`rotate(${item.rotation??0} 32 32)`}><Sprite kind={item.kind}/></g></svg>
           <rect x={-hit/2} y={-hit/2} width={hit} height={hit} fill="transparent" />
+          {tool==='select'&&!multiSelect&&selectedId===item.id&&!locked.objects&&<g>
+            <line x1="0" y1="0" x2={diameter/2+12/camera.z} y2={diameter/2+12/camera.z} stroke="#fff3ac" strokeWidth={2/camera.z} pointerEvents="none"/>
+            <rect data-resize={item.id} x={diameter/2-10/camera.z} y={diameter/2-10/camera.z} width={Math.max(22,36/camera.z)} height={Math.max(22,36/camera.z)} fill="#f4df8e" stroke="#2a5442" strokeWidth={3/camera.z}/>
+          </g>}
           {active&&<g pointerEvents="none"><rect x={-55} y={diameter/2+6} width="110" height="20" fill="#1f382f" stroke="#f6dfa4" strokeWidth="1.5"/><text textAnchor="middle" x="0" y={diameter/2+20} fontSize="11" fontFamily="monospace" fill="#fff7d4">{item.name.slice(0,15)}</text></g>}
         </g>;
       })}
@@ -245,6 +305,28 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
           <rect data-corner={i} x={p.x*ppu-handle/2} y={p.y*ppu-handle/2} width={handle} height={handle} fill="#f9e5a7" stroke="#345a47" strokeWidth="3" />
         </g>;
       })}
+      {tool==='feature-edit'&&<g className="feature-overlay">
+        {!hidden.regions&&!locked.regions&&layout.regions.map(reg=><g key={reg.id} data-feature-kind="region" data-feature-id={reg.id}>
+          <polygon points={shape(previewPoints({kind:'region',id:reg.id},reg.points))} fill="transparent" stroke={selectedFeature?.id===reg.id?'#ffef92':'transparent'} strokeWidth={3/camera.z} />
+          {selectedFeature?.kind==='region'&&selectedFeature.id===reg.id&&<>
+            {reg.points.map((pt,i)=>{const next=reg.points[(i+1)%reg.points.length],p=featurePreview?.id===reg.id&&featurePreview.index===i?featurePreview.point:pt;
+              return <g key={i}><line data-feature-edge={i} x1={p.x*ppu} y1={p.y*ppu} x2={next.x*ppu} y2={next.y*ppu} stroke="transparent" strokeWidth={Math.max(16,28/camera.z)} />
+                <rect data-feature-node={i} x={p.x*ppu-13/camera.z} y={p.y*ppu-13/camera.z} width={26/camera.z} height={26/camera.z} fill="#f6e7a8" stroke="#315644" strokeWidth={2/camera.z}/></g>;
+            })}
+          </>}
+        </g>)}
+        {!hidden.lines&&!locked.lines&&layout.lines.map(line=><g key={line.id} data-feature-kind="line" data-feature-id={line.id}>
+          <polyline points={shape(previewPoints({kind:'line',id:line.id},line.points))} fill="none" stroke="transparent" strokeWidth={Math.max(20,Math.max(line.widthM*ppu,30/camera.z))} />
+          {selectedFeature?.kind==='line'&&selectedFeature.id===line.id&&<>
+            {line.points.map((pt,i)=>{const p=featurePreview?.id===line.id&&featurePreview.index===i?featurePreview.point:pt;
+              return <g key={i}>
+                {i<line.points.length-1&&<line data-feature-edge={i} x1={p.x*ppu} y1={p.y*ppu} x2={line.points[i+1].x*ppu} y2={line.points[i+1].y*ppu} stroke="transparent" strokeWidth={Math.max(22,32/camera.z)}/>}
+                <circle data-feature-node={i} cx={p.x*ppu} cy={p.y*ppu} r={Math.max(8,14/camera.z)} fill="#f6e7a8" stroke="#315644" strokeWidth={3/camera.z}/>
+              </g>;
+            })}
+          </>}
+        </g>)}
+      </g>}
       {draft.length>0&&<g pointerEvents="none"><polyline points={shape(draft)} fill="none" stroke="#fff1a0" strokeWidth="3" strokeDasharray="6 3"/>{draft.map((p,i)=><circle key={i} cx={p.x*ppu} cy={p.y*ppu} r="5" fill="#fff1a0"/>)}</g>}
       <text x={10} y={garden.height*ppu+20} fontSize="12" fill="#41644c" pointerEvents="none">Surrounding workspace · {garden.width} × {garden.height} m</text>
     </svg>

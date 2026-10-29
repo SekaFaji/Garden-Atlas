@@ -41,6 +41,14 @@ Current patch: **P009 — Advanced multi-selection and tracing-image reference**
 - Add 10/25 metres of context around the garden without distorting geometry.
 - Existing P007 version-6 garden data remains unchanged; no migration required.
 
+## P010 — Existing feature edits, resize handles & layer locks
+- Existing region and line geometry now has a map selection/edit tool. Vertices drag directly; edges insert vertices; selected vertices can be removed with validation and Undo.
+- Selected individual garden objects expose a touch-sized resize handle; dimension values are validated before committing to one shared object.
+- Separate visibility and temporary lock toggles for objects, terrain, paths/fences and boundary. Locks are editor-only state, not server permissions.
+- No garden schema change: version 6 JSON, old backups and linked views remain compatible.
+- 34 model tests pass locally, including four new feature geometry/resize tests. Full production build and phone testing require verification.
+- Remaining: editable curved paths, terrain paint/brush, reordering layers, species library, photo galleries, IndexedDB and robust PDF book.
+
 ## P009 — Touch multi-edit and optional tracing reference
 - Tap-to-multi-select on the map, bulk movement in one history step, bulk alignment/distribution/deletion, and optional 0.5 m snapping.
 - Object rotation field for both visual styles.

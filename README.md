@@ -6,6 +6,16 @@
 
 Garden Atlas lets people illustrate their garden, maintain shared records for plants and structures, and use a dimensioned Scale view of the same shared garden. The included example contains **synthetic data only**—not a real address or parcel plan.
 
+## P010 — Edit existing map features and lock layers
+
+- Use **EDIT FEATURES** in the map toolbar, then tap a drawn path, fence or terrain region to select it.
+- **Drag a visible vertex handle** to reshape the feature. **Tap an edge** to insert a new vertex. Select a handle and choose **REMOVE SELECTED POINT** to delete it (minimum: three terrain corners or two path points).
+- Edits validate polygons and path geometry before committing. Invalid changes retain the original shape and show a notice. Successful edits are one undoable operation.
+- Select a tree or structure in **SELECT** mode and drag the square resize handle on its lower-right corner. Resizing is shared between Scale and Illustration; existing numeric size entry still works.
+- **LAYERS** now has individual show/hide and **LOCK/EDIT** controls for objects, terrain, paths/fences and the property outline. Locked layers cannot be moved or drawn over through the corresponding map tools; the object inspector respects object locks.
+- Locks are **temporary editor controls**, not yet persistent project permissions. Objects, regions, lines, backups and migration format are unchanged (garden version 6).
+- Mobile note: when editing features, choose the feature first to expose its handles. Pinch to zoom in for precision. Physical-device gesture testing remains necessary.
+
 ## P007 — Two connected views, one garden
 
 Garden Atlas is a mobile-friendly garden design web app. Its Scale and Illustration buttons change **how the same garden looks**, not where its objects are stored. A tree, path, fence, ground region or property boundary edited in either view immediately appears in the other. One shared position is retained per item.
@@ -32,7 +42,7 @@ Garden Atlas is a mobile-friendly garden design web app. Its Scale and Illustrat
 - **FREEHAND:** trace an approximate outline and release; the stroke is simplified into editable points. Invalid traces don't replace the old border.
 - **TERRAIN:** draw independent, fillable polygons using grass, soil, gravel, stone or water. These are 2D visual regions, not elevation contours or terrain simulation.
 - **PATH / FENCE:** tap a sequence of points and press **FINISH**. Each line gets an editable name and width (metres), is independently saved on the active map and appears in the printable report. The tool draws 2D paths/fences, not 3D structures.
-- Show/hide object, boundary and terrain layers. The two views now display the same shared placements, boundaries and terrain regions.
+- Show/hide object, boundary, paths/fences and terrain layers. The two views now display the same shared placements, boundaries and terrain regions.
 
 ### Faster editing, garden reports and multiple gardens
 - Place many objects without reselecting the toolbox item; duplicate an existing record for fast reuse. A mobile quick-palette stays directly above the map.

@@ -18,6 +18,15 @@
 
 # Changelog
 
+## P010 — Editable Map Features, Resize Handles & Layer Locking (2026-10-29)
+
+- Added direct editing of existing path, fence and terrain vertices, with edge insertion and selected-point removal.
+- Added polygon validation to avoid overwriting valid regions with crossing or collapsed edits.
+- Added a touch-sized object resize handle with one-step undo and unchanged shared map geometry.
+- Added independent layer visibility and lock toggles (objects, terrain, paths/fences, property boundary).
+- Retained garden v6 data format, existing projects, import/export and browser autosaving.
+- Added four automated tests for vertex editing and object resizing.
+
 ## P001 — Pixel Garden Editor Foundation (2026-10-29)
 
 - Scaffolded a TypeScript + React + Vite web app for the Garden Atlas repository.
