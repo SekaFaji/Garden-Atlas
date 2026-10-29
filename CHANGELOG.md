@@ -1,12 +1,21 @@
-## P013 — IndexedDB Storage & Photo Gallery (2026-10-29)
+## P015 — Storage integration and editor reliability (2026-10-29)
 
-- Complete browser garden libraries now save transactionally in IndexedDB; existing localStorage gardens are copied on first load without deleting older data.
-- Autosave is queued in edit order. The top bar distinguishes saving, successful IndexedDB saves and failed saves.
-- A previous valid library is periodically checkpointed for recovery; garden/library JSON backups remain essential.
-- Optional browser persistent-storage request and approximate site quota display under My Gardens.
-- Specimen photo galleries now allow up to eight optimized JPEG images per plant, batch import/progress, editable captions, removal and individual photo downloads.
-- Garden schema remains version 6; old P001–P012 garden backups and previous browser data remain compatible.
-- Photos are still optimized copies included in JSON, not original full-resolution archives. Clearing site data may delete all browser copies.
+- Fixed the real P014 editor to hydrate from IndexedDB and use ordered asynchronous save writes rather than the legacy localStorage autosave effect.
+- Editing waits for load completion, preserving existing browser gardens; previous localStorage keys are left untouched.
+- Distinguished in-progress saving from failed writes in the header and prevented claiming success before a write completes.
+- Warns about closing/reloading with unfinished or failed saves where supported; PWA updates stay blocked while unsaved.
+- Uses IndexedDB recovery where available; fallback remains explicitly limited to localStorage.
+- Added regression tests for save failure, disabled IndexedDB, and editor wiring; fixed a zero-usage storage estimate edge case.
+- No new garden features or format migration; version 6 backups remain valid.
+
+## P013 — IndexedDB Storage & Photo Gallery (2026-10-29)
+- Added async IndexedDB primary storage for complete multi-garden libraries, preserving prior localStorage saves unchanged during first-run migration.
+- Writes serialized in edit order, with time-based valid-revision recovery checkpoints, explicit saving/saved/failure UI and fallback when IndexedDB is unavailable.
+- Added site-storage estimate and optional browser persistent-storage request; external JSON backups are still required.
+- Upgraded specimen gallery from 3 to 8 compressed photos per plant, added batch import/progress and individual JPEG export links.
+- Raised optimized-photo size/dimension limits for better clarity; photos remain locally compressed and included in garden/library JSON backups (not original full-resolution archives).
+- Increased import limits to allow larger photo-inclusive backups. Garden model remains v6 and P001–P012 backups continue to be accepted.
+- Added IndexedDB migration, queue ordering, corruption recovery, checkpoint rotation and localStorage fallback tests.
 
 ## P012 — Plant Atlas and Specimen Records (2026-10-29)
 - Added shared species encyclopedia (common/botanical names, description and care notes) plus individual specimen profiles.
@@ -139,8 +148,9 @@
 - Added model tests covering catalog uniqueness, filtering, saved IDs, old backups, linked placement and bad preset rejection (39 tests in total).
 - These art presets are visual templates, not botanical identifications; no downloaded images, cloud accounts or external assets were added.
 
-
-## P014 — Offline PWA
-- Generated first-party-only versioned service worker caching final production app assets.
-- Standalone app manifest, install icons, offline status and user-controlled update actions.
-- Existing IndexedDB saving remains separate from software cache; JSON backups retained.
+## P014 — Offline PWA & Installation
+- Added home-screen manifest and custom pixel-art 192/512 PNG icons matching the existing favicon.
+- Automatically generate a versioned service worker after each production build. Precache only app HTML, JavaScript, CSS, icons and manifest within the GitHub Pages project scope.
+- Offline-capable app shell, online/offline notice, installation guidance, update checks and user-initiated update activation only after local saves.
+- Kept garden data and photo archives in IndexedDB, distinct from cached app files. Existing JSON imports/exports still work offline.
+- Added PWA integration tests and documentation for first-launch requirements, independent device storage and recovery limitations.

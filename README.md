@@ -6,28 +6,36 @@
 
 Garden Atlas lets people illustrate their garden, maintain shared records for plants and structures, and use a dimensioned Scale view of the same shared garden. The included example contains **synthetic data only**—not a real address or parcel plan.
 
-## P013 — IndexedDB Storage & Photo Gallery (2026-10-29)
+## P015 — Reliability polish (no new garden features)
 
-- Complete browser garden libraries now save transactionally in IndexedDB; existing localStorage gardens are copied on first load without deleting older data.
-- Autosave is queued in edit order. The top bar distinguishes saving, successful IndexedDB saves and failed saves.
-- A previous valid library is periodically checkpointed for recovery; garden/library JSON backups remain essential.
-- Optional browser persistent-storage request and approximate site quota display under My Gardens.
-- Specimen photo galleries now allow up to eight optimized JPEG images per plant, batch import/progress, editable captions, removal and individual photo downloads.
-- Garden schema remains version 6; old P001–P012 garden backups and previous browser data remain compatible.
-- Photos are still optimized copies included in JSON, not original full-resolution archives. Clearing site data may delete all browser copies.
+- **Fixed the actual editor save path:** the app now loads the browser garden library from IndexedDB before enabling editing, and queues every subsequent save to IndexedDB. P014 shipped with the IndexedDB module but the live editor still used its older localStorage calls.
+- **Clear save status:** **SAVING…**, **INDEXEDDB SAVED**, **LOCAL SAVE** (limited fallback) or **SAVE FAILED**. The app only reports saved after the write completes. An unfinished/failed save prompts before a normal browser reload or close where the browser supports this.
+- **Recovery and compatibility:** old localStorage data remains untouched during first migration; previous local recovery copies, JSON backup import/export and the v6 garden format are unchanged. A failed IndexedDB write is **not** falsely reported as success.
+- **PWA safety:** applying a waiting service-worker update remains disabled while the save is unfinished or failed. Cache files and personal garden records are kept separate.
+
+Before clearing browser data or testing an offline update, **export a JSON backup**, make a small edit, confirm the saved indicator, then reload to verify. Mobile operating systems may close apps without providing a reliable unload warning, and browser data can still be evicted. Multiple open tabs are not synchronized.
+
+## P013 — IndexedDB storage, photo gallery and recovery
+
+**New primary storage:** Garden libraries, including compressed specimen photographs and the optional reference image, are saved transactionally in browser **IndexedDB** instead of the much smaller `localStorage` area. The original browser `localStorage` garden is imported on the first run and **left untouched** as a migration fallback. When IndexedDB cannot be opened, the editor clearly identifies the limited localStorage fallback; saving may fail on large gardens, so export a backup.
+
+- Saves are **ordered** to prevent a slower earlier save from overwriting a later edit. The top bar distinguishes SAVING, INDEXEDDB SAVED and saving failures.
+- A local previous-version **checkpoint snapshot** is periodically kept in IndexedDB, and **LOCAL RECOVERY COPY** reads it. It is a best-effort second copy, not an independent backup.
+- Under My Gardens, the editor reports an approximate site-storage usage estimate and offers **PROTECT LOCAL STORAGE** where browser persistent-storage permission is supported. No browser setting guarantees permanence.
+- Up to **8 optimized JPEG photos per plant**, with multiselect upload, progress, editable captions, deletion and a **Save Photo** link for each picture. Photos are converted locally from JPG, PNG or WebP; each optimized photo remains size-limited for practical JSON backup files. **Original full-resolution files are not retained.**
+- Garden and whole-library JSON exports include these photos and remain portable between devices. Larger backups may take more storage and time; continue downloading backups after major changes.
+- Existing **version 6 garden JSON** and earlier imports remain compatible; no new mandatory fields or destructive schema changes. No cloud upload, shared accounts or automatic cross-device sync.
+
+**Important:** Clearing site data can delete IndexedDB and localStorage together. Two tabs editing the same garden are not synchronized; close extra tabs before making substantial edits. Download backup JSON outside the browser, and look for **INDEXEDDB SAVED** after making changes.
 
 ## P012 — Plant encyclopedia and specimen history
 
-Select any **tree, shrub or flower** on the map, then open **Details → Plant Atlas** to document that individual plant. Garden beds, structures, rocks and furniture are not single plant specimens, so they retain their existing general notes instead.
+Select any tree, shrub or flower, then open **Details → Plant Atlas** to document that individual plant. Garden beds, structures, rocks and furniture retain general notes instead.
 
-- **Separate species profiles:** create a shared entry with common/botanical names, a description and care notes; link multiple independent plants to it. Deleting a species unlinks its specimens but keeps them and their history.
-- **Identification confidence:** unidentified, tentative, or user-confirmed. The app does not identify species automatically and does not verify labels.
-- **Individual histories:** optional planting date, dated observations, and dated maintenance entries (watering, pruning, feeding, planting, inspection or other), each tied to the specimen's permanent object ID.
-- **Local photos:** add up to **eight compressed JPEG images per plant**, imported from JPG/PNG/WebP files. Images are processed in the browser, stored with the garden, shown in the Inspector and included in garden JSON backups and print reports. Photo captions are editable.
-- **Undo:** editing notes, species profiles, specimen histories and photos uses the existing history mechanism; typing bursts are grouped.
-- **Compatibility:** still garden file **version 6**, with optional `speciesLibrary` and `plant` fields. Old gardens, object IDs, original species text, map placements and legacy imports remain intact. Duplicating a plant keeps its species association but starts with a clean specimen history, date and photos.
-
-**Storage warning:** IndexedDB provides more space than localStorage, but browser data can still be cleared or evicted. Photos are locally compressed and included in JSON backups. Watch the save-status indicator and export regular backups outside this browser. No automatic cross-device sync.
+- Shared species profiles with common/botanical names, descriptive notes and care notes. Deleting a species unlinks specimens but does not delete them.
+- Identification status: unidentified, tentative, or user-confirmed. The app does not identify species automatically.
+- Per-specimen planting date, observations, maintenance, photos and a permanent object ID.
+- The same specimen is visible in the linked Scale and Illustration views. Earlier data remains compatible.
 
 ## P010 — Edit existing map features and lock layers
 
@@ -95,7 +103,7 @@ The **MAP SIZE** button is now in the toolbar immediately above the editor map, 
 - Each object's **rotation** can be edited in the Inspector (0–359 degrees). This changes its sprite's presentation, not its shared measured location or diameter.
 - Open **TRACE IMAGE** near the map to import a local JPG, PNG or WebP image. Images up to 15 MB are decoded and compressed locally into a bounded JPEG before saving; no upload or external image service is used.
 - Adjust reference **opacity, image width (metres), and X/Y offsets**, and toggle visibility. The same image alignment appears in Scale and Illustration. Importing a new photo replaces the previous one in the current garden.
-- The reference image is included in a garden's JSON backup and the full-library backup. Its size is restricted because this release still uses browser `localStorage`; **NOT SAVED** means you must export a backup immediately.
+- The reference image is included in a garden's JSON backup and the full-library backup. It remains compressed and size-limited; **SAVING / NOT SAVED** means you should check the status before closing or exporting.
 - Tracing is **manually aligned**, not georeferenced or automatically calibrated. Know a real-world distance before using the overlaid image for measurements. The image overlay is deliberately excluded from printable maps.
 - Existing version-6 gardens remain valid without a migration; reference and rotation fields are optional. Older versions still migrate through the existing parser.
 
@@ -111,7 +119,7 @@ The **MAP SIZE** button is now in the toolbar immediately above the editor map, 
 
 ### Important limitations
 
-- The library is stored primarily in **browser IndexedDB**, with a limited localStorage fallback. It has no cloud backend or cross-device synchronization. Clearing site data may delete it; backups are essential. The app warns when saving fails.
+- The library is saved primarily in **browser IndexedDB**, with a limited `localStorage` fallback. It has no cloud backend or cross-device synchronization. Clearing site data may delete it; backups are essential. The app warns when saving fails.
 - Project import **adds** a garden; whole-library import requires confirmation because it replaces the local library.
 - Advanced PDF output, plant encyclopedia and photo albums, real elevation, editable path/fence segments, planned-vs-existing scenarios and object resize handles are **not yet implemented**.
 - Undo history is scoped to the open garden editing session, not saved after a browser reload.
@@ -148,6 +156,15 @@ Currently there are **24 presets across eight categories**: trees, shrubs, flowe
 
 The `presetId` field is optional in the existing v6 Garden JSON schema; old P001–P010 JSON backups remain readable. Saved garden backups now include preset selections. The same sprite appears on both linked map styles and printable maps. These are **stylized visual presets**, not verified species identifications or exact-to-scale models. Custom user-uploaded sprite images, species profiles, care histories and photo galleries are not yet implemented.
 
+## P014 — Install and use Garden Atlas offline
 
-## P014 — Offline PWA
-First open Garden Atlas online. Once OFFLINE APP READY appears in My Gardens, the cached editor can open offline. On Android choose Install app from the browser menu; on iPhone Safari Share → Add to Home Screen. Garden data and compressed photos remain stored locally in IndexedDB, separate from the offline app cache. JSON import/export and editing work offline. Reconnecting can fetch software updates, but does not sync projects. Export JSON backups frequently: clearing browser data or uninstalling can erase local projects. Installed iOS home-screen apps may use separate storage, so import an exported backup if an existing garden does not appear.
+Garden Atlas is now an installable Progressive Web App (PWA). The **first visit needs internet access** so the browser can download and cache the complete editor (HTML, JavaScript, CSS, icons and manifest). Wait until the **OFFLINE APP READY** status appears under **MY GARDENS → OFFLINE APP & INSTALLATION** before relying on offline access. Installing via the browser menu is optional: the website can also work offline after the service worker installs.
+
+- **Android (Chrome and compatible browsers):** open the live site; use **Install app** in the browser menu, or the app's **INSTALL APP** button when supported. Launch from the new home-screen icon.
+- **iPhone / iPad:** open in Safari, use **Share → Add to Home Screen**. Some browsers and versions do not show a separate installation prompt. The installed app may have separate local storage; **export a backup from the browser and import it into the installed app** if your garden does not appear.
+- **Offline:** with the installed/cache-ready app, open the map, create or edit objects, record maintenance, view previously saved photos, and export/import your own JSON files. No login and no remote database required.
+- **Back online:** open the app, select **Check for updates** in My Gardens. If an app update is available, apply it **only after the local save completes**. New app versions don't intentionally overwrite garden projects.
+
+**What offline does not mean:** first-time installation, initial asset downloads and app updates require an internet connection. Data does **not sync between phones**. If browser/site data is cleared, the app is uninstalled, or the device is damaged, the local database can be lost. Use **Backup** or **Backup All Gardens** and store the downloaded JSON files somewhere independent of the browser. Imported reference images and compressed specimen photos are included in those backups. Browser/OS storage cleanup can still evict offline caches; offline availability must be tested on the target phone.
+
+This PWA caches only the generated first-party app files under `/Garden-Atlas/`; it does not cache arbitrary remote sites, photo feeds, or user-exported files. The service worker is generated from each production build's hashed assets and installs atomically. The garden library stays in IndexedDB, not the service-worker cache.

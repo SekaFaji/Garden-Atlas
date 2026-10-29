@@ -1,14 +1,24 @@
-# P013 — IndexedDB & Photo Safety
+# Garden Atlas — P015 Stabilization (2026-10-29)
 
-## P013 — IndexedDB Storage & Photo Gallery (2026-10-29)
+Current release target: **P015 — storage integration and offline/save-status reliability**. No new garden features.
 
-- Complete browser garden libraries now save transactionally in IndexedDB; existing localStorage gardens are copied on first load without deleting older data.
-- Autosave is queued in edit order. The top bar distinguishes saving, successful IndexedDB saves and failed saves.
-- A previous valid library is periodically checkpointed for recovery; garden/library JSON backups remain essential.
-- Optional browser persistent-storage request and approximate site quota display under My Gardens.
-- Specimen photo galleries now allow up to eight optimized JPEG images per plant, batch import/progress, editable captions, removal and individual photo downloads.
-- Garden schema remains version 6; old P001–P012 garden backups and previous browser data remain compatible.
-- Photos are still optimized copies included in JSON, not original full-resolution archives. Clearing site data may delete all browser copies.
+- Confirmed live P014 editor was still saving to localStorage despite the P013 IndexedDB module and its passing isolated tests. P015 connects asynchronous IndexedDB library loading and ordered saves to the actual editor.
+- Editing is gated until the saved library is loaded; old localStorage keys remain intact for recovery.
+- Explicit Saving / Saved / Save Failed states reflect completed writes, not merely queued work. A failed save warns the user and keeps the PWA update action disabled.
+- Retained offline asset cache, old imports, v6 garden records, recovery snapshots and JSON backups.
+- Remaining: manual Android offline/refresh/storage testing, multi-tab editing conflict prevention, original-resolution photo archives, and long-term backup resilience.
+
+---
+
+# P013 — IndexedDB Storage & Photo Safety
+
+- Primary browser storage: IndexedDB `garden-atlas-offline` (version 1), snapshot store `libraries`; migration reads previous `localStorage` keys without deleting or overwriting them.
+- Whole libraries saved as validated structured-clone records in transactions; asynchronous writes queued in edit order. The recent valid library is periodically stored in a separate recovery snapshot.
+- Boot is asynchronous and editing UI waits for the load. `INDEXEDDB SAVED` / `SAVING / NOT SAVED` / fallback status makes persistence visible.
+- Optional persistent-storage request and site-level usage estimate; neither guarantees durability after site data deletion. No automatic device sync or cross-tab editing coordination.
+- Plant photos: eight optimized JPEGs per specimen, batch import, captions, removal, individual downloads. Backups contain the JPEG data as JSON; originals aren't retained.
+- Model remains v6; existing P001–P012 garden/library backups are accepted without destructive conversion.
+- Pending: original full-resolution media in separate IDB blob assets, ZIP backup with originals, cross-tab conflict handling, offline PWA/service worker, P013 physical-phone photo testing.
 
 ## P012 — Plant Atlas & Specimen Records (2026-10-29)
 - Separate per-garden species encyclopedia entries from per-object specimen profiles; object IDs and coordinates unchanged.
@@ -88,8 +98,10 @@ Current patch: **P011 — Pixel-art preset catalog**.
 - 39 automated model tests pass locally; CI production build and physical-device interactions still require verification.
 - Remaining priorities: user-customized sprite imports, higher-detail asset library, real/planned plans, planting/species encyclopedia, photos, maintenance history, IndexedDB storage and PWA offline support.
 
-
-## P014 — Offline installation
-- Service worker precaches built editor shell scoped to /Garden-Atlas/; online once to install.
-- Install and update controls in My Gardens; updates wait for local saves.
-- Browser IndexedDB projects remain local; external JSON backup and device-specific PWA tests essential.
+## P014 — Offline install / PWA
+- Web app manifest, Android/iOS home-screen icons and service-worker caching of only final build files.
+- Project-scoped offline navigation and editor assets; no runtime caching of arbitrary online content.
+- Offline/online status, install instructions, opt-in update action, local-save guard and manual update check in My Gardens.
+- Existing IndexedDB garden storage is unchanged; regular JSON backups remain important.
+- Unit tests cover cache asset scope, cache revision on new build, offline navigation and manifest.
+- Validate installability and offline editing manually on actual Android/iOS devices; CI alone cannot emulate an installed PWA.

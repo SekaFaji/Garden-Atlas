@@ -16,8 +16,9 @@ import {
 } from './model';
 import {
   addProject, deleteProject, importGarden, importLibrary, loadLibrary,
-  loadLibraryRecovery, saveLibrary, updateActiveGarden, type ProjectLibrary
+  updateActiveGarden, type ProjectLibrary
 } from './storage';
+import { openBrowserLibrary, queueBrowserSave, recoverBrowserLibrary, estimateBrowserSpace, requestPersistentStorage, type StorageBackend } from './browserStorage';
 
 type LayerKey='objects'|'regions'|'lines'|'boundary';
 type LayerState=Record<LayerKey,boolean>;
@@ -60,14 +61,51 @@ export default function App(){
   const [mapSizeOpen,setMapSizeOpen]=useState(false);
   const [resizeMode,setResizeMode]=useState<'preserve'|'scale'>('preserve');
   const [notice,setNotice]=useState('Linked maps: edits to either view update both · pinch to zoom.');
-  const [saved,setSaved]=useState(true);
+  const [saveStatus,setSaveStatus]=useState<'loading'|'saving'|'saved'|'failed'>('loading');
+  const saved=saveStatus==='saved';
+  const [hydrated,setHydrated]=useState(false);
+  const [backend,setBackend]=useState<StorageBackend>('indexeddb');
+  const [storageInfo,setStorageInfo]=useState('Checking storage…');
   const [past,setPast]=useState<Garden[]>([]);
   const historyGroup=useRef<EditBurst|null>(null);
   const [future,setFuture]=useState<Garden[]>([]);
   const importFile=useRef<HTMLInputElement>(null),importAllFile=useRef<HTMLInputElement>(null);
   const selected=garden.objects.find(o=>o.id===selectedId)??null;
   const selectedGroup=garden.groups.find(g=>g.id===selectedGroupId)??null;
-  useEffect(()=>{setSaved(saveLibrary(library));},[library]);
+  useEffect(()=>{
+    let cancelled=false;
+    void openBrowserLibrary().then(result=>{
+      if(cancelled)return;
+      libraryRef.current=result.library;setLibrary(result.library);setBackend(result.backend);
+      setHydrated(true);setSaveStatus('saving');
+      if(result.warning)setNotice(result.warning);
+      void estimateBrowserSpace().then(v=>{if(!cancelled)setStorageInfo(v);});
+    });
+    return ()=>{cancelled=true;};
+  },[]);
+  useEffect(()=>{
+    if(!hydrated)return;
+    let active=true;
+    setSaveStatus('saving');
+    void queueBrowserSave(library,backend).then(ok=>{
+      if(!active)return;
+      setSaveStatus(ok?'saved':'failed');
+      if(!ok)setNotice('SAVE FAILED: Your latest changes are not safely stored. Export a JSON backup now.');
+      void estimateBrowserSpace().then(v=>{if(active)setStorageInfo(v);});
+    }).catch(()=>{
+      if(!active)return;
+      setSaveStatus('failed');
+      setNotice('SAVE FAILED: Browser storage is unavailable. Export a JSON backup now.');
+    });
+    return ()=>{active=false;};
+  },[library,hydrated,backend]);
+  // A queued save may still be in flight when the browser is closed or reloaded.
+  useEffect(()=>{
+    if(saveStatus==='saved'||saveStatus==='loading')return;
+    const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue='';};
+    window.addEventListener('beforeunload',warn);
+    return ()=>window.removeEventListener('beforeunload',warn);
+  },[saveStatus]);
   useEffect(()=>{setDims({width:String(garden.width),height:String(garden.height)});},[library.activeId,garden.width,garden.height]);
   const applyGarden=(next:Garden,withHistory=true,historyKey?:string)=>{
     if(!isGarden(next)){setNotice('Change rejected: garden would become invalid.');return;}
@@ -218,20 +256,20 @@ export default function App(){
     if(!next){setNotice('Keep at least one garden. Create another first.');return;}
     replaceLibrary(next);setNotice('Local garden deleted. Other projects preserved.');
   };
-  const recover=()=>{
-    const restored=loadLibraryRecovery();
+  const recover=async()=>{
+    const restored=await recoverBrowserLibrary(backend);
     if(!restored){setNotice('No valid previous local recovery snapshot found.');return;}
     if(!window.confirm('Restore the previous local library snapshot? Back up current data first.'))return;
     replaceLibrary(restored);setNotice('Restored a previous local snapshot.');
   };
   const onImport=(e:ChangeEvent<HTMLInputElement>,all:boolean)=>{
     const file=e.target.files?.[0];e.target.value='';if(!file)return;
-    if(file.size>(all?20_000_000:8_000_000)){setNotice('Backup file exceeds the import size limit.');return;}
+    if(file.size>(all?150_000_000:40_000_000)){setNotice('Backup file exceeds the import size limit.');return;}
     void file.text().then(text=>{
       if(all){const next=importLibrary(text);if(!next){setNotice('Invalid Garden Atlas library backup.');return;}
         if(window.confirm('Replace ALL local gardens with this library backup?')){replaceLibrary(next);setNotice('Garden library restored.');}
       }else{const nextGarden=importGarden(text);if(!nextGarden){setNotice('Invalid garden file. P001–P004 backups are supported.');return;}
-        const next=addProject(library,nextGarden);if(!next){setNotice('Maximum 20 projects.');return;}
+        const next=addProject(libraryRef.current,nextGarden);if(!next){setNotice('Maximum 20 projects.');return;}
         replaceLibrary(next);setNotice('Garden imported as a separate project. Existing gardens were preserved.');
       }
     }).catch(()=>setNotice('Could not read the file.'));
@@ -248,10 +286,11 @@ export default function App(){
       window.requestAnimationFrame(()=>document.querySelector('.map-frame')?.scrollIntoView({behavior:'smooth',block:'start'}));
     }
   };
+  if(!hydrated)return <div className="app-shell"><div className="status-message" role="status">Loading saved gardens…</div></div>;
   return <><div className="app-shell">
     <header className="topbar">
-      <div className="brand"><span className="brand-icon">✿</span><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL LANDSCAPE EDITOR · P014</div></div></div>
-      <div className="top-actions"><span className={`save-status ${saved?'':'danger'}`}>● {saved?'LOCAL SAVE':'NOT SAVED'}</span>
+      <div className="brand"><span className="brand-icon">✿</span><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL LANDSCAPE EDITOR · P015</div></div></div>
+      <div className="top-actions"><span role="status" aria-live="polite" className={`save-status ${saveStatus==='failed'?'danger':''}`}>● {saveStatus==='saved'?(backend==='indexeddb'?'INDEXEDDB SAVED':'LOCAL SAVE'):saveStatus==='saving'?'SAVING…':saveStatus==='failed'?'SAVE FAILED':'LOADING…'}</span>
         <button className="btn btn-muted" onClick={()=>importFile.current?.click()}>IMPORT</button>
         <button className="btn btn-highlight" onClick={()=>download(`garden-atlas-${slug(garden.name)}-${date()}.json`,JSON.stringify(garden,null,2))}>↓ BACKUP</button><button className="btn btn-muted" onClick={()=>window.print()} title="Open your browser print dialog to save the garden book as a PDF">☷ PDF / PRINT</button>
         <input hidden ref={importFile} type="file" accept=".json,application/json" onChange={e=>onImport(e,false)}/>
@@ -379,7 +418,7 @@ export default function App(){
           <div className="map-bottom"><span>{tool==='select'?(multiSelect?'MULTI MODE · TAP TO SELECT · DRAG SELECTED ITEMS TOGETHER':'DRAG ITEMS · PAN EMPTY SPACE · PINCH TO ZOOM'):tool==='pan'?'DRAG MAP · PINCH TO ZOOM':tool==='feature-edit'?'TAP PATH OR TERRAIN · DRAG HANDLES · TAP EDGE TO ADD POINT':tool==='outline-edit'?'DRAG CORNERS · TAP EDGE MIDPOINTS TO INSERT':tool==='outline-draw'?'TAP CORNERS · FINISH TO CLOSE OUTLINE':tool==='freehand'?'DRAW A CLOSED BORDER WITH ONE FINGER':tool==='terrain'?'TAP AREA CORNERS · FINISH TO ADD TERRAIN':tool==='path'||tool==='fence'?'TAP LINE POINTS · FINISH TO CREATE':`TAP TO PLACE ${tool.toUpperCase()}`}</span></div>
         </div>
         <div className="status-message" role="status">✦ {notice}</div>
-        <div className="feature-strip"><span>■ P012 PLANT ATLAS · SPECIMEN HISTORY</span><span>■ TOUCH-FIRST</span><span>■ LINKED SCALE + PIXEL VIEWS</span><span>■ LOCAL BACKUPS</span></div>
+        <div className="feature-strip"><span>■ P014 OFFLINE PWA · LOCAL DATA</span><span>■ TOUCH-FIRST</span><span>■ LINKED SCALE + PIXEL VIEWS</span><span>■ LOCAL BACKUPS</span></div>
       </section>
       <aside className={`panel details-panel ${selectedPanel==='inspector'?'mobile-active':''}`}>
         <div className="section-heading">06 / INSPECTOR</div>
@@ -426,10 +465,11 @@ export default function App(){
         <div className="section-heading list-heading">BACKUP & RECOVERY</div>
         {garden.linkMigration&&<button className="btn btn-muted" onClick={()=>download(`garden-atlas-original-two-views-${slug(garden.name)}.json`,JSON.stringify(garden.linkMigration!.original,null,2))}>↓ EXPORT ORIGINAL PRE-LINK MAPS</button>}
         <div className="project-actions"><button className="btn btn-muted" onClick={()=>download(`garden-atlas-all-projects-${date()}.json`,JSON.stringify(library,null,2))}>↓ BACKUP ALL GARDENS</button><button className="btn btn-muted" onClick={()=>importAllFile.current?.click()}>↑ RESTORE ALL GARDENS</button><button className="btn btn-muted" onClick={recover}>↶ LOCAL RECOVERY COPY</button></div>
-        <p className="panel-hint">JSON backups contain personal garden data. This version uses browser localStorage; clearing site data may erase it. No cloud sync.</p>
+        <p className="panel-hint">Primary storage: {backend==='indexeddb'?'IndexedDB (larger local storage)':'limited localStorage fallback'}. {storageInfo}. Clearing browser site data can still erase it; no cloud sync. JSON backups also include compressed photos.</p>
+        <button className="btn btn-muted" onClick={()=>{void requestPersistentStorage().then(ok=>setNotice(ok?'Browser granted persistent storage for this site. Keep external backups too.':'Persistent storage was unavailable or declined. JSON backups are recommended.'));}}>PROTECT LOCAL STORAGE</button>
       </aside>
     </main>
     <nav className="mobile-nav" aria-label="Editor panels"><button className={selectedPanel==='tools'?'active':''} onClick={()=>setSelectedPanel('tools')}>♣ OBJECTS</button><button className={selectedPanel==='inspector'?'active':''} onClick={()=>setSelectedPanel('inspector')}>✎ DETAILS</button><button className={selectedPanel==='projects'?'active':''} onClick={()=>setSelectedPanel('projects')}>▧ GARDENS</button></nav>
-    <footer className="footer">GARDEN ATLAS · P012 PLANT ATLAS & SPECIMEN RECORDS <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
+    <footer className="footer">GARDEN ATLAS · P013 INDEXEDDB & PHOTO LIBRARY <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
   </div><GardenReport garden={garden}/></>;
 }
