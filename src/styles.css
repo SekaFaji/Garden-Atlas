@@ -130,3 +130,25 @@ button:disabled { cursor: not-allowed; opacity: .5; }
   .footer { padding: 18px 15px 28px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+/* P002: group records and management in the existing pixel-art editor. */
+.group-create { display: flex; gap: 7px; margin-bottom: 12px; }
+.group-create input { min-width: 0; width: 100%; color: #eaf1dc; background: #11251d; border: 2px solid #507254; padding: 7px; font: 12px monospace; }
+.group-create .btn { padding: 8px 10px; font-size: 10px; }
+.group-list { display: grid; gap: 6px; max-height: 230px; overflow: auto; }
+.group-entry { display: flex; align-items: center; gap: 8px; background: #243f33; border: 1px solid #3d5d47; color: #d7e1cc; min-width: 0; text-align: left; padding: 8px; }
+.group-entry:hover { background: #30533f; }
+.group-entry.active { background: #456b50; border-color: #e2dc91; }
+.group-symbol, .group-inspector-icon { font: bold 22px monospace; color: #d2dfa0; }
+.group-title { min-width: 0; overflow-wrap: anywhere; font: bold 12px monospace; }
+.group-title small { display: block; color: #91b99a; font-size: 10px; margin-top: 3px; }
+.group-count { margin-left: auto; flex: none; color: #e3e3a6; font: 900 12px monospace; }
+.field select { width: 100%; background: #11251d; color: #ebefda; border: 2px solid #42634b; padding: 9px; border-radius: 0; font-size: 13px; }
+select:focus-visible { outline: 2px solid #f5d67c; outline-offset: 2px; }
+.group-inspector-heading { display: flex; gap: 14px; align-items: center; padding: 11px; border: 2px solid #64816a; margin-bottom: 17px; background: #284b39; }
+.group-inspector-icon { font-size: 38px; }
+.group-inspector-heading strong { font: 900 13px monospace; color: #e1e5b0; }
+.group-inspector-heading p { color: #afc6a9; font-size: 12px; margin: 5px 0 0; }
+.group-members { margin-top: 18px; display: grid; gap: 7px; }
+.member-button { display: flex; align-items: center; gap: 9px; text-align: left; color: #d7e1cc; background: #254436; border: 1px solid #53745a; padding: 8px; }
+.member-button span:nth-child(2) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.member-button:hover { background: #3f624c; }

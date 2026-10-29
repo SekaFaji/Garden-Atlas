@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { Sprite } from './Sprite';
 import {
-  KINDS, WORLD, clampPoint, demoGarden, info, isGarden, loadGarden, saveGarden,
+  KINDS, WORLD, clampPoint, demoGarden, info, loadGarden, movePlaced, nextGroupId,
+  parseGarden, removeGroup, saveGarden,
   type Garden, type GardenObject, type Kind, type Mode, type Point,
 } from './model';
 
-type Drag = { id: string; pointerId: number };
+type Drag = { id: string; pointerId: number; together: boolean };
 const SIZE = { width: WORLD.width * WORLD.pixelsPerUnit, height: WORLD.height * WORLD.pixelsPerUnit };
 
 function nextId(kind: Kind, objects: GardenObject[]): string {
@@ -26,15 +27,16 @@ function PixelIcon({ kind, size = 34 }: { kind: Kind; size?: number }) {
   </svg>;
 }
 
-function MapCanvas({ garden, mode, selectedId, tool, zoom, onPick, onPlace, onMove }: {
+function MapCanvas({ garden, mode, selectedId, selectedGroupId, tool, zoom, onPick, onPlace, onMove }: {
   garden: Garden;
   mode: Mode;
   selectedId: string | null;
+  selectedGroupId: string | null;
   tool: Kind | null;
   zoom: number;
   onPick: (id: string | null) => void;
   onPlace: (point: Point) => void;
-  onMove: (id: string, point: Point) => void;
+  onMove: (id: string, point: Point, together: boolean) => void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<Drag | null>(null);
@@ -61,7 +63,7 @@ function MapCanvas({ garden, mode, selectedId, tool, zoom, onPick, onPlace, onMo
   const pointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
     if (dragRef.current?.pointerId !== event.pointerId) return;
     const point = toPoint(event);
-    if (point) onMove(dragRef.current.id, point);
+    if (point) onMove(dragRef.current.id, point, dragRef.current.together);
   };
   const stopDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
     if (dragRef.current?.pointerId !== event.pointerId) return;
@@ -112,7 +114,8 @@ function MapCanvas({ garden, mode, selectedId, tool, zoom, onPick, onPlace, onMo
       {garden.objects.map(item => {
         const pos = item.placements[mode];
         if (!pos) return null;
-        const selected = item.id === selectedId;
+        const groupSelected = Boolean(selectedGroupId && item.groupId === selectedGroupId);
+        const selected = item.id === selectedId || groupSelected;
         const diameter = item.diameterM * WORLD.pixelsPerUnit * (mode === 'illustration' ? 1.05 : 1);
         return <g
           key={item.id}
@@ -122,9 +125,9 @@ function MapCanvas({ garden, mode, selectedId, tool, zoom, onPick, onPlace, onMo
           onPointerDown={event => {
             event.stopPropagation();
             if (event.button !== 0) return;
-            onPick(item.id);
+            if (!groupSelected) onPick(item.id);
             if (!tool) {
-              dragRef.current = { id: item.id, pointerId: event.pointerId };
+              dragRef.current = { id: item.id, pointerId: event.pointerId, together: groupSelected };
               svgRef.current?.setPointerCapture(event.pointerId);
             }
           }}
@@ -154,20 +157,45 @@ export default function App() {
   const [mode, setMode] = useState<Mode>('illustration');
   const [tool, setTool] = useState<Kind | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>('TREE-001');
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [newGroupName, setNewGroupName] = useState('');
   const [zoom, setZoom] = useState(100);
   const [saved, setSaved] = useState(true);
   const [notice, setNotice] = useState('Sample garden loaded. This is not your actual property.');
   const fileRef = useRef<HTMLInputElement>(null);
   const selected = garden.objects.find(item => item.id === selectedId) ?? null;
+  const selectedGroup = garden.groups.find(group => group.id === selectedGroupId) ?? null;
+  const selectObject = (id: string | null) => { setSelectedId(id); setSelectedGroupId(null); };
+  const selectGroup = (id: string) => { setSelectedGroupId(id); setSelectedId(null); setTool(null); };
 
   useEffect(() => { setSaved(saveGarden(garden)); }, [garden]);
   const updateObject = (id: string, patch: Partial<GardenObject>) => {
     setGarden(old => ({ ...old, objects: old.objects.map(o => o.id === id ? { ...o, ...patch } : o) }));
   };
-  const moveObject = (id: string, point: Point) => {
-    setGarden(old => ({ ...old, objects: old.objects.map(o => o.id === id
-      ? { ...o, placements: { ...o.placements, [mode]: point } }
-      : o) }));
+  const moveObject = (id: string, point: Point, together = false) => {
+    setGarden(old => movePlaced(old, id, mode, point, together));
+  };
+  const createGroup = () => {
+    const name = newGroupName.trim();
+    if (!name) { setNotice('Enter a group name first.'); return; }
+    if (garden.groups.some(g => g.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      setNotice('A group with that name already exists.'); return;
+    }
+    if (garden.groups.length >= 1000) { setNotice('Maximum group count reached.'); return; }
+    const id = nextGroupId(garden);
+    setGarden(old => ({ ...old, groups: [...old.groups, { id, name, notes: '' }] }));
+    selectGroup(id);
+    setNewGroupName('');
+    setNotice(`Created group “${name}”. Choose objects to assign to it.`);
+  };
+  const updateGroup = (id: string, patch: { name?: string; notes?: string }) => {
+    setGarden(old => ({ ...old, groups: old.groups.map(g => g.id === id ? { ...g, ...patch } : g) }));
+  };
+  const deleteGroup = () => {
+    if (!selectedGroup || !window.confirm(`Delete group “${selectedGroup.name}”? Its members will be ungrouped, not deleted.`)) return;
+    setGarden(old => removeGroup(old, selectedGroup.id));
+    setSelectedGroupId(null);
+    setNotice('Group deleted. All its objects and map placements were preserved.');
   };
   const addObject = (point: Point) => {
     if (!tool) return;
@@ -175,10 +203,10 @@ export default function App() {
     const id = nextId(tool, garden.objects);
     const object: GardenObject = {
       id, kind: tool, name: kind.initialName, diameterM: kind.diameterM,
-      group: '', species: '', notes: '', placements: { [mode]: point },
+      groupId: null, species: '', notes: '', placements: { [mode]: point },
     };
     setGarden(old => ({ ...old, objects: [...old.objects, object] }));
-    setSelectedId(id);
+    selectObject(id);
     setTool(null);
     setNotice(`${kind.label} placed in ${mode} map. The other map's position remains independent.`);
   };
@@ -191,7 +219,7 @@ export default function App() {
   const reset = () => {
     if (!window.confirm('Replace this garden with the sample garden? Export a backup first if needed.')) return;
     setGarden(demoGarden());
-    setSelectedId('TREE-001');
+    selectObject('TREE-001');
     setTool(null);
     setNotice('Demo restored. Your previous local changes were replaced.');
   };
@@ -212,10 +240,11 @@ export default function App() {
     if (file.size > 2_000_000) { setNotice('Import failed: file exceeds 2 MB.'); return; }
     try {
       const imported: unknown = JSON.parse(await file.text());
-      if (!isGarden(imported)) throw new Error('Unsupported or invalid Garden Atlas file');
+      const parsed = parseGarden(imported);
+      if (!parsed) throw new Error('Unsupported or invalid Garden Atlas file');
       if (!window.confirm('Replace current garden with imported data? Export a backup first if needed.')) return;
-      setGarden(imported);
-      setSelectedId(null);
+      setGarden(parsed);
+      selectObject(null);
       setTool(null);
       setNotice('Garden restored from JSON backup.');
     } catch { setNotice('Import failed: invalid or unsupported Garden Atlas JSON.'); }
@@ -223,7 +252,7 @@ export default function App() {
 
   return <div className="app-shell">
     <header className="topbar">
-      <div className="brand"><div className="brand-icon">✿</div><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL GARDEN EDITOR <span className="version">P001</span></div></div></div>
+      <div className="brand"><div className="brand-icon">✿</div><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL GARDEN EDITOR <span className="version">P002</span></div></div></div>
       <div className="top-actions">
         <span className={`save-status ${saved ? '' : 'danger'}`}><span className="status-dot" /> {saved ? 'LOCAL SAVE' : 'NOT SAVED'}</span>
         <button className="btn btn-muted" onClick={() => fileRef.current?.click()} title="Import garden JSON">IMPORT</button>
@@ -243,11 +272,23 @@ export default function App() {
         </div>
         <div className="section-heading list-heading"><span>02 / GARDEN ITEMS</span><span className="pill">{garden.objects.length}</span></div>
         <div className="item-list">
-          {garden.objects.map(o => <button key={o.id} className={`object-entry ${selectedId === o.id ? 'active' : ''}`} onClick={() => { setSelectedId(o.id); setTool(null); }}>
-            <PixelIcon kind={o.kind} size={29} /><span className="object-title">{o.name}<small>{o.id}</small></span><span className="presence">{o.placements[mode] ? '●' : '○'}</span>
+          {garden.objects.map(o => <button key={o.id} className={`object-entry ${selectedId === o.id ? 'active' : ''}`} onClick={() => { selectObject(o.id); setTool(null); }}>
+            <PixelIcon kind={o.kind} size={29} /><span className="object-title">{o.name}<small>{o.id}{o.groupId && <> · {garden.groups.find(g => g.id === o.groupId)?.name}</>}</small></span><span className="presence">{o.placements[mode] ? '●' : '○'}</span>
           </button>)}
         </div>
         <p className="library-footnote">● placed on this map &nbsp; ○ unplaced</p>
+        <div className="section-heading list-heading"><span>03 / GROUPS</span><span className="pill">{garden.groups.length}</span></div>
+        <p className="panel-hint">Select a group to edit it. Drag any highlighted member to move the whole group on this map.</p>
+        <div className="group-create">
+          <input aria-label="New group name" maxLength={120} placeholder="New group name" value={newGroupName} onChange={e => setNewGroupName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') createGroup(); }} />
+          <button className="btn btn-highlight" onClick={createGroup} disabled={!newGroupName.trim()}>+ ADD</button>
+        </div>
+        <div className="group-list">
+          {garden.groups.map(group => <button key={group.id} className={`group-entry ${selectedGroupId === group.id ? 'active' : ''}`} onClick={() => selectGroup(group.id)} aria-pressed={selectedGroupId === group.id}>
+            <span className="group-symbol">▦</span><span className="group-title">{group.name}<small>{group.id}</small></span>
+            <span className="group-count">{garden.objects.filter(o => o.groupId === group.id).length}</span>
+          </button>)}
+        </div>
       </aside>
 
       <section className="editor-column">
@@ -260,20 +301,23 @@ export default function App() {
         </div>
         <div className="map-frame">
           <div className="map-toolbar"><span><span className="live-dot" /> {mode === 'scale' ? 'SCALE MAP · 40 × 26 M' : 'ILLUSTRATED MAP · FREEFORM'}</span><span>PIXEL VIEW / TOP DOWN</span></div>
-          <MapCanvas garden={garden} mode={mode} selectedId={selectedId} tool={tool} zoom={zoom} onPick={setSelectedId} onPlace={addObject} onMove={moveObject} />
-          <div className="map-bottom"><span>{tool ? `PLACE ${info(tool).label.toUpperCase()} · TAP MAP` : 'SELECT OR DRAG AN OBJECT · TAP EMPTY SPACE TO DESELECT'}</span><div className="zoom-controls"><button aria-label="Zoom out" onClick={() => setZoom(x => Math.max(75, x - 25))}>−</button><span>{zoom}%</span><button aria-label="Zoom in" onClick={() => setZoom(x => Math.min(200, x + 25))}>+</button></div></div>
+          <MapCanvas garden={garden} mode={mode} selectedId={selectedId} selectedGroupId={selectedGroupId} tool={tool} zoom={zoom} onPick={selectObject} onPlace={addObject} onMove={moveObject} />
+          <div className="map-bottom"><span>{tool ? `PLACE ${info(tool).label.toUpperCase()} · TAP MAP` : selectedGroup ? 'GROUP SELECTED · DRAG A HIGHLIGHTED MEMBER TO MOVE ALL PLACED MEMBERS' : 'SELECT OR DRAG AN OBJECT · TAP EMPTY SPACE TO DESELECT'}</span><div className="zoom-controls"><button aria-label="Zoom out" onClick={() => setZoom(x => Math.max(75, x - 25))}>−</button><span>{zoom}%</span><button aria-label="Zoom in" onClick={() => setZoom(x => Math.min(200, x + 25))}>+</button></div></div>
         </div>
         <div className="status-message" role="status"><span>✦</span> {notice}</div>
-        <div className="feature-strip"><span>■ OFFLINE FIRST</span><span>■ SEPARATE MAP POSITIONS</span><span>■ SINGLE SHARED RECORD</span></div>
+        <div className="feature-strip"><span>■ OFFLINE FIRST</span><span>■ SEPARATE MAP POSITIONS</span><span>■ DURABLE GROUPS</span></div>
       </section>
 
       <aside className="panel details-panel">
-        <div className="section-heading"><span>03 / INSPECTOR</span><span className="keycap">EDIT</span></div>
+        <div className="section-heading"><span>04 / INSPECTOR</span><span className="keycap">EDIT</span></div>
         {selected ? <>
           <div className="selected-preview"><div className="preview-art"><PixelIcon kind={selected.kind} size={88} /></div><div className="preview-id">{selected.id}</div><div className="preview-kind">{info(selected.kind).label.toUpperCase()} / SHARED RECORD</div></div>
           <div className="field"><label htmlFor="obj-name">DISPLAY NAME</label><input id="obj-name" maxLength={80} value={selected.name} onChange={e => updateObject(selected.id, { name: e.target.value })} /></div>
           <div className="field"><label htmlFor="obj-species">SPECIES / TYPE</label><input id="obj-species" maxLength={140} placeholder="Unknown / optional" value={selected.species} onChange={e => updateObject(selected.id, { species: e.target.value })} /></div>
-          <div className="field"><label htmlFor="obj-group">GROUP</label><input id="obj-group" maxLength={120} placeholder="e.g. Back garden" value={selected.group} onChange={e => updateObject(selected.id, { group: e.target.value })} /></div>
+          <div className="field"><label htmlFor="obj-group">GROUP</label><select id="obj-group" value={selected.groupId ?? ''} onChange={e => updateObject(selected.id, { groupId: e.target.value || null })}>
+            <option value="">— UNGROUPED —</option>
+            {garden.groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select></div>
           <div className="field"><label htmlFor="obj-size">{mode === 'scale' ? 'DIAMETER / WIDTH (METRES)' : 'OBJECT SIZE (METRES · SHARED)'}</label><input id="obj-size" type="number" min="0.5" max="20" step="0.5" value={selected.diameterM} onChange={e => { const size = Number(e.target.value); if (Number.isFinite(size) && size >= 0.5 && size <= 20) updateObject(selected.id, { diameterM: size }); }} /></div>
           <div className="field"><label htmlFor="obj-notes">NOTES</label><textarea id="obj-notes" rows={3} maxLength={3000} placeholder="Observations, planting notes..." value={selected.notes} onChange={e => updateObject(selected.id, { notes: e.target.value })} /></div>
           <div className="placement-box"><div className="placement-title">{mode.toUpperCase()} PLACEMENT</div>{selected.placements[mode] ? <>
@@ -281,10 +325,20 @@ export default function App() {
             <button className="text-button" onClick={() => { const placements = { ...selected.placements }; delete placements[mode]; updateObject(selected.id, { placements }); }}>REMOVE FROM THIS MAP</button>
           </> : <><span>Not placed in this layout.</span><button className="btn btn-highlight place-button" onClick={() => moveObject(selected.id, { x: WORLD.width / 2, y: WORLD.height / 2 })}>PLACE AT CENTRE</button></>}</div>
           <button className="btn btn-danger delete-button" onClick={removeObject}>DELETE SHARED RECORD</button>
+        </> : selectedGroup ? <>
+          <div className="group-inspector-heading"><span className="group-inspector-icon">▦</span><div><strong>{selectedGroup.id}</strong><p>{garden.objects.filter(o => o.groupId === selectedGroup.id).length} linked object(s)</p></div></div>
+          <div className="field"><label htmlFor="group-name">GROUP NAME</label><input id="group-name" maxLength={120} value={selectedGroup.name} onChange={e => { if (e.target.value.trim()) updateGroup(selectedGroup.id, { name: e.target.value }); }} /></div>
+          <div className="field"><label htmlFor="group-notes">GROUP NOTES</label><textarea id="group-notes" rows={4} maxLength={3000} value={selectedGroup.notes} placeholder="Common care notes, purpose, location..." onChange={e => updateGroup(selectedGroup.id, { notes: e.target.value })} /></div>
+          <div className="placement-box"><div className="placement-title">GROUP MOVEMENT</div><span>Drag any highlighted member in the {mode} map to move all placed members together. Unplaced members are unchanged; the other map is not affected.</span></div>
+          <div className="group-members"><div className="placement-title">MEMBERS</div>
+            {garden.objects.filter(o => o.groupId === selectedGroup.id).map(o => <button key={o.id} className="member-button" onClick={() => selectObject(o.id)}><PixelIcon kind={o.kind} size={26}/><span>{o.name}</span><span>›</span></button>)}
+            {!garden.objects.some(o => o.groupId === selectedGroup.id) && <p className="panel-hint">No members yet. Select a garden item and assign it using its GROUP field.</p>}
+          </div>
+          <button className="btn btn-danger delete-button" onClick={deleteGroup}>DELETE GROUP · KEEP OBJECTS</button>
         </> : <div className="empty-inspector"><div className="empty-art">✦</div><strong>NO ITEM SELECTED</strong><p>Tap a tree, shrub, flower, bed or structure to edit its shared record.</p></div>}
         <div className="side-bottom"><button className="text-button" onClick={reset}>↺ RESET SAMPLE GARDEN</button><p>Data stays in this browser unless you export it. Back up important changes.</p></div>
       </aside>
     </main>
-    <footer className="footer">GARDEN ATLAS / P001 · PIXEL GARDEN EDITOR <span>FUTURE: DRAW TOOLS · GROUPS · PLANT ENCYCLOPEDIA · PDF BOOK</span></footer>
+    <footer className="footer">GARDEN ATLAS / P002 · PIXEL GARDEN EDITOR <span>FUTURE: DRAW TOOLS · LAYERS · PLANT ENCYCLOPEDIA · PDF BOOK</span></footer>
   </div>;
 }
