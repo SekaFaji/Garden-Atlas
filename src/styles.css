@@ -152,3 +152,27 @@ select:focus-visible { outline: 2px solid #f5d67c; outline-offset: 2px; }
 .member-button { display: flex; align-items: center; gap: 9px; text-align: left; color: #d7e1cc; background: #254436; border: 1px solid #53745a; padding: 8px; }
 .member-button span:nth-child(2) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .member-button:hover { background: #3f624c; }
+
+/* P003: touch-first editor controls. Fit whole map at 100%; zoom increases scrollable area. */
+.map-scroll { min-height: 0; max-height: 64vh; overflow: auto; overscroll-behavior: contain; touch-action: pan-x pan-y; }
+.garden-map { min-width: 0; max-width: none; touch-action: pan-x pan-y; }
+.map-object { cursor: pointer; }
+.map-edit-controls, .outline-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 9px 11px; background: #1b352a; border-bottom: 1px solid #46674b; }
+.map-edit-controls .btn, .outline-controls .btn { min-height: 42px; padding: 9px 12px; font-size: 11px; }
+.map-edit-controls .btn.active { background: #e4d69d; color: #253b2a; border-color: #fff2bf; }
+.terrain-label { display: inline-flex; gap: 7px; align-items: center; color: #d0dcae; font: bold 11px monospace; margin-left: auto; }
+.terrain-label select { min-height: 42px; padding: 8px; background: #2b4d38; color: #faf7d8; border: 2px solid #60896a; font: bold 12px monospace; }
+.outline-controls { background: #36553c; color: #ffedb4; font: bold 11px monospace; }
+.outline-controls span { flex: 1; min-width: 140px; }
+.garden-file-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.garden-file-actions button { flex: 1; min-height: 43px; font-size: 10px; }
+@media (max-width: 760px) {
+  .map-scroll { min-height: 0; max-height: 62vh; }
+  .map-edit-controls .btn { flex: 1 1 43%; }
+  .terrain-label { width: 100%; margin-left: 0; justify-content: space-between; }
+  .terrain-label select { flex: 1; max-width: 65%; }
+  .map-bottom { align-items: start; }
+  .map-bottom > span { max-width: unset; flex: 1; }
+  .zoom-controls button { min-width: 39px; min-height: 39px; }
+  .top-actions .btn { min-height: 42px; }
+}

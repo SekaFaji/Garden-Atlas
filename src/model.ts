@@ -13,12 +13,20 @@ export interface GardenObject {
   diameterM: number;
   placements: Partial<Record<Mode, Point>>;
 }
+export type Ground = 'grass' | 'soil' | 'gravel' | 'stone';
+export const GROUNDS: { value: Ground; label: string }[] = [
+  { value: 'grass', label: 'Grass' }, { value: 'soil', label: 'Soil' },
+  { value: 'gravel', label: 'Gravel' }, { value: 'stone', label: 'Stone' },
+];
+export interface MapLayout { boundary: Point[]; ground: Ground }
 export interface Garden {
-  version: 2;
+  version: 3;
   name: string;
   groups: GardenGroup[];
   objects: GardenObject[];
+  layouts: Record<Mode, MapLayout>;
 }
+interface GardenV2 extends Omit<Garden, 'version' | 'layouts'> { version: 2 }
 interface LegacyObject extends Omit<GardenObject, 'groupId'> { group: string }
 interface LegacyGarden { version: 1; name: string; objects: LegacyObject[] }
 
@@ -34,10 +42,14 @@ export const KINDS: { kind: Kind; label: string; initialName: string; diameterM:
 export const info = (kind: Kind) => KINDS.find(item => item.kind === kind)!;
 const STORAGE_V1 = 'garden-atlas:p001:v1';
 const STORAGE_V2 = 'garden-atlas:p002:v2';
+const STORAGE_V3 = 'garden-atlas:p003:v3';
+const STORAGE_RECOVERY = 'garden-atlas:p003:recovery';
+const STORAGE_CHECKPOINT = 'garden-atlas:p003:checkpoint-time';
 
 export function demoGarden(): Garden {
   return {
-    version: 2, name: 'Sample Garden',
+    version: 3, name: 'Sample Garden',
+    layouts: defaultLayouts(),
     groups: [
       { id: 'GROUP-001', name: 'Back garden', notes: 'An example garden zone.' },
       { id: 'GROUP-002', name: 'Orchard', notes: '' },
@@ -55,6 +67,97 @@ export function demoGarden(): Garden {
       { id: 'HOUSE-001', kind: 'house', name: 'House (demo)', species: '', groupId: 'GROUP-006', notes: 'Illustrative object; no real address or parcel data.', diameterM: 7, placements: { scale: { x: 20, y: 19 }, illustration: { x: 21, y: 19 } } },
     ],
   };
+}
+
+export function rectangleBoundary(): Point[] {
+  return [{ x: 1, y: 1 }, { x: 39, y: 1 }, { x: 39, y: 25 }, { x: 1, y: 25 }];
+}
+export function defaultLayouts(): Record<Mode, MapLayout> {
+  return {
+    scale: { boundary: rectangleBoundary(), ground: 'grass' },
+    illustration: { boundary: rectangleBoundary(), ground: 'grass' },
+  };
+}
+function isBoundaryPoint(p: unknown): p is Point {
+  if (!p || typeof p !== 'object') return false;
+  const q = p as Record<string, unknown>;
+  return typeof q.x === 'number' && Number.isFinite(q.x) && q.x >= 0 && q.x <= WORLD.width &&
+    typeof q.y === 'number' && Number.isFinite(q.y) && q.y >= 0 && q.y <= WORLD.height;
+}
+const cross = (a: Point, b: Point, c: Point) =>
+  (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+function crosses(a: Point, b: Point, c: Point, d: Point): boolean {
+  const ab1 = cross(a, b, c), ab2 = cross(a, b, d);
+  const cd1 = cross(c, d, a), cd2 = cross(c, d, b);
+  const onSegment = (p: Point, q: Point, t: Point): boolean =>
+    Math.abs(cross(p, q, t)) < 1e-9 &&
+    t.x >= Math.min(p.x, q.x) - 1e-9 && t.x <= Math.max(p.x, q.x) + 1e-9 &&
+    t.y >= Math.min(p.y, q.y) - 1e-9 && t.y <= Math.max(p.y, q.y) + 1e-9;
+  if (onSegment(a, b, c) || onSegment(a, b, d) || onSegment(c, d, a) || onSegment(c, d, b)) return true;
+  return (ab1 > 0) !== (ab2 > 0) && (cd1 > 0) !== (cd2 > 0);
+}
+/** Simple, non-self-intersecting polygon on the current 40 × 26 editor canvas. */
+export function validBoundary(value: unknown): value is Point[] {
+  if (!Array.isArray(value) || value.length < 3 || value.length > 64 || !value.every(isBoundaryPoint)) return false;
+  const points = value as Point[];
+  let twiceArea = 0;
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i], b = points[(i + 1) % points.length];
+    if (Math.hypot(a.x - b.x, a.y - b.y) < 0.1) return false;
+    twiceArea += a.x * b.y - b.x * a.y;
+    for (let j = i + 1; j < points.length; j++) {
+      if (j === i + 1 || (i === 0 && j === points.length - 1)) continue;
+      if (crosses(a, b, points[j], points[(j + 1) % points.length])) return false;
+    }
+  }
+  return Math.abs(twiceArea) >= 2;
+}
+function validLayout(value: unknown): value is MapLayout {
+  if (!value || typeof value !== 'object') return false;
+  const layout = value as Record<string, unknown>;
+  return GROUNDS.some(g => g.value === layout.ground) && validBoundary(layout.boundary);
+}
+export function polygonArea(points: Point[]): number {
+  return Math.abs(points.reduce((sum, p, i) => {
+    const next = points[(i + 1) % points.length];
+    return sum + p.x * next.y - next.x * p.y;
+  }, 0)) / 2;
+}
+
+/** A blank local project; the public demo is never required as a starting point. */
+export function emptyGarden(): Garden {
+  return { version: 3, name: 'My Garden', groups: [], objects: [], layouts: defaultLayouts() };
+}
+/** Insert a new midpoint along the longest edge. Corners can then be moved to shape the plot. */
+export function addBoundaryCorner(garden: Garden, mode: Mode): Garden | null {
+  const boundary = garden.layouts[mode].boundary;
+  if (boundary.length >= 32) return null;
+  let longest = -1, edge = 0;
+  for (let i = 0; i < boundary.length; i++) {
+    const a = boundary[i], b = boundary[(i + 1) % boundary.length];
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    if (length > longest) { longest = length; edge = i; }
+  }
+  if (longest < 0.2) return null;
+  const a = boundary[edge], b = boundary[(edge + 1) % boundary.length];
+  const next = [...boundary];
+  next.splice(edge + 1, 0, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  return validBoundary(next) ? { ...garden, layouts: { ...garden.layouts, [mode]: { ...garden.layouts[mode], boundary: next } } } : null;
+}
+/** Reject crossing or degenerate edits; never silently damage the saved outline. */
+export function moveBoundaryCorner(garden: Garden, mode: Mode, index: number, point: Point): Garden | null {
+  const boundary = garden.layouts[mode].boundary;
+  if (!Number.isInteger(index) || index < 0 || index >= boundary.length) return null;
+  const next = boundary.map((p, i) => i === index ? clampPoint(point) : p);
+  if (!validBoundary(next)) return null;
+  return { ...garden, layouts: { ...garden.layouts, [mode]: { ...garden.layouts[mode], boundary: next } } };
+}
+export function removeBoundaryCorner(garden: Garden, mode: Mode, index: number): Garden | null {
+  const boundary = garden.layouts[mode].boundary;
+  if (boundary.length <= 3 || !Number.isInteger(index) || index < 0 || index >= boundary.length) return null;
+  const next = boundary.filter((_, i) => i !== index);
+  if (!validBoundary(next)) return null;
+  return { ...garden, layouts: { ...garden.layouts, [mode]: { ...garden.layouts[mode], boundary: next } } };
 }
 
 export function clampPoint(p: Point): Point {
@@ -91,26 +194,35 @@ function isLegacyGarden(value: unknown): value is LegacyGarden {
   return g.version === 1 && isText(g.name) && Array.isArray(g.objects) && g.objects.length <= 3000 &&
     validObjects(g.objects, o => isText(o.group));
 }
-/** Verify records and group references before accepting an imported/saved garden. */
-export function isGarden(value: unknown): value is Garden {
-  if (typeof value !== 'object' || value === null) return false;
-  const g = value as Record<string, unknown>;
-  if (g.version !== 2 || !isText(g.name) || !Array.isArray(g.objects) || g.objects.length > 3000 ||
-      !Array.isArray(g.groups) || g.groups.length > 1000) return false;
+/** Verify existing shared records and groups in both P002 and P003 files. */
+function validShared(value: Record<string, unknown>): boolean {
+  if (!isText(value.name) || !Array.isArray(value.objects) || value.objects.length > 3000 ||
+      !Array.isArray(value.groups) || value.groups.length > 1000) return false;
   const ids = new Set<string>();
-  if (!g.groups.every((entry: unknown) => {
+  if (!value.groups.every((entry: unknown) => {
     if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return false;
     const gr = entry as Record<string, unknown>;
     if (!isText(gr.id) || !gr.id || ids.has(gr.id) || !isText(gr.name) || !gr.name.trim() || !isText(gr.notes)) return false;
     ids.add(gr.id);
     return true;
   })) return false;
-  return validObjects(g.objects, o => (o.groupId === null || typeof o.groupId === 'string' && ids.has(o.groupId)));
+  return validObjects(value.objects, o => o.groupId === null || typeof o.groupId === 'string' && ids.has(o.groupId));
 }
-
-/** Migrate P001 group labels to durable group IDs without changing any specimen or coordinates. */
+function isGardenV2(value: unknown): value is GardenV2 {
+  return !!value && typeof value === 'object' && (value as GardenV2).version === 2 &&
+    validShared(value as Record<string, unknown>);
+}
+export function isGarden(value: unknown): value is Garden {
+  if (!value || typeof value !== 'object') return false;
+  const g = value as Record<string, unknown>;
+  if (g.version !== 3 || !validShared(g) || !g.layouts || typeof g.layouts !== 'object') return false;
+  const layouts = g.layouts as Record<string, unknown>;
+  return validLayout(layouts.scale) && validLayout(layouts.illustration);
+}
+/** P001/P002 backups migrate forward without changing object IDs, groups or positions. */
 export function parseGarden(value: unknown): Garden | null {
   if (isGarden(value)) return value;
+  if (isGardenV2(value)) return { ...value, version: 3, layouts: defaultLayouts() };
   if (!isLegacyGarden(value)) return null;
   const groups: GardenGroup[] = [];
   const byName = new Map<string, string>();
@@ -123,11 +235,10 @@ export function parseGarden(value: unknown): Garden | null {
       byName.set(key, groupId);
       groups.push({ id: groupId, name: trimmed, notes: '' });
     }
-    // Explicit properties avoid retaining legacy group labels in new backups.
     return { id: o.id, kind: o.kind, name: o.name, species: o.species, groupId,
       notes: o.notes, diameterM: o.diameterM, placements: o.placements };
   });
-  const upgraded: Garden = { version: 2, name: value.name, groups, objects };
+  const upgraded: Garden = { version: 3, name: value.name, groups, objects, layouts: defaultLayouts() };
   return isGarden(upgraded) ? upgraded : null;
 }
 export function nextGroupId(garden: Garden): string {
@@ -166,24 +277,44 @@ export function movePlaced(garden: Garden, id: string, mode: Mode, requested: Po
   }) };
 }
 
-/** Save to a new key; P001 local data remains untouched as a safety backup. */
+/** Each browser keeps its own garden. V1/V2 are retained for safe migration. */
 export function loadGarden(): Garden {
   try {
-    const current = localStorage.getItem(STORAGE_V2);
-    if (current) {
-      const parsed = parseGarden(JSON.parse(current) as unknown);
-      if (parsed) return parsed;
+    for (const key of [STORAGE_V3, STORAGE_RECOVERY, STORAGE_V2, STORAGE_V1]) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      try {
+        const parsed = parseGarden(JSON.parse(raw) as unknown);
+        if (parsed) return parsed;
+      } catch { /* Try the next recovery source when an individual key is corrupt. */ }
     }
-    const legacy = localStorage.getItem(STORAGE_V1);
-    if (legacy) {
-      const parsed = parseGarden(JSON.parse(legacy) as unknown);
-      if (parsed) return parsed;
-    }
-  } catch { /* Private mode or malformed storage: show the example in memory. */ }
+  } catch { /* Private mode or disabled storage: show the example in memory. */ }
   return demoGarden();
 }
+/** Keep a previous valid snapshot in the same browser as a limited recovery copy. */
 export function saveGarden(garden: Garden): boolean {
   if (!isGarden(garden)) return false;
-  try { localStorage.setItem(STORAGE_V2, JSON.stringify(garden)); return true; }
-  catch { return false; }
+  try {
+    const next = JSON.stringify(garden);
+    const previous = localStorage.getItem(STORAGE_V3);
+    if (previous && previous !== next) {
+      try {
+        const last = Number(localStorage.getItem(STORAGE_CHECKPOINT) || 0);
+        if (Date.now() - last >= 60_000 && parseGarden(JSON.parse(previous) as unknown)) {
+          localStorage.setItem(STORAGE_RECOVERY, previous);
+          localStorage.setItem(STORAGE_CHECKPOINT, String(Date.now()));
+        }
+      } catch { /* A failed recovery copy must not prevent saving the current garden. */ }
+    }
+    localStorage.setItem(STORAGE_V3, next);
+    return true;
+  } catch { return false; }
+}
+
+/** Limited second local copy; it is not a substitute for user-downloaded backups. */
+export function loadRecoveryGarden(): Garden | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_RECOVERY);
+    return raw ? parseGarden(JSON.parse(raw) as unknown) : null;
+  } catch { return null; }
 }

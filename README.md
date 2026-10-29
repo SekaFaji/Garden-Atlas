@@ -1,73 +1,64 @@
 # 🌿 Garden Atlas
 
-**A pixel-art-inspired garden map editor built with TypeScript, React, SVG, and Vite.**
+**A pixel-art-inspired garden editor made with TypeScript, React, SVG, and Vite.** [Try the web app](https://sekafaji.github.io/Garden-Atlas/).
 
-> P002 is an early interactive prototype, not a finished landscape surveying tool. Its bundled garden is **synthetic sample data**, not anyone's private property.
+Garden Atlas helps you place and document trees, shrubs, flowers and structures on **two independent maps**: a measured Scale layout and a creative Illustration layout. Both maps reference the same object and group records. This is an early editor, not a professional survey application.
 
-## Current features (P002)
+## P003 features
 
-- **Two maps, one set of records:** Scale and Illustration modes keep independent placements for the same garden objects.
-- **Original pixel-block SVG sprites:** trees, shrubs, flowers, beds and structures (no copied game assets).
-- **Interactive editing:** select, drag, add, rename, resize, describe and delete objects.
-- **Editable groups:** create and rename groups, maintain group notes, assign existing objects and select members. Selecting a group highlights its placed members; drag a highlighted item to move the entire group in the active layout.
-- **Scale map:** 40 × 26 metre *sample canvas*, with 1 metre grid lines and 0.5 metre placement snapping. Scale measurements currently describe a flat plan, not geospatial surveying data.
-- **Illustration map:** independent freeform placements and a decorated sample background.
-- **Local save and JSON backup:** data is saved in browser storage, with explicit import/export for portability.
-- **Responsive UI:** desktop inspector/sidebar; mobile-friendly stacked layout and a scrollable/zoomable map.
+- Original pixel-block SVG sprites for trees, shrubs, flowers, garden beds and structures.
+- **Touch-first movement:** tap an item, press **MOVE SELECTED**, then tap its destination. Select a group and use **MOVE GROUP** to move its placed members together. Mouse/pen dragging is still available.
+- **Mobile-fitting map:** at 100% zoom, the map fits the content width; zooming enlarges the map for detailed work. Touch scrolling no longer triggers accidental placements.
+- **Garden boundaries:** on either map, choose **EDIT OUTLINE**, select a numbered corner, then tap its new location; add and remove corners. Invalid self-crossing or collapsed polygons are rejected.
+- **Ground style per map:** grass, soil, gravel or stone. This changes the whole plot's base texture, **not** elevation or multiple terrain zones.
+- **Groups:** durable group IDs, shared notes, memberships, and selected-group movement.
+- **Autosave:** project JSON stored locally in this browser with a limited previous-save recovery snapshot. A **NOT SAVED** indicator warns if browser storage fails.
+- **User-owned gardens:** **EMPTY GARDEN** starts a blank project; **BACKUP** downloads a named, dated JSON file; **IMPORT** restores a JSON file after confirmation. Backups include the layout, objects and groups.
+- **Compatibility:** P001 and P002 JSON/local browser saves migrate automatically to version 3 without losing specimen IDs, groups or saved positions. Old browser storage keys remain untouched.
 
-## Run locally
+## Quick start
 
-Prerequisites: Node.js 20.19+ or 22.12+, npm.
+1. Open the app on desktop or mobile. It starts with a **synthetic demonstration garden** unless this browser has a valid local save.
+2. Choose **+ EMPTY GARDEN** (bottom of the Inspector) for your own project. Rename it using the garden-name field.
+3. Choose Illustration or Scale. Use **EDIT OUTLINE**, select a corner by number, and tap the intended new location. **+ CORNER** subdivides a long edge.
+4. Choose an object from the toolbox and tap the map to place it, or select an existing object and tap **MOVE SELECTED** before tapping a destination. Objects can be left unplaced in either mode.
+5. Change the **GROUND** dropdown for this map. Objects and the other map's ground/outline are unchanged.
+6. Use the Inspector to edit object information. Assign objects to groups with the Group selector.
+7. When you've made useful progress, press **BACKUP** and save the JSON file. Import that file on another device or browser to continue there.
+
+### Saving and privacy
+
+Each browser origin/profile has its **own local garden data**, and edits are saved automatically to `localStorage`. The app has no login, server database or cloud sync. Browser data can be cleared, storage can be full/blocked, and different devices do **not** automatically share changes. Download regular JSON backups, especially before switching devices, clearing browser data or resetting a project. The local recovery snapshot is a limited safety net, **not** an external backup.
+
+JSON backups may contain personal garden descriptions. The public repository includes only fake demonstration data, no real property survey or personal photos. Import replaces the current project in this browser **only after explicit confirmation**. Export your current garden first if you want to keep it.
+
+### Current constraints
+
+- The example workspace is fixed at **40 × 26 local units/metres**. You can draw non-rectangular plots inside that canvas, but cannot yet resize the world; larger or non-metric properties need a future patch.
+- Scale measurements describe a flat local map with a 1-metre grid and approximate polygon area, not GPS, altitude, a cadastral survey or true slopes.
+- Each map currently has a single ground style. Multiple soil/grass/path polygons, elevation, property resizing and true landscape measurements are planned for later.
+- You can edit an outline independently in Scale and Illustration modes. Objects outside the outline remain in the project intentionally so no specimen disappears if you reshape the boundary.
+- This prototype supports a single active garden per browser; use JSON backups to maintain multiple projects. The planned garden library, photo storage, encyclopedia, full offline-service-worker support and PDF garden book are not yet implemented.
+
+## Development
+
+Requires Node.js 20.19+ or 22.12+ and npm:
 
 ```bash
 npm install
 npm run dev
-```
-
-Open the local URL printed by Vite. Build with:
-
-```bash
 npm test
 npm run build
-npm run preview
 ```
 
-## GitHub Pages
-
-The application has Vite `base: '/Garden-Atlas/'` configured for `https://sekafaji.github.io/Garden-Atlas/`. A GitHub Actions workflow in `.github/workflows/deploy.yml` builds and publishes the `dist` directory. Enable **Settings → Pages → Build and deployment → GitHub Actions** if it is not already enabled. Every push to `main` will trigger the deployment workflow once Actions/Pages permissions permit it.
-
-## Using the editor
-
-1. Choose **Illustration** or **Scale** above the map.
-2. Select an object in the toolbox, then tap/click an empty spot on the map to place it. The corresponding object remains *unplaced* on the other map until explicitly positioned there.
-3. Click/tap an item or use the item list; drag it within the current map. Its shared record remains unchanged in the other mode.
-4. Use the **GROUPS** section to create a group. Assign an object to it using the inspector GROUP dropdown. Select a group in the sidebar to edit its name/notes and see members; drag any highlighted member to move the whole group in the current map.
-5. Edit each object’s name, species, dimensions and notes in the inspector.
-6. Use **Backup** to save a JSON file, and **Import** to restore one (including P001 backups).
-
-**Important:** Automatic browser storage is not a safe long-term backup by itself. Back up your JSON file, especially before clearing site data or switching browsers/devices. The app intentionally has no backend, account or cloud sync.
-
-## Data & privacy
-
-- All records are stored locally in the current browser's `localStorage` (P001 foundation only).
-- Exported JSON can contain garden descriptions or other personal information; only share it if you intend to.
-- The repository contains **no real property survey, address, parcel polygon or private photos**.
-- Current JSON format is `version: 2`. P001 (`version: 1`) JSON is automatically migrated on import or first local load. The older P001 browser key is intentionally left intact during upgrade.
-- Browser storage limits may apply. Photo attachments and larger galleries will require IndexedDB in later patches.
-
-## Planned, not yet implemented
-
-Polygon/curve drawing; hedge/path shape grouping; layers; planted/real versus planned states; calibrated measurements; photo/species encyclopedia; maintenance history; richer mobile gestures; undo/redo; PDF garden book; import/export of entire media libraries.
+The deployed build uses `base: '/Garden-Atlas/'` in Vite. `.github/workflows/deploy.yml` runs tests and a production build on pushes to `main`, then deploys to GitHub Pages when Pages is enabled under **Settings → Pages → GitHub Actions**.
 
 ## Data compatibility
 
-P001 saves grouped items with plain-text labels. P002 converts each distinct label to a stable group ID, retains object IDs and both map positions, and saves to a **new** localStorage key. Export a new JSON backup after upgrading. This is still a single-garden prototype.
+Current format: `version: 3`, with `groups`, `objects`, and `layouts.scale` / `layouts.illustration` containing polygon boundaries and a ground style. Import validates every record. P001/P002 inputs receive default rectangular boundaries and grass without changing old object data. The new browser key is `garden-atlas:p003:v3`; older keys remain as migration fallbacks.
 
-## Design principles
+## Roadmap
 
-- One stable record ID per garden object; placements belong separately to each map mode.
-- Accurate map coordinates are never overwritten by freeform illustration edits.
-- Offline first, no account required, transparent local data ownership.
-- Incremental numbered patches with small, reviewable changes.
+Configurable world dimensions, terrain zones, scalable paths and shapes, richer touch gestures, undo/redo, multiple named gardens, species library, specimen photos, maintenance logs, layers, existing/planned scenarios and PDF generation.
 
-Made for hobby gardeners and small garden projects. The artwork, code and sample layout are original to this repository.
+Released as an open-source hobby project. Original artwork and no copied game assets.

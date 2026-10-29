@@ -1,27 +1,34 @@
 # Garden Atlas — Project status
 
-Current patch: **P002**
+Current patch: **P003 — Mobile Controls, Garden Outline & Backup Safety**
 
-## Confirmed project decisions
-- Public TypeScript + React web app, hosted through GitHub Pages and compatible with mobile browsers.
-- Pixel-art-inspired scalable SVG visuals.
-- Shared object records and independent Scale/Illustration placements.
-- Scale mode uses local metre coordinates; Illustration mode is freeform.
-- Offline-first local data, explicit JSON backups, and no account requirement.
-- Public sample data is synthetic, not a copy of a private property survey.
+## Core decisions
+- Public TypeScript + React + SVG pixel-art-inspired web app, deployed to GitHub Pages.
+- Mobile and desktop editing in the browser, no hosting/backend for user garden data.
+- Scale and Illustration keep independent positions and outlines; both share object/group records.
+- User-controlled local autosaving and JSON backups. No automatic cross-device sync.
+- Public sample property data is synthetic, not the user's real property survey.
 
-## Implemented through P002
-- Interactive map, sprite toolbox, drag-and-drop object placement, shared record inspector.
-- Garden groups with stable IDs, name and notes, membership assignments, member navigation.
-- Active-map group dragging while preserving member spacing and the untouched alternate map.
-- Versioned v2 JSON format; P001 local data and backups can be migrated without losing records.
-- Local autosave and import/export.
+## Implemented
+- Pixel SVG objects, editable shared records, drag-and-place controls, group creation and movement.
+- Touch-first tap-to-move action for objects and groups; scroll-friendly, mobile-fitting map.
+- Polygon plot per mode with selectable corners, add/remove, invalid polygon rejection, area in Scale mode.
+- Whole-plot ground style per mode: grass/soil/gravel/stone.
+- Blank garden option; JSON import/export, autosaving and limited local previous-save recovery.
+- P001/P002 → P003 model migration using new browser key; prior saved keys preserved.
+- 19 model tests verifying groups, migration, geometry, storage and independence.
 
-## Planned but not implemented
-- Actual property boundaries, polygon/path drawing, precise calibration, editable object art variants.
-- Layer controls, undo/redo, existing/planned scenarios, multi-garden library.
-- Species encyclopedia, specimen photos and observation histories.
-- Garden book PDF creation and maintenance planner.
+## Known limitations
+- Plot editor works only inside fixed sample 40 × 26 m canvas; not arbitrary garden dimensions yet.
+- Only one polygon and one ground texture per map; slopes, elevation and internal patches are not modeled.
+- Browser storage is not durable after clearing site data, and isn't synchronized across devices. Download JSON backups.
+- Touch drag gestures intentionally use tap-to-move for reliability; mouse/pen can drag.
+- No browser-based screenshot test in the automated model test suite.
+
+## Planned
+- Configurable map dimensions, region painting, path/fence polygons, undo/redo and layers.
+- Multi-garden library, IndexedDB photo support, plant encyclopedia, care histories.
+- Existing/planned scenarios and PDF garden-book export.
 
 ## Deployment
-`main` is the requested release branch. `.github/workflows/deploy.yml` runs tests and build on every push and attempts a GitHub Pages deployment. A Pages URL is only ready after a successful GitHub Actions workflow.
+`main` is the requested release branch. GitHub Actions runs tests, production build and GitHub Pages deployment. Check workflow status before claiming a release is live.

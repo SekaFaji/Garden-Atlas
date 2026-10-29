@@ -33,3 +33,20 @@
 - A group contains shared object records; it is not yet a drawable hedge line or a terrain polygon.
 - Group movement operates on already-placed objects in the current map only. An unplaced object is placed individually.
 - Photos, layers, advanced shape drawing and printable garden books remain future patches.
+
+## P003 — Mobile Controls, Garden Outline & Backup Safety (2026-10-29)
+
+- Added touch-friendly tap-to-move controls and map-width fitting at 100% zoom. Desktop mouse/pen drag is retained.
+- Added polygon outline editing per map with indexed corners and add/remove tools; invalid boundary edits are rejected.
+- Added configurable whole-plot ground styles: grass, soil, gravel and stone, independent by map mode.
+- Added new blank garden creation without demo content, plus clear browser-autosave and backup/recovery messaging.
+- Improved JSON backup naming and P001/P002 data migration into `version: 3`; retained older browser storage keys.
+- Added limited previous-save browser recovery fallback for an invalid current save; downloadable JSON is still the essential backup.
+- Expanded the model test suite to 19 passing tests. Fixed malformed-key fallback and boundary edge intersection handling.
+
+### P003 limitations
+
+- The workspace remains fixed at 40 × 26, so the plot outline is editable only within that space.
+- Ground style applies to the whole plot, not multiple terrain regions, slopes or elevations.
+- LocalStorage and previous-save recovery cannot survive browser data clearing or guarantee no data loss; export JSON regularly.
+- P003 is not a finished landscape surveying tool; full UI/device interaction must be verified after GitHub Pages deployment.
