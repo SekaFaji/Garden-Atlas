@@ -1,3 +1,14 @@
+## P007 — Linked Maps & Safer Undo/Redo (2026-10-29)
+
+- Linked Scale and Illustration views through one authoritative layout and one location per specimen.
+- Map edits (trees, boundaries, ground regions, paths, fences) now appear in both views automatically.
+- Added a data-version-6 migration with explicit Scale/Illustration source choice for existing gardens.
+- Archived each complete original pre-link garden, including both independent layouts; original maps can be exported.
+- Moved undo/redo controls near the map and added desktop keyboard shortcuts with field-aware handling.
+- Coalesced consecutive edits to one text field into fewer undo steps; kept 40 action snapshots per session.
+- Preserved JSON imports, browser autosaving, multi-garden library and original pixel-art sprites.
+- Updated test suite to cover migration, archive round-trips, linked geometries and edit grouping.
+
 # Changelog
 
 ## P001 — Pixel Garden Editor Foundation (2026-10-29)

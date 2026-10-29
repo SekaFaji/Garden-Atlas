@@ -1,37 +1,35 @@
 # Garden Atlas — Project status
 
-Current release: **P006 — Paths & fences with versioned data migration**
+Current patch: **P007 — Linked Scale/Illustration views & safer edit history**.
 
-## Confirmed design
-- TypeScript / React / SVG, pixel-art UI hosted on GitHub Pages; works on desktop and phone.
-- One shared record per item; independently edited Scale and Illustration map placements.
-- Map viewport and camera independent of the property's editable outline.
-- Browser-local projects and JSON backup. No account, cloud sync or geographic survey claim.
+## Source-of-truth decision
+- Scale and Illustration now display **the same** objects, coordinates, property boundary, ground regions, paths and fences.
+- They remain different **visual presentations**: the measured grid vs the pixel-art environment. They do not represent independent garden designs.
+- The project model is version **6**, with a single canonical `layout` and optional `object.position`.
 
-## P004 implemented
-- Pointer-based object drag, map panning, pinch/wheel zoom, fit/area, large touch targets, visible map selection.
-- New polygon and freehand outline tools; direct vertex editing and arbitrary edge insertion.
-- Resizable metric workspaces and independent ground terrain polygon regions.
-- Duplicate, repeat-placement, groups and group dragging, show/hide layers, undo/redo.
-- Up to 20 saved local garden projects, JSON garden or library import/export and a recovery snapshot.
-- V1/V2/V3 garden migration; preserves old browser keys.
+## Data migration
+- P001–P006 JSON backups and browser project-library saves are accepted using the preserved v5 legacy parser.
+- A migration banner requires the user to choose **Scale** or **Illustration** as the shared source before editing.
+- The **entire previous v5 garden** (including both old layouts and placements) remains in `linkMigration.original` and in subsequent JSON backups.
+- The source-selection preview is non-destructive; confirmation only changes the editable shared layout.
+- An **Export original pre-link maps** control remains available in My Gardens, even after confirmation.
+- Import/export and local autosave remain browser-only. The original previous-browser library format remains recoverable through the retained archived data, but automatic save updates its library JSON to the current format.
 
-## P005 implemented
-- Quick sprite palette adjacent to the map for mobile placing and selection.
-- Batch selection of multiple records in the object list and group assignment.
-- Printable HTML garden book with two vector maps, group list and full specimen inventory. PDF uses browser Print → Save as PDF (not an automatic PDF download).
+## Undo / redo
+- Clear controls near the map on both desktop and mobile.
+- Desktop keyboard shortcuts: Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z, Cmd/Ctrl+Y, excluding native text-field editing.
+- Continuous typing to a single field is consolidated into one undo step when keystrokes occur within a short burst.
+- Non-text edits such as drawing a path, placing an object and moving a group remain one undo step each.
+- Existing 40-state in-memory history remains session-local; it is not a replacement for JSON backups.
 
-## P006 implemented
-- Interactive path and fence polylines on either map. Tap waypoints, finish, rename, adjust width or delete a feature.
-- Path/fence strokes render under garden objects and appear in printed garden reports.
-- Garden data format v5, safe imports from v1–v4, automatic migration of saved browser library entries.
-- 27 automated tests covering safety, migration, geometry and camera behavior.
+## Remaining roadmap
+- P008: multi-select on the map, transform handles, snapping and alignment.
+- P009: edit paths/fences/terrain after drawing, layer locking and reordering.
+- P010: pixel art variants and custom object types.
+- P011: richer encyclopedia and specimen records, dated maintenance and photos.
+- P012: enriched printable reports, media storage and offline-PWA safety.
 
-## Not implemented yet
-- IndexedDB/media storage and photo attachments; real geospatial/altitude data.
-- Existing/Planned layers, on-map multi-select, fence posts/segment editing, custom object symbols, plant encyclopedia and rich/automatic PDF exporting.
-- Full phone-device touch regression testing; release automation build alone cannot guarantee gesture quality.
-
-## Testing
-- Node model/storage tests and GitHub Actions TypeScript build/deploy.
-- Browser save and recovery must be tested after deployment on an actual phone.
+## Validation
+- Model/storage/geometry/camera/history tests run with `npm test`.
+- CI runs `npm test` then `npm run build` on `main` before GitHub Pages deployment.
+- Actual mobile gesture testing remains important; automated tests do not prove a physical phone's touch feel.

@@ -53,7 +53,7 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,lin
     if(!initialFit.current&&size.width>2&&size.height>2){initialFit.current=true;setCamera(fitCamera(garden,size));}
   },[size.width,size.height,garden]);
   useEffect(()=>{setDraft([]);setPreview(null);setCornerPreview(null);activeRef.current=null;pointsRef.current.clear();pinchRef.current=null;},[mode,tool,garden.width,garden.height]);
-  const fit=(outer=false)=>{setCamera(fitCamera(garden,size,outer?undefined:garden.layouts[mode].boundary,outer?1.75:1.17));};
+  const fit=(outer=false)=>{setCamera(fitCamera(garden,size,outer?undefined:garden.layout.boundary,outer?1.75:1.17));};
   const zoomAt=(factor:number,x:number,y:number)=>{
     setCamera(zoomCamera(cameraRef.current,size,factor,x,y));
   };
@@ -99,7 +99,7 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,lin
     }
     if(tool==='outline-edit'&&edge){
       const index=Number(edge.dataset.edge);
-      const b=garden.layouts[mode].boundary;
+      const b=garden.layout.boundary;
       const closest=closestEdge(b,start);
       if(closest&&closest.index===index){
         const next=[...b];next.splice(index+1,0,clampPoint(closest.point,garden));
@@ -110,10 +110,10 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,lin
     if((tool==='select')&&hit&&!hidden.objects){
       const id=hit.dataset.object!;
       const obj=garden.objects.find(o=>o.id===id);
-      if(obj?.placements[mode]){
+      if(obj?.position){
         const together=Boolean(selectedGroupId&&obj.groupId===selectedGroupId);
         if(!together)onPick(id);
-        activeRef.current={kind:'object',id,start:clampPoint(start,garden),anchor:obj.placements[mode]!,together,moved:false};return;
+        activeRef.current={kind:'object',id,start:clampPoint(start,garden),anchor:obj.position!,together,moved:false};return;
       }
     }
     if(tool==='pan'||tool==='select'||tool==='outline-edit')activeRef.current={kind:'pan',x:e.clientX,y:e.clientY,camera:cameraRef.current};
@@ -149,7 +149,7 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,lin
       setPreview(null);return;
     }
     if(a.kind==='corner'){
-      if(a.moved){const boundary=garden.layouts[mode].boundary.map((pt,i)=>i===a.index?clampPoint(snap(p,mode),garden):pt);if(validPolygon(boundary,garden))onBoundary(boundary);else onNotice('Invalid outline. Edit cancelled to keep your garden safe.');}
+      if(a.moved){const boundary=garden.layout.boundary.map((pt,i)=>i===a.index?clampPoint(snap(p,mode),garden):pt);if(validPolygon(boundary,garden))onBoundary(boundary);else onNotice('Invalid outline. Edit cancelled to keep your garden safe.');}
       setCornerPreview(null);return;
     }
     if(a.kind==='freehand'){
@@ -170,7 +170,7 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,lin
   const wheel=(event:ReactWheelEvent<SVGSVGElement>)=>{
     event.preventDefault();const r=event.currentTarget.getBoundingClientRect();zoomAt(Math.exp(-event.deltaY*.0012),event.clientX-r.left,event.clientY-r.top);
   };
-  const layout=garden.layouts[mode],place=garden.objects.find(o=>o.id===preview?.id)?.placements[mode];
+  const layout=garden.layout,place=garden.objects.find(o=>o.id===preview?.id)?.position;
   const groupIds=preview?.together?garden.objects.filter(o=>o.groupId&&o.groupId===garden.objects.find(x=>x.id===preview.id)?.groupId).map(o=>o.id):[];
   const dx=preview&&place?preview.point.x-place.x:0,dy=preview&&place?preview.point.y-place.y:0;
   const vw=size.width/camera.z,vh=size.height/camera.z;
@@ -200,7 +200,7 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,lin
       </g>)}
       {!hidden.boundary&&<polygon points={shape(outline)} fill="none" stroke="#fff3c1" strokeWidth={Math.max(1.5,3/camera.z)} strokeDasharray={mode==='scale'?'10 6':undefined} pointerEvents="none" />}
       {!hidden.objects&&garden.objects.map(item=>{
-        const original=item.placements[mode];if(!original)return null;
+        const original=item.position;if(!original)return null;
         const active=selectedId===item.id||Boolean(selectedGroupId&&selectedGroupId===item.groupId);
         const dragged=Boolean(preview&&(item.id===preview.id||groupIds.includes(item.id)));
         const offset=dragged?{x:dx,y:dy}:{x:0,y:0};

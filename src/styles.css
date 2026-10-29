@@ -26,3 +26,22 @@
 /* P006: path and fence geometry tools. */
 .terrain-chooser input{background:#173221;color:#f8edce;border:2px solid #6b9772;font:12px monospace;padding:6px;width:80px}
 .line-entry{display:flex;align-items:center;gap:5px;padding:6px;background:#2d4d39;border:1px solid #54765b;margin-top:6px}.line-entry>input{background:#142a1c;color:#f5e9c8;border:1px solid #6a956e;min-width:0;flex:1;padding:6px;font-size:11px}.line-entry label{font:900 8px monospace;width:58px;color:#c9dfaa}.line-entry label input{display:block;width:100%;min-width:0;background:#162d20;color:#fff2d4;border:1px solid #729773;font-size:11px}.line-entry .btn{padding:7px}
+
+/* P007: explicit, non-destructive choice before linking existing two-view gardens. */
+.migration-panel { background:#273d30; color:#f2ecd0; border:3px solid #d9c47d; padding:16px; margin:12px 0 16px; box-shadow:4px 4px 0 #14271b; display:grid; gap:10px; }
+.migration-panel strong { font:900 14px monospace; letter-spacing:.7px; }
+.migration-panel p { margin:0; line-height:1.6; font-size:13px; }
+.migration-panel .migration-note { color:#d2d6b8; font-size:11px; }
+.migration-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.migration-actions button { flex:1; min-width:110px; background:#162b21; border:2px solid #68896f; color:#ebf0cf; padding:11px 8px; font:800 11px monospace; }
+.migration-actions button.active { border-color:#f6d986; color:#f6e9b2; background:#426645; }
+.migration-panel > .btn-highlight { justify-self:stretch; min-height:44px; }
+.map-frame.migration-locked { position:relative; }
+.map-frame.migration-locked::after { content:'CHOOSE A LINKED MAP SOURCE ABOVE BEFORE EDITING'; position:absolute; inset:0; z-index:10; display:flex; align-items:center; justify-content:center; padding:25px; text-align:center; font:900 15px/1.6 monospace; color:#fbefbc; background:rgba(12,27,20,.84); pointer-events:auto; }
+.history button:focus-visible, .migration-panel button:focus-visible { outline:3px solid #fff3b8; outline-offset:2px; }
+@media (max-width:760px) { .migration-panel { padding:12px; } .migration-actions button { font-size:10px; } }
+.editor-history-bar { display:flex; align-items:center; gap:8px; padding:8px 10px; background:#20382c; border-bottom:2px solid #54745b; }
+.editor-history-bar button { background:#385943; color:#f6eed0; padding:9px 12px; min-height:43px; border:2px solid #77956e; font:900 12px monospace; }
+.editor-history-bar button:disabled { opacity:.38; cursor:not-allowed; }
+.editor-history-bar span { color:#b8d3a9; margin-left:auto; font:900 10px monospace; }
+@media(max-width:760px) { .editor-history-bar { position:sticky; top:0; z-index:6; } .editor-history-bar span { font-size:9px; text-align:right; } }

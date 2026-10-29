@@ -6,7 +6,15 @@
 
 Garden Atlas lets people illustrate their garden, maintain shared records for plants and structures, and create a separate dimensioned Scale map. The included example contains **synthetic data only**—not a real address or parcel plan.
 
-## P004–P006 — Touch editor, garden reports, paths and fences
+## P007 — Two connected views, one garden
+
+Garden Atlas is a mobile-friendly garden design web app. Its Scale and Illustration buttons change **how the same garden looks**, not where its objects are stored. A tree, path, fence, ground region or property boundary edited in either view immediately appears in the other. One shared position is retained per item.
+
+**Upgrading a garden from P001–P006:** the old views may contain different positions. On first opening an old garden, preview Scale and Illustration, then explicitly choose which old layout becomes the shared editable map. Until you confirm, garden editing is locked. The entire original garden, including **both** old view layouts and placements, stays in the version-6 `linkMigration.original` archive. Use *Download original two-view backup* or *My Gardens → Export original pre-link maps* to recover either original layout; your JSON garden backup also includes the archive. Do not clear browser data until you have downloaded a backup.
+
+**Undo / Redo:** large, accessible buttons are near the map, with Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z and Ctrl/Cmd+Y outside text inputs. Typing bursts in the same field share a history step. Dragging a whole group, placing objects and editing shapes each create one step. Up to 40 snapshots are kept **only until the page is reloaded**.
+
+## Previous capabilities — P004–P006
 
 ### Mobile-first map
 - **Drag an item directly** using one finger or mouse. The item follows your finger; coordinates are committed once on release.
@@ -24,7 +32,7 @@ Garden Atlas lets people illustrate their garden, maintain shared records for pl
 - **FREEHAND:** trace an approximate outline and release; the stroke is simplified into editable points. Invalid traces don't replace the old border.
 - **TERRAIN:** draw independent, fillable polygons using grass, soil, gravel, stone or water. These are 2D visual regions, not elevation contours or terrain simulation.
 - **PATH / FENCE:** tap a sequence of points and press **FINISH**. Each line gets an editable name and width (metres), is independently saved on the active map and appears in the printable report. The tool draws 2D paths/fences, not 3D structures.
-- Show/hide object, boundary and terrain layers. The two maps can have independent placements, boundaries and terrain regions.
+- Show/hide object, boundary and terrain layers. The two views now display the same shared placements, boundaries and terrain regions.
 
 ### Faster editing, garden reports and multiple gardens
 - Place many objects without reselecting the toolbox item; duplicate an existing record for fast reuse. A mobile quick-palette stays directly above the map.
@@ -68,9 +76,9 @@ Vite is configured with `base: '/Garden-Atlas/'`. The [deployment workflow](.git
 
 ## Data model and compatibility
 
-Project data format **v5** contains `width`, `height`, `groups`, `objects`, and two independent layouts with their own `boundary`, `ground`, `regions`, and editable `lines` (paths/fences). Objects have permanent IDs and independent `scale`/`illustration` coordinates. The browser library format is separately versioned as `version: 1` and contains garden projects with stable project IDs.
+Project data format **v6** contains `width`, `height`, `groups`, `objects` (with one optional `position` each), and a shared `layout` with `boundary`, `ground`, `regions`, and editable `lines` (paths/fences). Older projects include a full original P006 archive that preserves both independent layouts. The browser library format is separately versioned as `version: 1` and contains garden projects with stable project IDs.
 
-P001–P004 garden JSON is migrated without discarding saved specimen IDs, notes, placements, groups or P003 polygon boundaries. Use an exported JSON backup before editing or upgrading.
+P001–P006 garden JSON is migrated without discarding specimen IDs, notes, groups or original independent map data. A source-view confirmation is required before editing. Use an exported JSON backup before editing or upgrading.
 
 ## License
 
