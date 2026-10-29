@@ -67,7 +67,7 @@ test('photos validate format, size, number and do not leak into nonplant objects
  assert.equal(JSON.parse(JSON.stringify(g)).objects.find(o=>o.id===plant.id).plant.photos[0].dataUrl,jpeg);
  g=updateProfile(base,plant.id,()=>({...blankProfile(),photos:[{id:'PHOTO-1',addedOn:'2026-10-29',caption:'bad',dataUrl:'javascript:alert(1)'}]}));
  assert.equal(isGarden(g),false);
- g=updateProfile(base,plant.id,()=>({...blankProfile(),photos:Array.from({length:4},(_,i)=>({id:`PHOTO-${i}`,addedOn:'2026-10-29',caption:'x',dataUrl:jpeg}))}));
+ g=updateProfile(base,plant.id,()=>({...blankProfile(),photos:Array.from({length:9},(_,i)=>({id:`PHOTO-${i}`,addedOn:'2026-10-29',caption:'x',dataUrl:jpeg}))}));
  assert.equal(isGarden(g),false);
  g={...base,objects:base.objects.map(o=>o.kind==='house'?{...o,plant:blankProfile()}:o)};
  assert.equal(isGarden(g),false);
@@ -91,4 +91,12 @@ test('species encyclopedia and specimen notes are included in whole garden JSON'
  assert.ok(backup.includes('Checked health'));
  assert.ok(backup.includes('Pinus'));
  assert.equal(isGarden(JSON.parse(backup)),true);
+});
+
+test('P013 eight photo slots and bounded JPEG size',()=>{
+ const base=testGarden(), id=base.objects.find(o=>o.kind==='tree').id;
+ const entries=Array.from({length:8},(_,i)=>({id:'PHOTO-'+i,addedOn:'2026-10-29',caption:'View '+i,dataUrl:jpeg}));
+ assert.equal(isGarden(updateProfile(base,id,()=>({...blankProfile(),photos:entries}))),true);
+ assert.equal(isGarden(updateProfile(base,id,()=>({...blankProfile(),photos:[...entries,{...entries[0],id:'PHOTO-9'}]}))),false);
+ assert.equal(isGarden(updateProfile(base,id,()=>({...blankProfile(),photos:[{...entries[0],dataUrl:'data:image/jpeg;base64,'+'a'.repeat(320001)}]}))),false);
 });

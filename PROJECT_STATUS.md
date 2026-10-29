@@ -1,3 +1,15 @@
+# P013 — IndexedDB & Photo Safety
+
+## P013 — IndexedDB Storage & Photo Gallery (2026-10-29)
+
+- Complete browser garden libraries now save transactionally in IndexedDB; existing localStorage gardens are copied on first load without deleting older data.
+- Autosave is queued in edit order. The top bar distinguishes saving, successful IndexedDB saves and failed saves.
+- A previous valid library is periodically checkpointed for recovery; garden/library JSON backups remain essential.
+- Optional browser persistent-storage request and approximate site quota display under My Gardens.
+- Specimen photo galleries now allow up to eight optimized JPEG images per plant, batch import/progress, editable captions, removal and individual photo downloads.
+- Garden schema remains version 6; old P001–P012 garden backups and previous browser data remain compatible.
+- Photos are still optimized copies included in JSON, not original full-resolution archives. Clearing site data may delete all browser copies.
+
 ## P012 — Plant Atlas & Specimen Records (2026-10-29)
 - Separate per-garden species encyclopedia entries from per-object specimen profiles; object IDs and coordinates unchanged.
 - Identification confidence, planting date, observation history, maintenance history and photo captions for trees/shrubs/flowers.

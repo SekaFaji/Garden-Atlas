@@ -20,6 +20,8 @@ export interface SpecimenProfile {
   maintenance: Maintenance[];
   photos: SpecimenPhoto[];
 }
+export const MAX_SPECIMEN_PHOTOS = 8;
+export const MAX_PHOTO_DATA_CHARS = 320_000;
 export const PLANT_KINDS = ['tree','shrub','flower'] as const;
 export const isPlantKind=(kind:GardenObject['kind'])=>PLANT_KINDS.some(x=>x===kind);
 export const blankProfile=():SpecimenProfile=>({speciesId:null,identification:'unidentified',plantedOn:'',observations:[],maintenance:[],photos:[]});
@@ -39,7 +41,7 @@ const validIds=(items:unknown[],max:number,validator:(v:Record<string,unknown>)=
   ids.add(row.id);return true;
  });
 };
-const jpeg=(v:unknown):v is string=>str(v,120_000)&&/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(v);
+const jpeg=(v:unknown):v is string=>str(v,MAX_PHOTO_DATA_CHARS)&&/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(v);
 /** Backwards compatible validation: absent fields mean a P011 garden or an unprofiled specimen. */
 export function validPlantAtlas(input:Record<string,unknown>,objects:unknown[]):boolean {
  const species=input.speciesLibrary;
@@ -57,7 +59,7 @@ export function validPlantAtlas(input:Record<string,unknown>,objects:unknown[]):
   if(!Array.isArray(p.observations)||!Array.isArray(p.maintenance)||!Array.isArray(p.photos))return false;
   if(!validIds(p.observations,100,v=>validDate(v.date)&&str(v.note,3000)))return false;
   if(!validIds(p.maintenance,100,v=>validDate(v.date)&&['watering','pruning','feeding','planting','inspection','other'].includes(String(v.action))&&str(v.note,3000)))return false;
-  if(!validIds(p.photos,3,v=>validDate(v.addedOn)&&str(v.caption,240)&&jpeg(v.dataUrl)))return false;
+  if(!validIds(p.photos,MAX_SPECIMEN_PHOTOS,v=>validDate(v.addedOn)&&str(v.caption,240)&&jpeg(v.dataUrl)))return false;
  }
  return true;
 }

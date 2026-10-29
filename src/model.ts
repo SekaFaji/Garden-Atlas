@@ -41,7 +41,7 @@ const validSize=(n:unknown)=>typeof n==='number'&&Number.isFinite(n)&&n>=10&&n<=
 const isObj=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v);
 const isText=(v:unknown,max=10000):v is string=>typeof v==='string'&&v.length<=max;
 const isPoint=(v:unknown,g:Pick<Garden,'width'|'height'>):v is Point=>isObj(v)&&typeof v.x==='number'&&Number.isFinite(v.x)&&v.x>=0&&v.x<=g.width&&typeof v.y==='number'&&Number.isFinite(v.y)&&v.y>=0&&v.y<=g.height;
-/** Data URLs are tightly bounded because all projects are stored in browser localStorage. */
+/** Reference image data stays bounded for browser performance and JSON backup portability. */
 function validReference(r:unknown,g:Pick<Garden,'width'|'height'>):boolean {
  if(!isObj(r)||!isText(r.name,140)||!isText(r.dataUrl,360_000)||!/^data:image\/jpeg;base64,[a-zA-Z0-9+/]+={0,2}$/.test(r.dataUrl))return false;
  const numbers=['x','y','widthM','heightM','opacity'] as const;

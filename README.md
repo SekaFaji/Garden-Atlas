@@ -6,6 +6,16 @@
 
 Garden Atlas lets people illustrate their garden, maintain shared records for plants and structures, and use a dimensioned Scale view of the same shared garden. The included example contains **synthetic data only**—not a real address or parcel plan.
 
+## P013 — IndexedDB Storage & Photo Gallery (2026-10-29)
+
+- Complete browser garden libraries now save transactionally in IndexedDB; existing localStorage gardens are copied on first load without deleting older data.
+- Autosave is queued in edit order. The top bar distinguishes saving, successful IndexedDB saves and failed saves.
+- A previous valid library is periodically checkpointed for recovery; garden/library JSON backups remain essential.
+- Optional browser persistent-storage request and approximate site quota display under My Gardens.
+- Specimen photo galleries now allow up to eight optimized JPEG images per plant, batch import/progress, editable captions, removal and individual photo downloads.
+- Garden schema remains version 6; old P001–P012 garden backups and previous browser data remain compatible.
+- Photos are still optimized copies included in JSON, not original full-resolution archives. Clearing site data may delete all browser copies.
+
 ## P012 — Plant encyclopedia and specimen history
 
 Select any **tree, shrub or flower** on the map, then open **Details → Plant Atlas** to document that individual plant. Garden beds, structures, rocks and furniture are not single plant specimens, so they retain their existing general notes instead.
@@ -13,11 +23,11 @@ Select any **tree, shrub or flower** on the map, then open **Details → Plant A
 - **Separate species profiles:** create a shared entry with common/botanical names, a description and care notes; link multiple independent plants to it. Deleting a species unlinks its specimens but keeps them and their history.
 - **Identification confidence:** unidentified, tentative, or user-confirmed. The app does not identify species automatically and does not verify labels.
 - **Individual histories:** optional planting date, dated observations, and dated maintenance entries (watering, pruning, feeding, planting, inspection or other), each tied to the specimen's permanent object ID.
-- **Local photos:** add up to **three compressed JPEG thumbnails per plant**, imported from JPG/PNG/WebP files. Images are processed in the browser, stored with the garden, shown in the Inspector and included in garden JSON backups and print reports. Photo captions are editable.
+- **Local photos:** add up to **eight compressed JPEG images per plant**, imported from JPG/PNG/WebP files. Images are processed in the browser, stored with the garden, shown in the Inspector and included in garden JSON backups and print reports. Photo captions are editable.
 - **Undo:** editing notes, species profiles, specimen histories and photos uses the existing history mechanism; typing bursts are grouped.
 - **Compatibility:** still garden file **version 6**, with optional `speciesLibrary` and `plant` fields. Old gardens, object IDs, original species text, map placements and legacy imports remain intact. Duplicating a plant keeps its species association but starts with a clean specimen history, date and photos.
 
-**Storage warning:** Specimen thumbnails are deliberately compressed and limited because the application still uses browser `localStorage`; many plants/photos may exhaust a browser's quota. Watch the **NOT SAVED** indicator and export JSON backups regularly. Clearing browser storage or using another browser/device can remove local changes. Photos are not uploaded to any server, and there is no automatic cross-device sync. The next data-safety step is IndexedDB media storage and stronger export/recovery.
+**Storage warning:** IndexedDB provides more space than localStorage, but browser data can still be cleared or evicted. Photos are locally compressed and included in JSON backups. Watch the save-status indicator and export regular backups outside this browser. No automatic cross-device sync.
 
 ## P010 — Edit existing map features and lock layers
 
@@ -101,7 +111,7 @@ The **MAP SIZE** button is now in the toolbar immediately above the editor map, 
 
 ### Important limitations
 
-- The library is stored in **browser `localStorage`**. It has no cloud backend or cross-device synchronization. Clearing site data may delete it; backups are essential. The app warns when saving fails.
+- The library is stored primarily in **browser IndexedDB**, with a limited localStorage fallback. It has no cloud backend or cross-device synchronization. Clearing site data may delete it; backups are essential. The app warns when saving fails.
 - Project import **adds** a garden; whole-library import requires confirmation because it replaces the local library.
 - Advanced PDF output, plant encyclopedia and photo albums, real elevation, editable path/fence segments, planned-vs-existing scenarios and object resize handles are **not yet implemented**.
 - Undo history is scoped to the open garden editing session, not saved after a browser reload.

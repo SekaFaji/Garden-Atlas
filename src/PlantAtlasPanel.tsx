@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent } from 'react';
 import {
-  addSpecies, blankProfile, deleteSpecies, isPlantKind, uniqueEntryId, updateProfile, updateSpecies, validDate,
+  addSpecies, blankProfile, deleteSpecies, isPlantKind, uniqueEntryId, updateProfile, updateSpecies, validDate, MAX_SPECIMEN_PHOTOS, MAX_PHOTO_DATA_CHARS,
   type CareAction, type Maintenance, type Observation, type SpecimenPhoto
 } from './plantAtlas';
 import type { Garden } from './model';
@@ -13,11 +13,11 @@ interface Props {
   onNotice: (message: string) => void;
 }
 const today = () => new Date().toISOString().slice(0, 10);
-const MAX_PHOTO_CHARS = 120_000;
+const MAX_PHOTO_CHARS = MAX_PHOTO_DATA_CHARS;
 
 async function photoFromFile(file: File): Promise<string> {
-  if (!['image/jpeg','image/png','image/webp'].includes(file.type) || file.size > 8_000_000) {
-    throw new Error('Choose a JPG, PNG or WebP under 8 MB.');
+  if (!['image/jpeg','image/png','image/webp'].includes(file.type) || file.size > 12_000_000) {
+    throw new Error('Choose a JPG, PNG or WebP under 12 MB.');
   }
   const objectUrl = URL.createObjectURL(file);
   const image = new Image();
@@ -29,7 +29,7 @@ async function photoFromFile(file: File): Promise<string> {
     });
     if (!image.naturalWidth || !image.naturalHeight) throw new Error('Image has no usable dimensions.');
     const canvas = document.createElement('canvas');
-    for (const edge of [560, 450, 360, 280]) {
+    for (const edge of [1000, 850, 700, 540, 400]) {
       const ratio = Math.min(1, edge / Math.max(image.naturalWidth, image.naturalHeight));
       canvas.width = Math.max(1, Math.round(image.naturalWidth * ratio));
       canvas.height = Math.max(1, Math.round(image.naturalHeight * ratio));
@@ -38,7 +38,7 @@ async function photoFromFile(file: File): Promise<string> {
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-      for (const quality of [.74, .58, .44]) {
+      for (const quality of [.82, .7, .56]) {
         const dataUrl = canvas.toDataURL('image/jpeg', quality);
         if (dataUrl.length <= MAX_PHOTO_CHARS && dataUrl.startsWith('data:image/jpeg;base64,')) return dataUrl;
       }
@@ -59,6 +59,7 @@ export function PlantAtlasPanel({ garden, objectId, disabled, onChange, onNotice
   const [careAction, setCareAction] = useState<CareAction>('watering');
   const [careText, setCareText] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
   if (!object || !isPlantKind(object.kind)) return null;
   const p = object.plant ?? blankProfile();
   const species = (garden.speciesLibrary ?? []).find(s => s.id === p.speciesId);
@@ -96,18 +97,33 @@ export function PlantAtlasPanel({ garden, objectId, disabled, onChange, onNotice
     setCareText('');
   };
   const importPhoto = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file=event.target.files?.[0];event.target.value='';
-    if (!file || disabled) return;
-    if (p.photos.length>=3) {onNotice('Maximum three compressed photos per specimen.');return;}
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = '';
+    if (!files.length || disabled || uploading) return;
+    const available = MAX_SPECIMEN_PHOTOS - p.photos.length;
+    if (available <= 0) { onNotice('Maximum ' + MAX_SPECIMEN_PHOTOS + ' photos per specimen.'); return; }
+    if (files.length > available) onNotice('Only ' + available + ' photo slots remain. Extra files will be skipped.');
     setUploading(true);
+    const imported: SpecimenPhoto[] = [];
+    let errors = 0;
     try {
-      const dataUrl=await photoFromFile(file);
-      onChange(g=>updateProfile(g,objectId,profile=>profile.photos.length>=3?profile:{
-        ...profile, photos:[...profile.photos,{id:uniqueEntryId('PHOTO',profile.photos),addedOn:today(),caption:file.name.slice(0,120),dataUrl}]
+      const picked = files.slice(0, available);
+      for (let index = 0; index < picked.length; index++) {
+        setUploadProgress((index + 1) + ' / ' + picked.length);
+        try {
+          const dataUrl = await photoFromFile(picked[index]);
+          imported.push({id:'', addedOn:today(),caption:picked[index].name.slice(0,120),dataUrl});
+        } catch { errors++; }
+      }
+      if (imported.length) onChange(g=>updateProfile(g,objectId,profile=>{
+        const photos = [...profile.photos];
+        for (const photo of imported.slice(0, Math.max(0, MAX_SPECIMEN_PHOTOS - photos.length))) {
+          photos.push({...photo,id:uniqueEntryId('PHOTO',photos)});
+        }
+        return {...profile,photos};
       }));
-      onNotice('Photo added locally. Download a JSON backup to keep your pictures safe.');
-    } catch(error) {onNotice(error instanceof Error?error.message:'Photo import failed.');}
-    finally {setUploading(false);}
+      onNotice(imported.length + ' compressed photo(s) added' + (errors ? ', ' + errors + ' failed' : '') + '. Check the save indicator and download a JSON backup.');
+    } finally {setUploading(false);setUploadProgress('');}
   };
   return <section className="plant-atlas" aria-label={`Plant atlas for ${object.name}`}>
     <div className="section-heading list-heading">🌱 PLANT ATLAS · {object.id}</div>
@@ -146,9 +162,9 @@ export function PlantAtlasPanel({ garden, objectId, disabled, onChange, onNotice
     <div className="section-heading list-heading">MAINTENANCE HISTORY <span className="pill">{p.maintenance.length}</span></div>
     <div className="atlas-entry-form"><input disabled={disabled} aria-label="Maintenance date" type="date" value={careDate} onChange={e=>setCareDate(e.target.value)}/><select disabled={disabled} aria-label="Maintenance action" value={careAction} onChange={e=>setCareAction(e.target.value as CareAction)}>{(['watering','pruning','feeding','planting','inspection','other'] as CareAction[]).map(x=><option key={x} value={x}>{x.toUpperCase()}</option>)}</select><textarea disabled={disabled} aria-label="Maintenance note" maxLength={3000} rows={2} placeholder="What was done and why…" value={careText} onChange={e=>setCareText(e.target.value)}/><button disabled={disabled||!careText.trim()||p.maintenance.length>=100} className="btn btn-highlight" onClick={addCare}>+ RECORD MAINTENANCE</button></div>
     <div className="atlas-event-list">{[...p.maintenance].reverse().map((entry:Maintenance)=><div className="atlas-event" key={entry.id}><b>{entry.date} · {entry.action}</b><span>{entry.note}</span><button disabled={disabled} aria-label={`Remove maintenance ${entry.id}`} onClick={()=>onChange(g=>updateProfile(g,objectId,old=>({...old,maintenance:old.maintenance.filter(x=>x.id!==entry.id)})))}>×</button></div>)}</div>
-    <div className="section-heading list-heading">SPECIMEN PHOTOS <span className="pill">{p.photos.length}/3</span></div>
-    <label className="atlas-upload">{uploading?'PROCESSING PHOTO…':'＋ ADD PHOTO (JPG / PNG / WEBP)'}<input disabled={disabled||uploading||p.photos.length>=3} type="file" accept="image/jpeg,image/png,image/webp" onChange={importPhoto}/></label>
-    <p className="panel-hint">Up to 3 compressed photos per plant. Stored in this browser and included in garden JSON backups; not uploaded to a server. Large gardens may hit browser storage limits.</p>
-    <div className="atlas-photos">{p.photos.map((photo:SpecimenPhoto)=><div key={photo.id} className="atlas-photo"><img src={photo.dataUrl} alt={photo.caption||`Specimen ${objectId}`} loading="lazy"/><label className="field">CAPTION<input disabled={disabled} maxLength={240} value={photo.caption} onChange={e=>onChange(g=>updateProfile(g,objectId,old=>({...old,photos:old.photos.map(x=>x.id===photo.id?{...x,caption:e.target.value}:x)})),`photo:${photo.id}:caption`)}/></label><button disabled={disabled} className="btn btn-muted" onClick={()=>onChange(g=>updateProfile(g,objectId,old=>({...old,photos:old.photos.filter(x=>x.id!==photo.id)})))}>REMOVE PHOTO</button></div>)}</div>
+    <div className="section-heading list-heading">SPECIMEN PHOTOS <span className="pill">{p.photos.length}/{MAX_SPECIMEN_PHOTOS}</span></div>
+    <label className="atlas-upload">{uploading?'PROCESSING PHOTO '+uploadProgress+'…':'＋ ADD PHOTOS (JPG / PNG / WEBP)'}<input disabled={disabled||uploading||p.photos.length>=MAX_SPECIMEN_PHOTOS} type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={importPhoto}/></label>
+    <p className="panel-hint">Up to 8 compressed photos per plant. Multiple files can be added together, and each photo can be exported separately. Photos are saved locally in IndexedDB when supported, and are included in JSON backups. These are optimized copies, not full-resolution originals.</p>
+    <div className="atlas-photos">{p.photos.map((photo:SpecimenPhoto)=><div key={photo.id} className="atlas-photo"><img src={photo.dataUrl} alt={photo.caption||`Specimen ${objectId}`} loading="lazy"/><label className="field">CAPTION<input disabled={disabled} maxLength={240} value={photo.caption} onChange={e=>onChange(g=>updateProfile(g,objectId,old=>({...old,photos:old.photos.map(x=>x.id===photo.id?{...x,caption:e.target.value}:x)})),`photo:${photo.id}:caption`)}/></label><a className="btn btn-muted" href={photo.dataUrl} download={["garden-",objectId,"-",photo.id,".jpg"].join("")}>↓ SAVE PHOTO</a><button disabled={disabled} className="btn btn-muted" onClick={()=>onChange(g=>updateProfile(g,objectId,old=>({...old,photos:old.photos.filter(x=>x.id!==photo.id)})))}>REMOVE PHOTO</button></div>)}</div>
   </section>;
 }
