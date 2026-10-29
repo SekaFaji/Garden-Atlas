@@ -3,12 +3,13 @@ import type { ChangeEvent } from 'react';
 import { MapView, type Tool } from './MapView';
 import { Sprite } from './Sprite';
 import { PlantAtlasPanel } from './PlantAtlasPanel';
+import { ObjectDimensions } from './ObjectDimensions';
 import { OfflineTools } from './OfflineTools';
 import { PRESETS, findPresets, defaultPreset, getPreset } from './catalog';
 import { GardenReport } from './Report';
 import { imageToReference } from './reference';
 import { isSameEditBurst, type EditBurst } from './history';
-import { editFeaturePoint, resizeObjectDiameter, type FeatureSelection, type EditAction } from './featureEdit';
+import { editFeaturePoint, resizeObjectAxes, type FeatureSelection, type EditAction } from './featureEdit';
 import {
   GROUNDS, KINDS, createPresetObject, changeObjectPreset, addLine, addRegion, alignSelection, moveSelection, setReferenceWidth, clampPoint, demoGarden, emptyGarden, info, isGarden,
   movePlaced, nextGroupId, nextObjectId, polygonArea, removeGroup, resizeGarden, resizeWorkspace, addSurroundings, setBoundary, previewLinkedSource, chooseLinkedSource,
@@ -140,10 +141,10 @@ export default function App(){
   const togglePick=(id:string)=>setCheckedIds(ids=>ids.includes(id)?ids.filter(x=>x!==id):[...ids,id]);
   const selectGroup=(id:string)=>{setSelectedGroupId(id);setSelectedId(null);setTool('select');setSelectedPanel('inspector');};
   const objectPatch=(id:string,patch:Partial<GardenObject>,key?:string)=>{if(locked.objects){setNotice('Unlock Plants & structures to edit this item.');return;}applyGarden({...garden,objects:garden.objects.map(o=>o.id===id?{...o,...patch}:o)},true,key?`object:${id}:${key}`:undefined);};
-  const resizeSelected=(id:string,diameter:number)=>{
+  const resizeSelected=(id:string,widthM:number,lengthM:number)=>{
     if(locked.objects){setNotice('Unlock Plants & structures before resizing.');return;}
-    const updated=resizeObjectDiameter(garden,id,diameter);
-    if(updated)applyGarden(updated);else setNotice('Resize rejected: choose a diameter from 0.5 to 100 metres.');
+    const updated=resizeObjectAxes(garden,id,{widthM,lengthM});
+    if(updated)applyGarden(updated);else setNotice('Resize rejected: dimensions must be between 0 and 100 metres.');
   };
   const editExistingFeature=(selection:FeatureSelection,index:number,action:EditAction,point?:Point)=>{
     if(locked[selection.kind==='region'?'regions':'lines']){setNotice('Unlock this layer to edit it.');return;}
@@ -312,7 +313,7 @@ export default function App(){
         <div className="preset-grid" aria-label="Garden object presets">
           {findPresets(presetSearch,presetFilter).map(p=><button key={p.id} className={`preset-button ${tool===p.kind&&presetId===p.id?'active':''}`} aria-pressed={tool===p.kind&&presetId===p.id}
             disabled={locked.objects} onClick={()=>activatePreset(p.id)}>
-            <Icon kind={p.kind} presetId={p.id} size={46}/><span>{p.name}</span><small>{p.diameterM} m starting size</small>
+            <Icon kind={p.kind} presetId={p.id} size={34}/><span>{p.name}</span><small>{p.diameterM} m starting size</small>
           </button>)}
           {findPresets(presetSearch,presetFilter).length===0&&<p className="panel-hint">No presets match this search.</p>}
         </div>
@@ -381,7 +382,7 @@ export default function App(){
               <span>{garden.linkMigration&&!garden.linkMigration.confirmed?'CHOOSE MAP SOURCE FIRST':'BOTH MAPS LINKED'}</span>
             </div>
             <div className="primary-tools" role="toolbar" aria-label="Editor interaction tools">
-            {([{id:'select',label:'↖ SELECT'},{id:'pan',label:'✋ PAN'},{id:'feature-edit',label:'✎ EDIT FEATURES'},{id:'outline-edit',label:'◇ EDIT BORDER'},{id:'outline-draw',label:'✎ DRAW BORDER'},{id:'freehand',label:'〰 FREEHAND'},{id:'terrain',label:'▧ TERRAIN'},{id:'path',label:'〰 PATH'},{id:'fence',label:'┃ FENCE'}] as {id:Tool;label:string}[]).map(x=><button key={x.id} className={tool===x.id?'active':''} onClick={()=>setNewTool(x.id)}>{x.label}</button>)}
+            {([{id:'select',label:'↖ SELECT'},{id:'pan',label:'✋ PAN'},{id:'feature-edit',label:'✎ FEATURES'},{id:'outline-edit',label:'◇ EDIT EDGE'},{id:'outline-draw',label:'＋ BORDER'},{id:'freehand',label:'〰 FREEHAND'},{id:'terrain',label:'▧ TERRAIN'},{id:'path',label:'〰 PATH'},{id:'fence',label:'┃ FENCE'}] as {id:Tool;label:string}[]).map(x=><button key={x.id} className={tool===x.id?'active':''} aria-pressed={tool===x.id} title={x.id.replaceAll('-', ' ')} onClick={()=>setNewTool(x.id)}>{x.label}</button>)}
           </div>
           {(tool==='path'||tool==='fence')&&<div className="terrain-chooser"><span>{tool.toUpperCase()} WIDTH (M)</span><input aria-label="Path or fence width in metres" type="number" min="0.2" max="12" step="0.2" value={lineWidth} onChange={e=>{const n=Number(e.target.value);if(n>=.2&&n<=12)setLineWidth(n);}}/></div>}
           {tool==='terrain'&&<div className="terrain-chooser"><span>NEW REGION</span><select aria-label="Terrain brush" value={ground} onChange={e=>setGround(e.target.value as Ground)}>{GROUNDS.map(g=><option key={g.value} value={g.value}>{g.label}</option>)}</select></div>}
@@ -435,7 +436,7 @@ export default function App(){
           <label className="field">SPECIES / TYPE<input maxLength={140} value={selected.species} placeholder="Optional" onChange={e=>objectPatch(selected.id,{species:e.target.value},'species')}/></label>
           <label className="field">GROUP<select value={selected.groupId??''} onChange={e=>objectPatch(selected.id,{groupId:e.target.value||null})}><option value="">— UNGROUPED —</option>{garden.groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
           <label className="field">ROTATION (DEGREES)<input type="number" min="0" max="359" step="5" value={selected.rotation??0} onChange={e=>{const n=Number(e.target.value);if(Number.isFinite(n)&&n>=0&&n<360)objectPatch(selected.id,{rotation:n});}}/></label>
-          <label className="field">DIAMETER / WIDTH (METRES)<input type="number" min="0.5" max="100" step="0.5" value={selected.diameterM} onChange={e=>{const n=Number(e.target.value);if(Number.isFinite(n)&&n>=.5&&n<=100)objectPatch(selected.id,{diameterM:n});}}/></label>
+          <ObjectDimensions key={selected.id} object={selected} disabled={locked.objects} onNotice={setNotice} onChange={axes=>{const updated=resizeObjectAxes(garden,selected.id,axes);if(updated)applyGarden(updated);else setNotice('Invalid dimension. Previous measurements preserved.');}}/>
           <label className="field">NOTES<textarea rows={4} maxLength={3000} value={selected.notes} onChange={e=>objectPatch(selected.id,{notes:e.target.value},'notes')}/></label>
           <div className="placement-box">SHARED POSITION: {selected.position?`${selected.position!.x.toFixed(1)} m × ${selected.position!.y.toFixed(1)} m`:'Not placed'}
             {!selected.position&&<button className="btn btn-highlight" onClick={()=>move(selected.id,{x:garden.width/2,y:garden.height/2},false)}>PLACE AT CENTER</button>}
@@ -470,6 +471,6 @@ export default function App(){
       </aside>
     </main>
     <nav className="mobile-nav" aria-label="Editor panels"><button className={selectedPanel==='tools'?'active':''} onClick={()=>setSelectedPanel('tools')}>♣ OBJECTS</button><button className={selectedPanel==='inspector'?'active':''} onClick={()=>setSelectedPanel('inspector')}>✎ DETAILS</button><button className={selectedPanel==='projects'?'active':''} onClick={()=>setSelectedPanel('projects')}>▧ GARDENS</button></nav>
-    <footer className="footer">GARDEN ATLAS · P013 INDEXEDDB & PHOTO LIBRARY <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
+    <footer className="footer">GARDEN ATLAS · P016 EDITOR POLISH <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
   </div><GardenReport garden={garden}/></>;
 }

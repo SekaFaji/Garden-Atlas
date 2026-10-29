@@ -11,7 +11,7 @@ export type Kind = 'tree' | 'shrub' | 'flower' | 'bed' | 'house' | 'rock' | 'pon
 export type Ground = 'grass' | 'soil' | 'gravel' | 'stone' | 'water';
 export interface Point { x:number; y:number }
 export interface GardenGroup { id:string; name:string; notes:string }
-export interface GardenObject { id:string; kind:Kind; name:string; species:string; groupId:string|null; notes:string; diameterM:number; position?:Point; rotation?:number; presetId?:string; plant?:SpecimenProfile }
+export interface GardenObject { id:string; kind:Kind; name:string; species:string; groupId:string|null; notes:string; diameterM:number; widthM?:number; lengthM?:number; position?:Point; rotation?:number; presetId?:string; plant?:SpecimenProfile }
 export interface Region { id:string; name:string; ground:Ground; points:Point[] }
 export type LineKind = 'path'|'fence';
 export interface LineFeature { id:string; kind:LineKind; name:string; points:Point[]; widthM:number }
@@ -37,6 +37,13 @@ export const KINDS:{kind:Kind;label:string;initialName:string;diameterM:number}[
  {kind:'furniture',label:'Furniture',initialName:'Garden furniture',diameterM:2},
 ];
 export const info=(kind:Kind)=>KINDS.find(x=>x.kind===kind)!;
+/** Legacy square/circular objects keep their old diameter as the default for both axes.
+ * Explicit zero records an unmeasured axis; the renderer retains a small touch target. */
+export function objectDimensions(o:Pick<GardenObject,'diameterM'|'widthM'|'lengthM'>):{widthM:number;lengthM:number}{
+ return {widthM:o.widthM??o.diameterM,lengthM:o.lengthM??o.diameterM};
+}
+export const validObjectAxis=(n:unknown):n is number=>typeof n==='number'&&Number.isFinite(n)&&n>=0&&n<=100;
+
 const validSize=(n:unknown)=>typeof n==='number'&&Number.isFinite(n)&&n>=10&&n<=500;
 const isObj=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v);
 const isText=(v:unknown,max=10000):v is string=>typeof v==='string'&&v.length<=max;
@@ -96,7 +103,7 @@ export function isGarden(value:unknown):value is Garden {
  const gids=new Set<string>(),oids=new Set<string>();
  for(const gr of g.groups){if(!isObj(gr)||!isText(gr.id,80)||!gr.id||gids.has(gr.id)||!isText(gr.name)||!gr.name.trim()||!isText(gr.notes))return false;gids.add(gr.id);}
  for(const o of g.objects){
-  if(!isObj(o)||!isText(o.id,80)||!o.id||oids.has(o.id)||!KINDS.some(k=>k.kind===o.kind)||!isText(o.name)||!isText(o.species)||!isText(o.notes)||!Number.isFinite(o.diameterM)||o.diameterM<.5||o.diameterM>100||!(o.groupId===null||typeof o.groupId==='string'&&gids.has(o.groupId))||!(o.presetId===undefined||typeof o.presetId==='string'&&getPreset(o.presetId)?.kind===o.kind)||!(o.position===undefined||isPoint(o.position,g))||!(o.rotation===undefined||typeof o.rotation==='number'&&Number.isFinite(o.rotation)&&o.rotation>=0&&o.rotation<360))return false;
+  if(!isObj(o)||!isText(o.id,80)||!o.id||oids.has(o.id)||!KINDS.some(k=>k.kind===o.kind)||!isText(o.name)||!isText(o.species)||!isText(o.notes)||!Number.isFinite(o.diameterM)||o.diameterM<.5||o.diameterM>100||!(o.widthM===undefined||validObjectAxis(o.widthM))||!(o.lengthM===undefined||validObjectAxis(o.lengthM))||!(o.groupId===null||typeof o.groupId==='string'&&gids.has(o.groupId))||!(o.presetId===undefined||typeof o.presetId==='string'&&getPreset(o.presetId)?.kind===o.kind)||!(o.position===undefined||isPoint(o.position,g))||!(o.rotation===undefined||typeof o.rotation==='number'&&Number.isFinite(o.rotation)&&o.rotation>=0&&o.rotation<360))return false;
   oids.add(o.id);
  }
  if(g.reference!==undefined&&!validReference(g.reference,g))return false;

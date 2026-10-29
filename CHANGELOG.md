@@ -1,3 +1,11 @@
+## P016 — Mobile tool compactness and object dimensions (2026-10-29)
+
+- Reduced main tool button bulk, abbreviated labels, and arranged mobile interaction tools in a two-row, five-column grid rather than a long horizontally-scrolling toolbar.
+- Reduced quick-add button and object palette footprint without removing tool choices or access labels.
+- Replaced immediate, constrained diameter input with independent width/length editable drafts. Blank/zero while typing no longer gets rejected mid-entry; final value `0` means not measured, invalid final input reverts with feedback.
+- Optional `widthM` and `lengthM` fields are independently saved, drawn in both linked views, resized from the corner handle and shown in print. Old single-diameter v6 gardens remain visually unchanged until edited.
+- Preserved app storage, map layers, object IDs, specimen histories, photos and JSON migration. Added four regression tests; total suite: 63 passing locally.
+
 ## P015 — Storage integration and editor reliability (2026-10-29)
 
 - Fixed the real P014 editor to hydrate from IndexedDB and use ordered asynchronous save writes rather than the legacy localStorage autosave effect.

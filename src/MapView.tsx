@@ -4,7 +4,7 @@ import { Sprite } from './Sprite';
 import { closestEdge, formatArea } from './geometry';
 import type { FeatureSelection, EditAction } from './featureEdit';
 import { fitCamera, panCamera, pinchCamera, zoomCamera, type Camera } from './camera';
-import { clampPoint, polygonArea, simplifyStroke, validPolygon, WORLD, KINDS, type Garden, type Ground, type Kind, type Mode, type Point, type LineKind } from './model';
+import { clampPoint, polygonArea, simplifyStroke, validPolygon, objectDimensions, WORLD, KINDS, type Garden, type Ground, type Kind, type Mode, type Point, type LineKind } from './model';
 
 export type Tool = 'select' | 'feature-edit' | 'pan' | 'outline-edit' | 'outline-draw' | 'freehand' | 'terrain' | LineKind | Kind;
 interface Props {
@@ -15,7 +15,7 @@ interface Props {
   onSelectFeature:(selected:FeatureSelection|null)=>void;
   onSelectVertex:(index:number|null)=>void;
   onEditFeature:(selected:FeatureSelection,index:number,action:EditAction,point?:Point)=>void;
-  onResizeObject:(id:string,diameterM:number)=>void;
+  onResizeObject:(id:string,widthM:number,lengthM:number)=>void;
   onPick: (id: string|null) => void;
   onTogglePick: (id:string)=>void;
   onMoveSelection: (anchorId:string,point:Point)=>void;
@@ -34,7 +34,7 @@ type Activity =
   | {kind:'freehand';points:Point[]}
   | {kind:'tap';start:PointerInfo}
   | {kind:'feature-node';feature:FeatureSelection;index:number;point:Point;moved:boolean}
-  | {kind:'resize';id:string;origin:Point;diameter:number;moved:boolean};
+  | {kind:'resize';id:string;origin:Point;widthM:number;lengthM:number;moved:boolean};
 const ppu=WORLD.pixelsPerUnit;
 const color: Record<Ground,string>={grass:'#8ebc77',soil:'#a57c53',gravel:'#a8aca0',stone:'#bdb8a9',water:'#64a6bc'};
 const snap=(p:Point,mode:Mode,force=false):Point=>force?{x:Math.round(p.x*2)/2,y:Math.round(p.y*2)/2}:mode==='scale'?{x:Math.round(p.x*10)/10,y:Math.round(p.y*10)/10}:p;
@@ -53,7 +53,7 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
   const [preview,setPreview]=useState<{id:string;point:Point;together:boolean;many?:readonly string[]}|null>(null);
   const [cornerPreview,setCornerPreview]=useState<{index:number;point:Point}|null>(null);
   const [featurePreview,setFeaturePreview]=useState<{kind:FeatureSelection['kind'];id:string;index:number;point:Point}|null>(null);
-  const [resizePreview,setResizePreview]=useState<{id:string;diameter:number}|null>(null);
+  const [resizePreview,setResizePreview]=useState<{id:string;widthM:number;lengthM:number}|null>(null);
   const [draft,setDraft]=useState<Point[]>([]);
   const [pinching,setPinching]=useState(false);
   const initialFit=useRef(false);
@@ -117,7 +117,7 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
     const featureEdge=target.closest('[data-feature-edge]') as SVGElement|null;
     if(tool==='select'&&resizeHit&&!locked.objects){
       const obj=garden.objects.find(o=>o.id===resizeHit.dataset.resize);
-      if(obj?.position){activeRef.current={kind:'resize',id:obj.id,origin:obj.position,diameter:obj.diameterM,moved:false};return;}
+      if(obj?.position){activeRef.current={kind:'resize',id:obj.id,origin:obj.position,...objectDimensions(obj),moved:false};return;}
     }
     if(tool==='feature-edit'&&featureHit){
       const feature={kind:featureHit.dataset.featureKind as FeatureSelection['kind'],id:featureHit.dataset.featureId!};
@@ -190,9 +190,11 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
       if(a.moved)setFeaturePreview({...a.feature,index:a.index,point:clampPoint(snap(p,mode,snapEnabled),garden)});
     }
     if(a.kind==='resize'&&p){
-      const diameter=Math.max(.5,Math.min(100,Math.max(Math.abs(p.x-a.origin.x),Math.abs(p.y-a.origin.y))*2));
-      if(Math.abs(diameter-a.diameter)>.06)a.moved=true;
-      if(a.moved)setResizePreview({id:a.id,diameter:snapEnabled?Math.round(diameter*2)/2:Math.round(diameter*20)/20});
+      const widthM=Math.min(100,Math.max(0,2*Math.abs(p.x-a.origin.x)));
+      const lengthM=Math.min(100,Math.max(0,2*Math.abs(p.y-a.origin.y)));
+      if(Math.abs(widthM-a.widthM)>.06||Math.abs(lengthM-a.lengthM)>.06)a.moved=true;
+      const round=(n:number)=>snapEnabled?Math.round(n*2)/2:Math.round(n*20)/20;
+      if(a.moved)setResizePreview({id:a.id,widthM:round(widthM),lengthM:round(lengthM)});
     }
     if(a.kind==='freehand'&&p){const next=clampPoint(p,garden),prev=a.points[a.points.length-1];if(Math.hypot(prev.x-next.x,prev.y-next.y)>.16){a.points.push(next);if(a.points.length%3===0)setDraft([...a.points]);}}
   };
@@ -208,8 +210,9 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
       setFeaturePreview(null);return;
     }
     if(a.kind==='resize'){
-      if(a.moved){const d=Math.max(.5,Math.min(100,Math.max(Math.abs(p.x-a.origin.x),Math.abs(p.y-a.origin.y))*2));
-        onResizeObject(a.id,snapEnabled?Math.round(d*2)/2:Math.round(d*20)/20);}
+      if(a.moved){const widthM=Math.min(100,Math.max(0,2*Math.abs(p.x-a.origin.x))),lengthM=Math.min(100,Math.max(0,2*Math.abs(p.y-a.origin.y)));
+        const round=(n:number)=>snapEnabled?Math.round(n*2)/2:Math.round(n*20)/20;
+        onResizeObject(a.id,round(widthM),round(lengthM));}
       setResizePreview(null);return;
     }
     if(a.kind==='object'){
@@ -284,17 +287,21 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
         const dragged=Boolean(preview&&(item.id===preview.id||groupIds.includes(item.id)));
         const offset=dragged?{x:dx,y:dy}:{x:0,y:0};
         const p={x:original.x+offset.x,y:original.y+offset.y};
-        const diameter=(resizePreview?.id===item.id?resizePreview.diameter:item.diameterM)*ppu*(mode==='illustration'?1.08:1);
-        const hit=Math.max(diameter,48/Math.max(.06,camera.z));
+        const axes=resizePreview?.id===item.id?resizePreview:objectDimensions(item);
+        // A zero measurement is kept in the record; use only a small visible/tappable marker.
+        const width=Math.max(.5,axes.widthM)*ppu*(mode==='illustration'?1.08:1);
+        const length=Math.max(.5,axes.lengthM)*ppu*(mode==='illustration'?1.08:1);
+        const hitWidth=Math.max(width,48/Math.max(.06,camera.z));
+        const hitLength=Math.max(length,48/Math.max(.06,camera.z));
         return <g data-object={item.id} key={item.id} className="map-object" transform={`translate(${p.x*ppu} ${p.y*ppu})`}>
-          {active&&<rect x={-diameter/2-7} y={-diameter/2-7} width={diameter+14} height={diameter+14} fill="none" stroke="#fff3ac" strokeWidth="3" strokeDasharray="7 4" pointerEvents="none" />}
-          <svg x={-diameter/2} y={-diameter/2} width={diameter} height={diameter} viewBox="0 0 64 64" pointerEvents="none"><g transform={`rotate(${item.rotation??0} 32 32)`}><Sprite kind={item.kind} presetId={item.presetId}/></g></svg>
-          <rect x={-hit/2} y={-hit/2} width={hit} height={hit} fill="transparent" />
+          {active&&<rect x={-width/2-7} y={-length/2-7} width={width+14} height={length+14} fill="none" stroke="#fff3ac" strokeWidth="3" strokeDasharray="7 4" pointerEvents="none" />}
+          <svg x={-width/2} y={-length/2} width={width} height={length} viewBox="0 0 64 64" pointerEvents="none"><g transform={`rotate(${item.rotation??0} 32 32)`}><Sprite kind={item.kind} presetId={item.presetId}/></g></svg>
+          <rect x={-hitWidth/2} y={-hitLength/2} width={hitWidth} height={hitLength} fill="transparent" />
           {tool==='select'&&!multiSelect&&selectedId===item.id&&!locked.objects&&<g>
-            <line x1="0" y1="0" x2={diameter/2+12/camera.z} y2={diameter/2+12/camera.z} stroke="#fff3ac" strokeWidth={2/camera.z} pointerEvents="none"/>
-            <rect data-resize={item.id} x={diameter/2-10/camera.z} y={diameter/2-10/camera.z} width={Math.max(22,36/camera.z)} height={Math.max(22,36/camera.z)} fill="#f4df8e" stroke="#2a5442" strokeWidth={3/camera.z}/>
+            <line x1="0" y1="0" x2={width/2+12/camera.z} y2={length/2+12/camera.z} stroke="#fff3ac" strokeWidth={2/camera.z} pointerEvents="none"/>
+            <rect data-resize={item.id} aria-label="Resize selected object width and length" x={width/2-10/camera.z} y={length/2-10/camera.z} width={Math.max(22,36/camera.z)} height={Math.max(22,36/camera.z)} fill="#f4df8e" stroke="#2a5442" strokeWidth={3/camera.z}/>
           </g>}
-          {active&&<g pointerEvents="none"><rect x={-55} y={diameter/2+6} width="110" height="20" fill="#1f382f" stroke="#f6dfa4" strokeWidth="1.5"/><text textAnchor="middle" x="0" y={diameter/2+20} fontSize="11" fontFamily="monospace" fill="#fff7d4">{item.name.slice(0,15)}</text></g>}
+          {active&&<g pointerEvents="none"><rect x={-55} y={length/2+6} width="110" height="20" fill="#1f382f" stroke="#f6dfa4" strokeWidth="1.5"/><text textAnchor="middle" x="0" y={length/2+20} fontSize="11" fontFamily="monospace" fill="#fff7d4">{item.name.slice(0,15)}</text></g>}
         </g>;
       })}
       {tool==='outline-edit'&&outline.map((p,i)=>{

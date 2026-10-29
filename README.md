@@ -6,6 +6,14 @@
 
 Garden Atlas lets people illustrate their garden, maintain shared records for plants and structures, and use a dimensioned Scale view of the same shared garden. The included example contains **synthetic data only**—not a real address or parcel plan.
 
+## P016 — Smaller tools and easier measurements
+
+On mobile, map interaction tools now fit in a compact two-row grid, and the quick planting strip and object palette take up less room while retaining touch targets. No existing editor tools were removed.
+
+Choose a map object and open **Details → Width (X) / Length (Y)**. The two numbers are independent: a 4 × 8 m bed or hedge renders at that proportion in both Scale and Illustration views and in the printable report. You can erase, temporarily type `0`, use decimal input, then **press Enter or tap away** to apply. The inputs are not validated or reverted on every keystroke. A final `0` means **not measured** on that axis; a small map icon remains so the object is selectable. Negative values or values above 100 m are rejected at commit. Press Escape before leaving the field to cancel the edit.
+
+Existing v6 objects retain their original dimensions because missing width/length default to the saved diameter. New measurements use optional fields in the existing version-6 JSON. Resizing from a selected object's bottom-right map handle now updates both axes separately; Undo reverses the change. Geometry, specimen IDs, photographs, backup paths, offline storage and migration formats are otherwise unchanged.
+
 ## P015 — Reliability polish (no new garden features)
 
 - **Fixed the actual editor save path:** the app now loads the browser garden library from IndexedDB before enabling editing, and queues every subsequent save to IndexedDB. P014 shipped with the IndexedDB module but the live editor still used its older localStorage calls.

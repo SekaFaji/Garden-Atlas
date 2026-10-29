@@ -1,3 +1,18 @@
+# Garden Atlas — P016 UI/UX Size & Toolbar Polish (2026-10-29)
+
+**Current patch: P016. This patch fixes existing controls; it does not add garden-management features.**
+
+- Inspector dimensions are now two independent editable measurements: **Width (X)** and **Length (Y)**, with map/print geometry kept in sync.
+- Input values are committed when leaving the field or pressing Enter, so blank or intermediate `0` no longer snaps back while typing. `0` is accepted as **not measured**; the object stays visible through a minimum-size interactive marker.
+- Legacy object records with only `diameterM` display their existing diameter for both axes. Optional `widthM`/`lengthM` preserve compatibility with v6 backups, with no data migration or changed ID/position.
+- Selected objects can be resized in both dimensions from the existing on-map corner handle; resize remains one undoable edit.
+- Main tool labels, quick placement strip, category buttons and preset previews are more compact, while keeping touch-friendly minimum heights.
+- The P015 IndexedDB save path and offline service worker are untouched.
+- Local checks: 63 passing tests; parsed changed TypeScript/JSX files. Full TypeScript and production build to be checked in GitHub CI due to missing local React/Vite dependencies.
+- Manual Android verification still needed: keyboard entry, tool fit, orientation, save/reload and pinch/drag behavior.
+
+---
+
 # Garden Atlas — P015 Stabilization (2026-10-29)
 
 Current release target: **P015 — storage integration and offline/save-status reliability**. No new garden features.

@@ -136,6 +136,39 @@
 .report-photo img {width:150px;height:120px;object-fit:cover;}
 .report-photo figcaption {font-size:10px;word-break:break-word;}
 @media(max-width:760px){.plant-atlas{padding:10px;}.atlas-entry-form input,.atlas-entry-form textarea,.atlas-entry-form select{font-size:16px;}}
+/* P014: installation/update actions and offline status within My Gardens. */
+.offline-tools { display:grid; gap:9px; border:1px solid #52775e; background:#203a2e; padding:12px; margin:8px 0 14px; }
+.offline-summary { display:flex; flex-wrap:wrap; gap:8px 16px; color:#e1eac4; font:900 10px monospace; }
+.offline-network { color:#b8de9e; }
+.offline-network.disconnected { color:#f1d39c; }
+.offline-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.offline-actions button { min-height:43px; }
+.offline-tools .panel-hint { margin:0; line-height:1.5; }
+.offline-feedback { margin:0; color:#f4dba3; font:12px monospace; }
+@media(max-width:760px) { .offline-actions button { flex:1 1 145px; } }
 
-/* P014 offline installation */
-.offline-tools{display:grid;gap:9px;border:1px solid #52775e;background:#203a2e;padding:12px;margin:8px 0 14px}.offline-summary{display:flex;flex-wrap:wrap;gap:8px 16px;color:#e1eac4;font:900 10px monospace}.offline-network{color:#b8de9e}.offline-network.disconnected{color:#f1d39c}.offline-actions{display:flex;gap:8px;flex-wrap:wrap}.offline-actions button{min-height:43px}.offline-tools .panel-hint{margin:0;line-height:1.5}.offline-feedback{margin:0;color:#f4dba3;font:12px monospace}@media(max-width:760px){.offline-actions button{flex:1 1 145px}}
+/* P016 — compact controls with touch-safe hit areas, no horizontal editor-tool scrolling. */
+.primary-tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:3px;padding:4px;overflow:visible}
+.primary-tools button{min-width:0;min-height:40px;padding:7px 3px;font-size:9px;white-space:normal;line-height:1.1;text-align:center}
+.quick-palette{gap:3px;padding:4px;scrollbar-width:thin}
+.quick-palette button{min-width:52px;min-height:49px;font-size:9px;gap:0}
+.quick-palette .item-art{width:24px;height:24px}
+.palette-item{min-height:68px;padding:5px 2px;gap:1px}
+.palette-item .item-art{width:31px;height:31px}
+.preset-button .item-art{max-width:35px;max-height:35px}
+.dimension-row{grid-template-columns:repeat(2,minmax(0,1fr));margin:9px 0 2px;gap:7px}
+.dimension-row label{min-width:0;gap:7px;line-height:1.35}
+.dimension-row input{font:600 16px system-ui;min-width:0;padding:10px 7px;min-height:44px}
+.dimension-hint{margin:4px 0 11px;font-size:11px;line-height:1.5;color:#bfd0ad}
+@media(max-width:760px){
+ .primary-tools{grid-template-columns:repeat(5,minmax(0,1fr));gap:3px;padding:4px}
+ .primary-tools button{min-height:42px;padding:5px 2px;font-size:9px;overflow-wrap:anywhere}
+ .quick-palette{position:sticky;top:0;z-index:5}
+ .quick-palette button{min-width:49px;min-height:46px;font-size:9px}
+ .quick-palette .item-art{width:22px;height:22px}
+ .palette-item{min-height:61px;font-size:9px;padding:4px 1px}
+ .palette-item .item-art{width:27px;height:27px}
+ .editor-history-bar{gap:3px}
+ .editor-history-bar button{padding:6px 5px}
+}
+@media(max-width:370px){.primary-tools button{font-size:8px}.quick-palette button{min-width:46px}}

@@ -1,5 +1,5 @@
 import { Sprite } from './Sprite';
-import { polygonArea, type Garden, type Mode, type Ground } from './model';
+import { polygonArea, objectDimensions, type Garden, type Mode, type Ground } from './model';
 import { formatArea } from './geometry';
 import { isPlantKind } from './plantAtlas';
 
@@ -14,11 +14,11 @@ function ReportMap({garden,mode}:{garden:Garden;mode:Mode}){
     {layout.lines.map(line=><g key={line.id}><polyline points={points(line.points)} fill="none" stroke={line.kind==='path'?'#665a45':'#463325'} strokeWidth={line.widthM*20+3}/><polyline points={points(line.points)} fill="none" stroke={line.kind==='path'?'#d9ceb1':'#b99b74'} strokeWidth={line.widthM*20} strokeDasharray={line.kind==='fence'?'9 10':undefined}/></g>)}
     {garden.objects.map(item=>{
       const p=item.position;if(!p)return null;
-      const d=Math.max(20,item.diameterM*20);
+      const axes=objectDimensions(item),w=Math.max(10,axes.widthM*20),h=Math.max(10,axes.lengthM*20);
       return <g key={item.id} transform={`translate(${p.x*20} ${p.y*20})`}>
-        <svg x={-d/2} y={-d/2} width={d} height={d} viewBox="0 0 64 64"><g transform={`rotate(${item.rotation??0} 32 32)`}><Sprite kind={item.kind} presetId={item.presetId}/></g></svg>
-        <rect x={-55} y={d/2+4} width="110" height="15" fill="#ffffff" opacity=".85"/>
-        <text x="0" y={d/2+15} textAnchor="middle" fontSize="10" fill="#1e3b26">{item.id.slice(0,14)}</text>
+        <svg x={-w/2} y={-h/2} width={w} height={h} viewBox="0 0 64 64"><g transform={`rotate(${item.rotation??0} 32 32)`}><Sprite kind={item.kind} presetId={item.presetId}/></g></svg>
+        <rect x={-55} y={h/2+4} width="110" height="15" fill="#ffffff" opacity=".85"/>
+        <text x="0" y={h/2+15} textAnchor="middle" fontSize="10" fill="#1e3b26">{item.id.slice(0,14)}</text>
       </g>;
     })}
   </svg></div>;
@@ -44,7 +44,7 @@ export function GardenReport({garden}:{garden:Garden}){
     {garden.objects.length===0?<p>No garden objects recorded yet.</p>:garden.objects.map(o=><section key={o.id} className="report-specimen">
       <div className="report-specimen-icon"><svg width="50" height="50" viewBox="0 0 64 64"><Sprite kind={o.kind} presetId={o.presetId}/></svg></div>
       <div><h3>{o.name||'Unnamed'} <small>{o.id}</small></h3>
-        <p><strong>Type:</strong> {o.kind}{o.presetId?` (${o.presetId})`:""} · <strong>Species:</strong> {o.species||'Not recorded'} · <strong>Diameter:</strong> {o.diameterM.toFixed(1)} m</p>
+        <p><strong>Type:</strong> {o.kind}{o.presetId?` (${o.presetId})`:""} · <strong>Species:</strong> {o.species||'Not recorded'} · <strong>Size (width × length):</strong> {objectDimensions(o).widthM} × {objectDimensions(o).lengthM} m</p>
         <p><strong>Group:</strong> {garden.groups.find(g=>g.id===o.groupId)?.name||'Ungrouped'}</p>
         <p><strong>Scale:</strong> {o.position?`${o.position.x.toFixed(1)} m, ${o.position.y.toFixed(1)} m`:'Unplaced'} · <strong>Both views linked</strong></p>
         {o.notes&&<p><strong>Notes:</strong> {o.notes}</p>}
