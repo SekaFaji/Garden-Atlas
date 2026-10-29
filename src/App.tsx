@@ -4,6 +4,7 @@ import { MapView, type Tool } from './MapView';
 import { Sprite } from './Sprite';
 import { PlantAtlasPanel } from './PlantAtlasPanel';
 import { ObjectDimensions } from './ObjectDimensions';
+import { MetricDraftInput } from './MetricDraftInput';
 import { OfflineTools } from './OfflineTools';
 import { PRESETS, findPresets, defaultPreset, getPreset } from './catalog';
 import { GardenReport } from './Report';
@@ -58,6 +59,8 @@ export default function App(){
   const [showReference,setShowReference]=useState(true);
   const [importingReference,setImportingReference]=useState(false);
   const referenceFile=useRef<HTMLInputElement>(null);
+  const inspectorRef=useRef<HTMLElement>(null);
+  const showDetails=()=>{setSelectedPanel('inspector');requestAnimationFrame(()=>inspectorRef.current?.scrollIntoView({behavior:'smooth',block:'start'}));};
   const [dims,setDims]=useState({width:String(garden.width),height:String(garden.height)});
   const [mapSizeOpen,setMapSizeOpen]=useState(false);
   const [resizeMode,setResizeMode]=useState<'preserve'|'scale'>('preserve');
@@ -318,7 +321,7 @@ export default function App(){
           {findPresets(presetSearch,presetFilter).length===0&&<p className="panel-hint">No presets match this search.</p>}
         </div>
         <div className="section-heading list-heading">02 / GARDEN ITEMS <span className="pill">{garden.objects.length}</span></div>
-        <div className="item-list">{garden.objects.map(o=><div key={o.id} className="object-row"><button className={`object-entry ${selectedId===o.id?'active':''}`} onClick={()=>{select(o.id);setNewTool('select');}}><Icon kind={o.kind} presetId={o.presetId} size={28}/><span>{o.name}<small>{o.id} {o.position?'●':'○'}</small></span></button><label title={`Select ${o.name} for grouping`} className="batch-check"><input type="checkbox" aria-label={`Batch-select ${o.name}`} checked={checkedIds.includes(o.id)} onChange={e=>setCheckedIds(ids=>e.target.checked?[...ids,o.id]:ids.filter(x=>x!==o.id))}/></label></div>)}</div>
+        <div className="item-list">{garden.objects.map(o=><div key={o.id} className="object-row"><button className={`object-entry ${selectedId===o.id?'active':''}`} onClick={()=>{select(o.id);setNewTool('select');showDetails();}}><Icon kind={o.kind} presetId={o.presetId} size={28}/><span>{o.name}<small>{o.id} {o.position?'●':'○'}</small></span></button><label title={`Select ${o.name} for grouping`} className="batch-check"><input type="checkbox" aria-label={`Batch-select ${o.name}`} checked={checkedIds.includes(o.id)} onChange={e=>setCheckedIds(ids=>e.target.checked?[...ids,o.id]:ids.filter(x=>x!==o.id))}/></label></div>)}</div>
         <div className="batch-editor" aria-label="Multi-object editor">
           <button className={`btn ${multiSelect?'btn-highlight':'btn-muted'}`} aria-pressed={multiSelect} onClick={()=>{setMultiSelect(v=>!v);setTool('select');setSelectedGroupId(null);setSelectedId(null);}}>◩ {multiSelect?'MULTI SELECT ON':'MULTI SELECT'}</button>
           <button className="btn btn-muted" onClick={()=>{setCheckedIds(garden.objects.filter(o=>o.position).map(o=>o.id));setMultiSelect(true);setTool('select');setSelectedId(null);}}>SELECT ALL PLACED</button>
@@ -344,7 +347,7 @@ export default function App(){
         <p className="panel-hint">Layer locks prevent changes in this editing session; visibility affects display only. Both views share the same garden.</p>
         <div className="section-heading list-heading">05 / TERRAIN AREAS & LINES</div>
         <div className="terrain-list">{garden.layout.regions.map(r=><div className="terrain-entry" key={r.id}><button className="feature-pick" onClick={()=>{setSelectedFeature({kind:'region',id:r.id});setSelectedVertex(null);setNewTool('feature-edit');}}>{r.name} · {r.id} · EDIT POINTS</button><button disabled={locked.regions} title="Delete terrain region" onClick={()=>applyGarden({...garden,layout:{...garden.layout,regions:garden.layout.regions.filter(x=>x.id!==r.id)}})}>×</button></div>)}</div>
-        <div className="terrain-list">{garden.layout.lines.map(line=><div className="line-entry" key={line.id}><button className="feature-pick" onClick={()=>{setSelectedFeature({kind:'line',id:line.id});setSelectedVertex(null);setNewTool('feature-edit');}}>✎ EDIT POINTS</button><input disabled={locked.lines} aria-label={`Name of ${line.id}`} maxLength={120} value={line.name} onChange={e=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.map(x=>x.id===line.id?{...x,name:e.target.value}:x)}})}/><label>WIDTH M<input disabled={locked.lines} type="number" min="0.2" max="12" step="0.2" value={line.widthM} onChange={e=>{const n=Number(e.target.value);if(n>=.2&&n<=12)applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.map(x=>x.id===line.id?{...x,widthM:n}:x)}});}}/></label><button disabled={locked.lines} className="btn btn-danger" title="Delete path or fence" onClick={()=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.filter(x=>x.id!==line.id)}})}>×</button></div>)}</div>
+        <div className="terrain-list">{garden.layout.lines.map(line=><div className="line-entry" key={line.id}><button className="feature-pick" onClick={()=>{setSelectedFeature({kind:'line',id:line.id});setSelectedVertex(null);setNewTool('feature-edit');}}>✎ EDIT POINTS</button><input disabled={locked.lines} aria-label={`Name of ${line.id}`} maxLength={120} value={line.name} onChange={e=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.map(x=>x.id===line.id?{...x,name:e.target.value}:x)}})}/><label>WIDTH M<MetricDraftInput key={line.id} disabled={locked.lines} label={`${line.name} width in metres`} min={0.2} max={12} value={line.widthM} onCommit={n=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.map(x=>x.id===line.id?{...x,widthM:n}:x)}})} onNotice={setNotice}/></label><button disabled={locked.lines} className="btn btn-danger" title="Delete path or fence" onClick={()=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.filter(x=>x.id!==line.id)}})}>×</button></div>)}</div>
       </aside>
       <section className="editor-column">
         <div className="editor-top"><div><div className="eyebrow">CURRENT GARDEN</div><input className="garden-name" aria-label="Garden name" value={garden.name} maxLength={80} onChange={e=>applyGarden({...garden,name:e.target.value},true,'garden-name')}/></div>
@@ -384,7 +387,7 @@ export default function App(){
             <div className="primary-tools" role="toolbar" aria-label="Editor interaction tools">
             {([{id:'select',label:'↖ SELECT'},{id:'pan',label:'✋ PAN'},{id:'feature-edit',label:'✎ FEATURES'},{id:'outline-edit',label:'◇ EDIT EDGE'},{id:'outline-draw',label:'＋ BORDER'},{id:'freehand',label:'〰 FREEHAND'},{id:'terrain',label:'▧ TERRAIN'},{id:'path',label:'〰 PATH'},{id:'fence',label:'┃ FENCE'}] as {id:Tool;label:string}[]).map(x=><button key={x.id} className={tool===x.id?'active':''} aria-pressed={tool===x.id} title={x.id.replaceAll('-', ' ')} onClick={()=>setNewTool(x.id)}>{x.label}</button>)}
           </div>
-          {(tool==='path'||tool==='fence')&&<div className="terrain-chooser"><span>{tool.toUpperCase()} WIDTH (M)</span><input aria-label="Path or fence width in metres" type="number" min="0.2" max="12" step="0.2" value={lineWidth} onChange={e=>{const n=Number(e.target.value);if(n>=.2&&n<=12)setLineWidth(n);}}/></div>}
+          {(tool==='path'||tool==='fence')&&<div className="terrain-chooser"><span>{tool.toUpperCase()} WIDTH (M)</span><MetricDraftInput label="New path or fence width in metres" min={0.2} max={12} value={lineWidth} onCommit={setLineWidth} onNotice={setNotice}/></div>}
           {tool==='terrain'&&<div className="terrain-chooser"><span>NEW REGION</span><select aria-label="Terrain brush" value={ground} onChange={e=>setGround(e.target.value as Ground)}>{GROUNDS.map(g=><option key={g.value} value={g.value}>{g.label}</option>)}</select></div>}
           <div className="reference-toolbar">
             <button className="btn btn-muted" onClick={()=>setReferenceOpen(o=>!o)} aria-expanded={referenceOpen} aria-controls="reference-panel">▧ TRACE IMAGE {referenceOpen?'▴':'▾'} {garden.reference?'●':''}</button>
@@ -397,10 +400,10 @@ export default function App(){
             {garden.reference&&<>
               <small>{garden.reference.name} · shown in BOTH map styles</small>
               <label>OPACITY {Math.round(garden.reference.opacity*100)}%<input type="range" min="5" max="100" step="5" value={garden.reference.opacity*100} onChange={e=>updateReference({opacity:Number(e.target.value)/100})}/></label>
-              <label>IMAGE WIDTH (metres)<input type="number" min="0.5" max={garden.width} step="0.5" value={Number(garden.reference.widthM.toFixed(2))} onChange={e=>referenceWidth(Number(e.target.value))}/></label>
+              <label>IMAGE WIDTH (metres)<MetricDraftInput label="Tracing image width in metres" min={0.5} max={garden.width} value={garden.reference.widthM} onCommit={referenceWidth} onNotice={setNotice}/></label>
               <div className="reference-coordinates">
-                <label>LEFT X (m)<input type="number" min="0" max={garden.width-garden.reference.widthM} step="0.5" value={Number(garden.reference.x.toFixed(2))} onChange={e=>updateReference({x:Number(e.target.value)})}/></label>
-                <label>TOP Y (m)<input type="number" min="0" max={garden.height-garden.reference.heightM} step="0.5" value={Number(garden.reference.y.toFixed(2))} onChange={e=>updateReference({y:Number(e.target.value)})}/></label>
+                <label>LEFT X (m)<MetricDraftInput label="Tracing image X offset in metres" min={0} max={Math.max(0,garden.width-garden.reference.widthM)} value={garden.reference.x} onCommit={x=>updateReference({x})} onNotice={setNotice}/></label>
+                <label>TOP Y (m)<MetricDraftInput label="Tracing image Y offset in metres" min={0} max={Math.max(0,garden.height-garden.reference.heightM)} value={garden.reference.y} onCommit={y=>updateReference({y})} onNotice={setNotice}/></label>
               </div>
               <button className="btn btn-danger" onClick={()=>{if(window.confirm('Remove this tracing image from your garden? Undo can restore it.')){const {reference:_reference,...rest}=garden;void _reference;applyGarden(rest);}}}>REMOVE REFERENCE</button>
               <p>Align the image using width and X/Y offsets. For accurate tracing, calibrate from a known real-world distance. This is a visual reference, not a legal survey.</p>
@@ -416,12 +419,13 @@ export default function App(){
           <div className="quick-palette" aria-label="Quick add garden objects">{KINDS.map(k=><button key={k.kind} className={tool===k.kind?'active':''} onClick={()=>{setPresetId(defaultPreset(k.kind).id);setNewTool(k.kind);}} title={`Place ${k.label}`}><Icon kind={k.kind} presetId={defaultPreset(k.kind).id} size={29}/><span>{k.label}</span></button>)}<button className={tool==='select'?'active':''} onClick={()=>setNewTool('select')} title="Select and drag">↖<span>Move</span></button></div>
           <MapView garden={garden} mode={mode} tool={tool} terrain={ground} lineWidth={lineWidth} selectedId={selectedId} selectedGroupId={selectedGroupId} hidden={visibility} showReference={showReference} snapEnabled={snapEnabled} selectedIds={checkedIds} multiSelect={multiSelect} locked={locked} selectedFeature={selectedFeature} onSelectFeature={feature=>{setSelectedFeature(feature);setSelectedVertex(null);}} onSelectVertex={setSelectedVertex} onEditFeature={editExistingFeature} onResizeObject={resizeSelected}
             onPick={select} onTogglePick={togglePick} onMoveSelection={moveMultiple} onPlace={place} onMove={move} onBoundary={outline} onTerrain={addArea} onLine={addMapLine} onNotice={setNotice}/>
+          {tool==='select'&&!multiSelect&&selected&&<div className="map-selection-bar" aria-label="Selected garden item"><span><strong>SELECTED</strong> · {selected.name}</span><button type="button" className="btn btn-highlight" onClick={showDetails}>EDIT DETAILS ↓</button></div>}
           <div className="map-bottom"><span>{tool==='select'?(multiSelect?'MULTI MODE · TAP TO SELECT · DRAG SELECTED ITEMS TOGETHER':'DRAG ITEMS · PAN EMPTY SPACE · PINCH TO ZOOM'):tool==='pan'?'DRAG MAP · PINCH TO ZOOM':tool==='feature-edit'?'TAP PATH OR TERRAIN · DRAG HANDLES · TAP EDGE TO ADD POINT':tool==='outline-edit'?'DRAG CORNERS · TAP EDGE MIDPOINTS TO INSERT':tool==='outline-draw'?'TAP CORNERS · FINISH TO CLOSE OUTLINE':tool==='freehand'?'DRAW A CLOSED BORDER WITH ONE FINGER':tool==='terrain'?'TAP AREA CORNERS · FINISH TO ADD TERRAIN':tool==='path'||tool==='fence'?'TAP LINE POINTS · FINISH TO CREATE':`TAP TO PLACE ${tool.toUpperCase()}`}</span></div>
         </div>
         <div className="status-message" role="status">✦ {notice}</div>
-        <div className="feature-strip"><span>■ P014 OFFLINE PWA · LOCAL DATA</span><span>■ TOUCH-FIRST</span><span>■ LINKED SCALE + PIXEL VIEWS</span><span>■ LOCAL BACKUPS</span></div>
+        <div className="feature-strip"><span>■ P017 EDITOR POLISH</span><span>■ TOUCH-FIRST</span><span>■ LINKED SCALE + PIXEL VIEWS</span><span>■ LOCAL BACKUPS</span></div>
       </section>
-      <aside className={`panel details-panel ${selectedPanel==='inspector'?'mobile-active':''}`}>
+      <aside ref={inspectorRef} className={`panel details-panel ${selectedPanel==='inspector'?'mobile-active':''}`}>
         <div className="section-heading">06 / INSPECTOR</div>
         {selected?<>
           <div className="selected-preview"><div className="preview-art"><Icon kind={selected.kind} presetId={selected.presetId} size={80}/></div><strong>{selected.id}</strong><p>{info(selected.kind).label} · shared record</p></div>
@@ -435,7 +439,7 @@ export default function App(){
           <label className="field">DISPLAY NAME<input maxLength={80} value={selected.name} onChange={e=>objectPatch(selected.id,{name:e.target.value},'name')}/></label>
           <label className="field">SPECIES / TYPE<input maxLength={140} value={selected.species} placeholder="Optional" onChange={e=>objectPatch(selected.id,{species:e.target.value},'species')}/></label>
           <label className="field">GROUP<select value={selected.groupId??''} onChange={e=>objectPatch(selected.id,{groupId:e.target.value||null})}><option value="">— UNGROUPED —</option>{garden.groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
-          <label className="field">ROTATION (DEGREES)<input type="number" min="0" max="359" step="5" value={selected.rotation??0} onChange={e=>{const n=Number(e.target.value);if(Number.isFinite(n)&&n>=0&&n<360)objectPatch(selected.id,{rotation:n});}}/></label>
+          <label className="field">ROTATION (DEGREES)<MetricDraftInput key={selected.id} disabled={locked.objects} label="Rotation in degrees" min={0} max={359} decimals={0} value={selected.rotation??0} onCommit={n=>objectPatch(selected.id,{rotation:n})} onNotice={setNotice}/></label>
           <ObjectDimensions key={selected.id} object={selected} disabled={locked.objects} onNotice={setNotice} onChange={axes=>{const updated=resizeObjectAxes(garden,selected.id,axes);if(updated)applyGarden(updated);else setNotice('Invalid dimension. Previous measurements preserved.');}}/>
           <label className="field">NOTES<textarea rows={4} maxLength={3000} value={selected.notes} onChange={e=>objectPatch(selected.id,{notes:e.target.value},'notes')}/></label>
           <div className="placement-box">SHARED POSITION: {selected.position?`${selected.position!.x.toFixed(1)} m × ${selected.position!.y.toFixed(1)} m`:'Not placed'}
@@ -471,6 +475,6 @@ export default function App(){
       </aside>
     </main>
     <nav className="mobile-nav" aria-label="Editor panels"><button className={selectedPanel==='tools'?'active':''} onClick={()=>setSelectedPanel('tools')}>♣ OBJECTS</button><button className={selectedPanel==='inspector'?'active':''} onClick={()=>setSelectedPanel('inspector')}>✎ DETAILS</button><button className={selectedPanel==='projects'?'active':''} onClick={()=>setSelectedPanel('projects')}>▧ GARDENS</button></nav>
-    <footer className="footer">GARDEN ATLAS · P016 EDITOR POLISH <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
+    <footer className="footer">GARDEN ATLAS · P017 MOBILE UX POLISH <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
   </div><GardenReport garden={garden}/></>;
 }

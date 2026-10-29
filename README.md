@@ -1,3 +1,9 @@
+## P017 — Existing editor usability polish (2026-10-29)
+
+- **Number fields:** edit line widths, rotation and tracing image dimensions/offsets without fields reverting as you type. Tap outside or press Enter to apply; Escape cancels. Invalid values keep the previous measurement and show a notice.
+- **Mobile controls:** map toolbars no longer stick on top of each other, and the active selection has an **EDIT DETAILS** shortcut directly below the map. Selecting an object from the list scrolls to its Inspector.
+- **Scope:** no new garden tools or storage model changes; same data and backup formats. Physical Android checks for keyboard, pinch, save/reload and scrolling remain necessary.
+
 # 🌿 Garden Atlas
 
 **A touch-first, pixel-art-inspired TypeScript garden editor.** Built with React, SVG and Vite, deployed as a static site on GitHub Pages.

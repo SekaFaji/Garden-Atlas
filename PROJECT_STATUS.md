@@ -1,3 +1,16 @@
+# Garden Atlas — P017 Editor UI/UX & Input Reliability (2026-10-29)
+
+**Current patch: P017. Existing-feature polish only; garden schema v6 is unchanged.**
+
+- Fixed the P016-inconsistent numeric entry experience for **path/fence widths**, **object rotation** and **reference-image width and coordinates**. Draft entry uses a numeric keyboard, allows blank/partial typing until blur or Enter, validates the finished value, and restores the saved value on invalid input or Escape. The object width/length editor from P016 remains unchanged.
+- Existing path/fence width commits only once per completed edit, not at every intermediate keystroke, reducing accidental history entries and autosaves. New-drawing widths are also edited as drafts.
+- Repaired mobile tool layout: removed conflicting `position:sticky; top:0` behavior from two toolbars that would obscure one another; retained all editor modes and existing quick palette.
+- Added a compact selected-item strip immediately below the map with a clear **EDIT DETAILS** action; selecting an object in the object list also scrolls the Inspector into view. Tapping the map still keeps map navigation in place until explicitly opening Details.
+- Mobile form fields use 16px font sizing for easier typing without unintended browser zoom. Selected item names truncate instead of pushing controls off-screen; touch targets remain around 42–48px.
+- No changes to IndexedDB, service worker, the plant atlas data model, library migration or plot geometry. Manual Android device review is still required.
+
+---
+
 # Garden Atlas — P016 UI/UX Size & Toolbar Polish (2026-10-29)
 
 **Current patch: P016. This patch fixes existing controls; it does not add garden-management features.**

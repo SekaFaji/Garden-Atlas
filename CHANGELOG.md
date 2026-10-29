@@ -1,3 +1,11 @@
+## P017 — Mobile Toolbars & Measurement Input Polish (2026-10-29)
+
+- Fixed per-keystroke reversion in existing path/fence width fields, new path/fence width, object rotation, and tracing image width/X/Y offsets; commit valid values on blur or Enter, Escape restores unchanged state.
+- Removed overlapping sticky mobile editing rows, kept all tools and quick palette available.
+- Made selected objects easier to edit using a compact map selection strip and a scroll-to-Inspector action; object list selection uses the same navigation.
+- Raised mobile input font sizes, kept touch-sized controls, and did not change garden v6 schema, save paths, or existing feature semantics.
+- Added tests for number parsing, bounds and intermediate editing states.
+
 ## P016 — Mobile tool compactness and object dimensions (2026-10-29)
 
 - Reduced main tool button bulk, abbreviated labels, and arranged mobile interaction tools in a two-row, five-column grid rather than a long horizontally-scrolling toolbar.

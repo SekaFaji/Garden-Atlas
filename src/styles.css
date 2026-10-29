@@ -172,3 +172,26 @@
  .editor-history-bar button{padding:6px 5px}
 }
 @media(max-width:370px){.primary-tools button{font-size:8px}.quick-palette button{min-width:46px}}
+
+/* P017: clearer mobile inspector handoff, non-overlapping toolbars and stable metric entry. */
+.metric-draft-input{width:100%;min-width:0;min-height:42px;padding:9px;border:2px solid #668c69;background:#12291e;color:#fff5dc;font:600 16px system-ui;border-radius:0}
+.metric-draft-input:disabled{opacity:.55}
+.map-selection-bar{display:flex;gap:9px;align-items:center;justify-content:space-between;padding:8px 10px;background:#254936;border-top:2px solid #729576;color:#f0edcd;font:800 11px monospace;min-width:0}
+.map-selection-bar span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.map-selection-bar strong{color:#b8dd9c}
+.map-selection-bar button{flex:none;min-height:40px;padding:8px 10px;font-size:10px}
+.details-panel{scroll-margin-top:14px}
+.primary-tools button:focus-visible,.quick-palette button:focus-visible{outline:3px solid #ffe6a1;outline-offset:-3px}
+@media(max-width:760px){
+ /* P016 had two different sticky rows both at top:0 that obscured one another. */
+ .editor-history-bar{position:relative;top:auto;z-index:auto;padding:5px;gap:3px;flex-wrap:nowrap}
+ .editor-history-bar span{display:none}
+ .editor-history-bar button{min-width:0;flex:1;padding:6px 2px;font-size:10px;min-height:42px}
+ .quick-palette{position:relative;top:auto;z-index:auto;overflow-x:auto;overscroll-behavior-x:contain}
+ .map-selection-bar{padding:6px 8px;gap:5px}
+ .map-selection-bar button{font-size:10px;min-width:105px}
+ .primary-tools button{font-size:10px;letter-spacing:-.2px;min-height:44px}
+ .field input,.field select,.field textarea,.group-create input,.line-entry input,.terrain-chooser input,.reference-panel input:not([type=range]){font-size:16px}
+ .mobile-nav button{min-height:48px}
+}
+@media(max-width:370px){.editor-history-bar button{font-size:9px}.map-selection-bar span{font-size:10px}}
