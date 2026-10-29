@@ -1,3 +1,12 @@
+## P021 — Map Drawing Controls & Draft Safety (2026-10-29)
+- Existing-feature UI polish only; no new garden objects, fields or storage format.
+- Drawing modes now show contextual controls before placing a first point, including current mode, required points, accessible FINISH / remove-last-point / CLEAR controls.
+- Escape clears the active draft and Backspace removes its last point outside text fields; no other keyboard interactions change.
+- Tool changes and Scale/Illustration changes warn before abandoning incomplete draft points; cancelling keeps the original drawing and selected tool intact.
+- Tighter mobile drawing controls reduce map coverage while preserving accessible target sizes.
+- Garden schema remains v6; linked views, saves, backup/import, gestures and previously created features are unaffected.
+- Automated tests cover drawing requirements and interaction guard wiring. Physical-device testing remains required.
+
 ## P020 — Name Entry, Project Navigation & Mobile Row Polish (2026-10-29)
 
 - Added reusable draft-commit behavior to existing garden/group/object name fields, with Enter/blur to commit and Escape to revert; invalid required names no longer get stuck while typing.

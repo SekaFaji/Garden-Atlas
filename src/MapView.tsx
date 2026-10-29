@@ -3,13 +3,14 @@ import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent }
 import { Sprite } from './Sprite';
 import { closestEdge, formatArea } from './geometry';
 import { deliberateTap, intentionalDrag, type ScreenPoint } from './touchIntent';
+import { isDrawingTool, minimumDrawingPoints, drawingHint, drawingToolName } from './drawingUX';
 import type { FeatureSelection, EditAction } from './featureEdit';
 import { fitCamera, panCamera, pinchCamera, zoomCamera, type Camera } from './camera';
 import { clampPoint, polygonArea, simplifyStroke, validPolygon, objectDimensions, WORLD, KINDS, type Garden, type Ground, type Kind, type Mode, type Point, type LineKind } from './model';
 
 export type Tool = 'select' | 'feature-edit' | 'pan' | 'outline-edit' | 'outline-draw' | 'freehand' | 'terrain' | LineKind | Kind;
 interface Props {
-  garden: Garden; mode: Mode; tool: Tool; selectedId: string | null; selectedGroupId: string | null; selectedIds: readonly string[]; multiSelect:boolean; snapEnabled:boolean; showReference:boolean;
+  garden: Garden; mode: Mode; tool: Tool; onDraftCountChange:(count:number)=>void; selectedId: string | null; selectedGroupId: string | null; selectedIds: readonly string[]; multiSelect:boolean; snapEnabled:boolean; showReference:boolean;
   terrain: Ground; lineWidth: number; hidden: { objects: boolean; regions: boolean; boundary: boolean; lines: boolean };
   locked: {objects:boolean;regions:boolean;lines:boolean;boundary:boolean};
   selectedFeature: FeatureSelection|null;
@@ -44,7 +45,7 @@ const px=(p:Point)=>`${p.x*ppu},${p.y*ppu}`;
 const polygon=(pts:Point[])=>pts.map(px).join(' ');
 const midpoint=(a:PointerInfo,b:PointerInfo)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
 const distance=(a:PointerInfo,b:PointerInfo)=>Math.hypot(a.x-b.x,a.y-b.y);
-export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds,multiSelect,snapEnabled,showReference,terrain,lineWidth,hidden,locked,selectedFeature,onSelectFeature,onSelectVertex,onEditFeature,onResizeObject,onPick,onTogglePick,onMoveSelection,onPlace,onMove,onBoundary,onTerrain,onLine,onNotice}:Props){
+export function MapView({garden,mode,tool,onDraftCountChange,selectedId,selectedGroupId,selectedIds,multiSelect,snapEnabled,showReference,terrain,lineWidth,hidden,locked,selectedFeature,onSelectFeature,onSelectVertex,onEditFeature,onResizeObject,onPick,onTogglePick,onMoveSelection,onPlace,onMove,onBoundary,onTerrain,onLine,onNotice}:Props){
   const svgRef=useRef<SVGSVGElement>(null);
   const pointsRef=useRef(new Map<number,PointerInfo>());
   const activeRef=useRef<Activity|null>(null);
@@ -57,6 +58,17 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
   const [featurePreview,setFeaturePreview]=useState<{kind:FeatureSelection['kind'];id:string;index:number;point:Point}|null>(null);
   const [resizePreview,setResizePreview]=useState<{id:string;widthM:number;lengthM:number}|null>(null);
   const [draft,setDraft]=useState<Point[]>([]);
+  useEffect(()=>onDraftCountChange(draft.length),[draft.length,onDraftCountChange]);
+  useEffect(()=>{
+    if(!isDrawingTool(tool)||draft.length===0)return;
+    const onKey=(e:KeyboardEvent)=>{
+      const target=e.target as HTMLElement|null;
+      if(target?.closest('input,textarea,select,[contenteditable=true]'))return;
+      if(e.key==='Backspace'){e.preventDefault();setDraft(points=>points.slice(0,-1));}
+      if(e.key==='Escape'){e.preventDefault();setDraft([]);}
+    };
+    window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey);
+  },[tool,draft.length]);
   const [pinching,setPinching]=useState(false);
   const initialFit=useRef(false);
   useEffect(()=>{
@@ -357,7 +369,15 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds
       <button onClick={()=>fit(true)} title="Show surrounding workspace">AREA</button>
     </div>
     <div className="viewport-status"><span>{mode==='scale'?formatArea(polygonArea(layout.boundary)):'ILLUSTRATION'}</span><span>ZOOM {Math.round(camera.z*100)}%</span></div>
-    {(tool==='outline-draw'||tool==='terrain'||tool==='path'||tool==='fence')&&draft.length>0&&<div className="drawing-controls"><span>{draft.length} points</span><button onClick={finishDraft} disabled={draft.length<(tool==='path'||tool==='fence'?2:3)}>✓ FINISH</button><button onClick={()=>setDraft([])}>✕ CLEAR</button></div>}
+    {isDrawingTool(tool)&&<div className="drawing-controls" aria-label={`${drawingToolName(tool)} drawing controls`}>
+      <span className="drawing-progress" role="status" aria-live="polite"><b>{drawingToolName(tool)}</b> · {draft.length} / {minimumDrawingPoints(tool)} minimum</span>
+      <span className="drawing-instruction">{drawingHint(tool,draft.length)}</span>
+      <div className="drawing-actions">
+        <button className="drawing-finish" onClick={finishDraft} disabled={draft.length<minimumDrawingPoints(tool)} title="Complete the shape">✓ FINISH</button>
+        <button onClick={()=>setDraft(points=>points.slice(0,-1))} disabled={!draft.length} title="Remove the last draft point">↶ POINT</button>
+        <button onClick={()=>setDraft([])} disabled={!draft.length} title="Discard draft points">✕ CLEAR</button>
+      </div>
+    </div>}
     {pinching&&<div className="gesture-hint">PINCH TO ZOOM</div>}
   </div>;
 }

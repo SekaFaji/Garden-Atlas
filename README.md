@@ -1,3 +1,9 @@
+## P021 — Clearer drawing controls, safer tool switching
+
+When using **PATH**, **FENCE**, **BORDER** or **TERRAIN**, the map displays the active drawing mode and how many vertices are needed *before* the first tap. Tap the map to add points, then choose **FINISH**. **POINT** removes the most recent draft point; **CLEAR** discards the draft. Outside text fields, Backspace removes one draft point and Escape clears the drawing.
+
+Changing drawing tools or switching between Illustration and Scale while points are unfinished now asks before discarding the draft. Choosing Cancel keeps the current tool, view and draft. These are editor-only improvements; no objects or garden version-6 data change. Finished features still use the same validation and Undo/Redo as before.
+
 ## P020 — Smoother editing and mobile navigation (2026-10-29)
 
 - **Garden, group and object name fields:** you can clear and retype freely; finishing with **Enter** or tapping away saves one edit, **Escape** cancels it. Empty finished garden/group names are rejected with the previous name retained. Objects retain their earlier optional-empty label behavior.

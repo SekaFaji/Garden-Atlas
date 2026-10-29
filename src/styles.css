@@ -267,3 +267,21 @@
  .line-entry>.btn{min-width:44px;min-height:44px}
  .terrain-entry>.feature-pick{min-height:44px}
 }
+
+/* P021: make the active drawing mode apparent without turning the map into a toolbar. */
+.primary-tools button.active{box-shadow:inset 0 -3px 0 #577c4f,0 0 0 1px #f5edb8;font-weight:1000}
+.drawing-controls{z-index:3;right:72px;left:8px;top:8px;display:flex;flex-direction:column;align-items:stretch;gap:4px;max-width:340px;padding:7px 8px;box-shadow:2px 3px 0 #173123}
+.drawing-progress{font-size:11px;line-height:1.3;white-space:normal}
+.drawing-instruction{font:500 10px/1.3 system-ui;color:#dfedcf}
+.drawing-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+.drawing-actions button{min-height:38px;min-width:0;padding:6px 3px;font:900 10px monospace;border:1px solid #6d9b73;color:#f6edcf;background:#315c43}
+.drawing-actions .drawing-finish:not(:disabled){background:#c7e4a9;color:#243f2f;border-color:#e6f1bf}
+.drawing-actions button:disabled{opacity:.45}
+.drawing-actions button:focus-visible{outline:3px solid #f5e6aa;outline-offset:1px}
+@media(max-width:760px){
+ .drawing-controls{top:6px;left:6px;right:58px;max-width:300px;padding:5px;gap:3px}
+ .drawing-progress{font-size:10px}
+ .drawing-instruction{font-size:10px}
+ .drawing-actions button{min-height:40px;font-size:9px}
+}
+@media(max-width:350px){.drawing-controls{right:52px}.drawing-actions button{font-size:8px}}

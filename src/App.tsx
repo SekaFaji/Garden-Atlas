@@ -39,6 +39,7 @@ export default function App(){
   const libraryRef=useRef(library);libraryRef.current=library;
   const garden=library.projects.find(p=>p.id===library.activeId)!.garden;
   const [mode,setMode]=useState<Mode>('illustration');
+  const [draftCount,setDraftCount]=useState(0);
   const [tool,setTool]=useState<Tool>('select');
   const [ground,setGround]=useState<Ground>('soil');
   const [presetId,setPresetId]=useState('tree-oak');
@@ -164,7 +165,7 @@ export default function App(){
   // Selecting on the map must not yank mobile focus away from the map. Details opens explicitly.
   const select=(id:string|null)=>{setSelectedId(id);setSelectedGroupId(null);};
   const togglePick=(id:string)=>setCheckedIds(ids=>ids.includes(id)?ids.filter(x=>x!==id):[...ids,id]);
-  const selectGroup=(id:string)=>{setSelectedGroupId(id);setSelectedId(null);setTool('select');showDetails();};
+  const selectGroup=(id:string)=>{if(!setNewTool('select'))return;setSelectedGroupId(id);setSelectedId(null);showDetails();};
   const objectPatch=(id:string,patch:Partial<GardenObject>,key?:string)=>{if(locked.objects){setNotice('Unlock Plants & structures to edit this item.');return;}applyGarden({...garden,objects:garden.objects.map(o=>o.id===id?{...o,...patch}:o)},true,key?`object:${id}:${key}`:undefined);};
   const resizeSelected=(id:string,widthM:number,lengthM:number)=>{
     if(locked.objects){setNotice('Unlock Plants & structures before resizing.');return;}
@@ -300,13 +301,27 @@ export default function App(){
       }
     }).catch(()=>setNotice('Could not read the file.'));
   };
-  const setNewTool=(value:Tool)=>{
+  const confirmDraftExit=(nextTool:Tool,nextMode:Mode=mode)=>{
+    if(draftCount>0&&(nextTool!==tool||nextMode!==mode)){
+      return window.confirm(`Discard ${draftCount} unfinished drawing point${draftCount===1?'':'s'}? Finish or clear the shape first to keep working on it.`);
+    }
+    return true;
+  };
+  const setNewTool=(value:Tool):boolean=>{
     const layer:LayerKey|null=value==='outline-edit'||value==='outline-draw'||value==='freehand'?'boundary':value==='terrain'?'regions':value==='path'||value==='fence'||value==='feature-edit'?'lines':KINDS.some(k=>k.kind===value)?'objects':null;
-    if(layer&&locked[layer]&&!(value==='feature-edit'&&!locked.regions)){setNotice(`Unlock ${layer} to use this tool.`);return;}
-    setTool(value);if(value!=='select')setMultiSelect(false);if(value==='select'||value==='pan')setNotice(value==='select'?'Drag an object to move it, or drag empty ground to pan.':'Pan around the map; pinch with two fingers to zoom.');};
+    if(layer&&locked[layer]&&!(value==='feature-edit'&&!locked.regions)){setNotice(`Unlock ${layer} to use this tool.`);return false;}
+    if(!confirmDraftExit(value))return false;
+    setTool(value);if(value!=='select')setMultiSelect(false);if(value==='select'||value==='pan')setNotice(value==='select'?'Drag an object to move it, or drag empty ground to pan.':'Pan around the map; pinch with two fingers to zoom.');
+    return true;
+  };
+  const changeMapMode=(next:Mode)=>{
+    if(!confirmDraftExit('select',next))return;
+    setMode(next);setTool('select');setMultiSelect(false);
+  };
   const activatePreset=(id:string)=>{
     const preset=getPreset(id);if(!preset||locked.objects)return;
-    setPresetId(preset.id);setNewTool(preset.kind);
+    if(!setNewTool(preset.kind))return;
+    setPresetId(preset.id);
     setNotice(`${preset.name}: tap the map to place, then drag to adjust.`);
     if(window.matchMedia('(max-width:760px)').matches){
       setSelectedPanel('map');
@@ -316,7 +331,7 @@ export default function App(){
   if(!hydrated)return <div className="app-shell"><div className="status-message" role="status">Loading saved gardens…</div></div>;
   return <><div className="app-shell">
     <header className="topbar">
-      <div className="brand"><span className="brand-icon">✿</span><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL LANDSCAPE EDITOR · P020</div></div></div>
+      <div className="brand"><span className="brand-icon">✿</span><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL LANDSCAPE EDITOR · P021</div></div></div>
       <div className="top-actions"><span role="status" aria-live="polite" className={`save-status ${saveStatus==='failed'?'danger':''}`}>● {saveStatus==='saved'?(backend==='indexeddb'?'INDEXEDDB SAVED':'LOCAL SAVE'):saveStatus==='saving'?'SAVING…':saveStatus==='failed'?'SAVE FAILED':'LOADING…'}</span>
         <button className="btn btn-muted" onClick={()=>importFile.current?.click()}>IMPORT</button>
         <button className="btn btn-highlight" onClick={()=>download(`garden-atlas-${slug(garden.name)}-${date()}.json`,JSON.stringify(garden,null,2))}>↓ BACKUP</button><button className="btn btn-muted" onClick={()=>window.print()} title="Open your browser print dialog to save the garden book as a PDF">☷ PDF / PRINT</button>
@@ -344,10 +359,10 @@ export default function App(){
           {findPresets(presetSearch,presetFilter).length===0&&<p className="panel-hint">No presets match this search.</p>}
         </div>
         <div className="section-heading list-heading">02 / GARDEN ITEMS <span className="pill">{garden.objects.length}</span></div>
-        <div className="item-list">{garden.objects.map(o=><div key={o.id} className="object-row"><button className={`object-entry ${selectedId===o.id?'active':''}`} onClick={()=>{select(o.id);setNewTool('select');showDetails();}}><Icon kind={o.kind} presetId={o.presetId} size={28}/><span>{o.name}<small>{o.id} {o.position?'●':'○'}</small></span></button><label title={`Select ${o.name} for grouping`} className="batch-check"><input type="checkbox" aria-label={`Batch-select ${o.name}`} checked={checkedIds.includes(o.id)} onChange={e=>setCheckedIds(ids=>e.target.checked?[...ids,o.id]:ids.filter(x=>x!==o.id))}/></label></div>)}</div>
+        <div className="item-list">{garden.objects.map(o=><div key={o.id} className="object-row"><button className={`object-entry ${selectedId===o.id?'active':''}`} onClick={()=>{if(!setNewTool('select'))return;select(o.id);showDetails();}}><Icon kind={o.kind} presetId={o.presetId} size={28}/><span>{o.name}<small>{o.id} {o.position?'●':'○'}</small></span></button><label title={`Select ${o.name} for grouping`} className="batch-check"><input type="checkbox" aria-label={`Batch-select ${o.name}`} checked={checkedIds.includes(o.id)} onChange={e=>setCheckedIds(ids=>e.target.checked?[...ids,o.id]:ids.filter(x=>x!==o.id))}/></label></div>)}</div>
         <div className="batch-editor" aria-label="Multi-object editor">
-          <button className={`btn ${multiSelect?'btn-highlight':'btn-muted'}`} aria-pressed={multiSelect} onClick={()=>{setMultiSelect(v=>!v);setTool('select');setSelectedGroupId(null);setSelectedId(null);}}>◩ {multiSelect?'MULTI SELECT ON':'MULTI SELECT'}</button>
-          <button className="btn btn-muted" onClick={()=>{setCheckedIds(garden.objects.filter(o=>o.position).map(o=>o.id));setMultiSelect(true);setTool('select');setSelectedId(null);}}>SELECT ALL PLACED</button>
+          <button className={`btn ${multiSelect?'btn-highlight':'btn-muted'}`} aria-pressed={multiSelect} onClick={()=>{if(!setNewTool('select'))return;setMultiSelect(v=>!v);setSelectedGroupId(null);setSelectedId(null);}}>◩ {multiSelect?'MULTI SELECT ON':'MULTI SELECT'}</button>
+          <button className="btn btn-muted" onClick={()=>{if(!setNewTool('select'))return;setCheckedIds(garden.objects.filter(o=>o.position).map(o=>o.id));setMultiSelect(true);setSelectedId(null);}}>SELECT ALL PLACED</button>
           <button className="btn btn-muted" onClick={()=>setCheckedIds([])} disabled={!checkedIds.length}>CLEAR</button>
           {checkedIds.length>0&&<><span>{checkedIds.length} selected · drag any selected item to move the set</span>
             <div className="alignment-grid">
@@ -364,17 +379,17 @@ export default function App(){
         <div className="layer-list">{([{key:'objects',label:'Plants & structures'},{key:'regions',label:'Terrain regions'},{key:'lines',label:'Paths & fences'},{key:'boundary',label:'Property outline'}] as const).map(x=><div className="layer-control" key={x.key}>
           <label><input type="checkbox" checked={!visibility[x.key]} onChange={e=>setVisibility(v=>({...v,[x.key]:!e.target.checked}))}/>{x.label}</label>
           <button className={`layer-lock ${locked[x.key]?'locked':''}`} aria-pressed={locked[x.key]} aria-label={`${locked[x.key]?'Unlock':'Lock'} ${x.label}`} onClick={()=>{
-            setLocked(v=>({...v,[x.key]:!v[x.key]}));setTool('select');setSelectedFeature(null);setSelectedVertex(null);
+            if(!setNewTool('select'))return;setLocked(v=>({...v,[x.key]:!v[x.key]}));setSelectedFeature(null);setSelectedVertex(null);
           }}>{locked[x.key]?'🔒 LOCKED':'🔓 EDIT'}</button>
         </div>)}</div>
         <p className="panel-hint">Layer locks prevent changes in this editing session; visibility affects display only. Both views share the same garden.</p>
         <div className="section-heading list-heading">05 / TERRAIN AREAS & LINES</div>
-        <div className="terrain-list">{garden.layout.regions.map(r=><div className="terrain-entry" key={r.id}><button className="feature-pick" onClick={()=>{setSelectedFeature({kind:'region',id:r.id});setSelectedVertex(null);setNewTool('feature-edit');navigateTo('map');}}>{r.name} · {r.id} · EDIT POINTS</button><button disabled={locked.regions} title="Delete terrain region" onClick={()=>applyGarden({...garden,layout:{...garden.layout,regions:garden.layout.regions.filter(x=>x.id!==r.id)}})}>×</button></div>)}</div>
-        <div className="terrain-list">{garden.layout.lines.map(line=><div className="line-entry" key={line.id}><button className="feature-pick" onClick={()=>{setSelectedFeature({kind:'line',id:line.id});setSelectedVertex(null);setNewTool('feature-edit');navigateTo('map');}}>✎ EDIT POINTS</button><input disabled={locked.lines} aria-label={`Name of ${line.id}`} maxLength={120} value={line.name} onChange={e=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.map(x=>x.id===line.id?{...x,name:e.target.value}:x)}})}/><label>WIDTH M<MetricDraftInput key={line.id} disabled={locked.lines} label={`${line.name} width in metres`} min={0.2} max={12} value={line.widthM} onCommit={n=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.map(x=>x.id===line.id?{...x,widthM:n}:x)}})} onNotice={setNotice}/></label><button disabled={locked.lines} className="btn btn-danger" title="Delete path or fence" onClick={()=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.filter(x=>x.id!==line.id)}})}>×</button></div>)}</div>
+        <div className="terrain-list">{garden.layout.regions.map(r=><div className="terrain-entry" key={r.id}><button className="feature-pick" onClick={()=>{if(!setNewTool('feature-edit'))return;setSelectedFeature({kind:'region',id:r.id});setSelectedVertex(null);navigateTo('map');}}>{r.name} · {r.id} · EDIT POINTS</button><button disabled={locked.regions} title="Delete terrain region" onClick={()=>applyGarden({...garden,layout:{...garden.layout,regions:garden.layout.regions.filter(x=>x.id!==r.id)}})}>×</button></div>)}</div>
+        <div className="terrain-list">{garden.layout.lines.map(line=><div className="line-entry" key={line.id}><button className="feature-pick" onClick={()=>{if(!setNewTool('feature-edit'))return;setSelectedFeature({kind:'line',id:line.id});setSelectedVertex(null);navigateTo('map');}}>✎ EDIT POINTS</button><input disabled={locked.lines} aria-label={`Name of ${line.id}`} maxLength={120} value={line.name} onChange={e=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.map(x=>x.id===line.id?{...x,name:e.target.value}:x)}})}/><label>WIDTH M<MetricDraftInput key={line.id} disabled={locked.lines} label={`${line.name} width in metres`} min={0.2} max={12} value={line.widthM} onCommit={n=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.map(x=>x.id===line.id?{...x,widthM:n}:x)}})} onNotice={setNotice}/></label><button disabled={locked.lines} className="btn btn-danger" title="Delete path or fence" onClick={()=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.filter(x=>x.id!==line.id)}})}>×</button></div>)}</div>
       </aside>
       <section ref={editorRef} className="editor-column">
         <div className="editor-top"><div><div className="eyebrow">CURRENT GARDEN</div><NameDraftInput className="garden-name" label="Garden name" value={garden.name} maxLength={80} onCommit={name=>{const current=libraryRef.current.projects.find(p=>p.id===libraryRef.current.activeId)!.garden;applyGarden({...current,name});}} onNotice={setNotice}/></div>
-          <div className="mode-switch"><button className={mode==='illustration'?'on':''} onClick={()=>{setMode('illustration');setNewTool('select');}}>✦ ILLUSTRATION</button><button className={mode==='scale'?'on':''} onClick={()=>{setMode('scale');setNewTool('select');}}>▦ SCALE</button></div>
+          <div className="mode-switch"><button className={mode==='illustration'?'on':''} onClick={()=>changeMapMode('illustration')}>✦ ILLUSTRATION</button><button className={mode==='scale'?'on':''} onClick={()=>changeMapMode('scale')}>▦ SCALE</button></div>
         </div>
         {garden.linkMigration&&!garden.linkMigration.confirmed&&<section className="migration-panel" role="alertdialog" aria-label="Choose your linked map source">
           <strong>LINK YOUR EXISTING GARDEN</strong>
@@ -401,7 +416,7 @@ export default function App(){
             <p className="map-size-footnote">Property outline: {polygonArea(garden.layout.boundary).toFixed(1)} m². To alter the actual land border, use DRAW BORDER or EDIT BORDER. All changes can be undone.</p>
           </section>}
           <div className="editor-history-bar" aria-label="Editing history">
-              <button className={multiSelect?'active-history':''} aria-pressed={multiSelect} onClick={()=>{setMultiSelect(v=>!v);setTool('select');setSelectedGroupId(null);setSelectedId(null);}} title="Tap objects to select multiple">◩ MULTI</button>
+              <button className={multiSelect?'active-history':''} aria-pressed={multiSelect} onClick={()=>{if(!setNewTool('select'))return;setMultiSelect(v=>!v);setSelectedGroupId(null);setSelectedId(null);}} title="Tap objects to select multiple">◩ MULTI</button>
               <button className={snapEnabled?'active-history':''} aria-pressed={snapEnabled} onClick={()=>setSnapEnabled(v=>!v)} title="Snap moves and placements to a 0.5 metre grid">⌗ SNAP {snapEnabled?'ON':'OFF'}</button>
               <button disabled={!past.length||Boolean(garden.linkMigration&&!garden.linkMigration.confirmed)} onClick={undo} title="Undo · Ctrl/Cmd+Z">↶ UNDO</button>
               <button disabled={!future.length||Boolean(garden.linkMigration&&!garden.linkMigration.confirmed)} onClick={redo} title="Redo · Ctrl/Cmd+Shift+Z">↷ REDO</button>
@@ -439,8 +454,8 @@ export default function App(){
             }}>− REMOVE SELECTED POINT</button>
             <button onClick={()=>{setSelectedFeature(null);setSelectedVertex(null);}}>CLEAR SELECTION</button>
           </div>}
-          <div className="quick-palette" aria-label="Quick add garden objects">{KINDS.map(k=><button key={k.kind} className={tool===k.kind?'active':''} onClick={()=>{setPresetId(defaultPreset(k.kind).id);setNewTool(k.kind);}} title={`Place ${k.label}`}><Icon kind={k.kind} presetId={defaultPreset(k.kind).id} size={29}/><span>{k.label}</span></button>)}<button className={tool==='select'?'active':''} onClick={()=>setNewTool('select')} title="Select and drag">↖<span>Move</span></button></div>
-          <MapView garden={garden} mode={mode} tool={tool} terrain={ground} lineWidth={lineWidth} selectedId={selectedId} selectedGroupId={selectedGroupId} hidden={visibility} showReference={showReference} snapEnabled={snapEnabled} selectedIds={checkedIds} multiSelect={multiSelect} locked={locked} selectedFeature={selectedFeature} onSelectFeature={feature=>{setSelectedFeature(feature);setSelectedVertex(null);}} onSelectVertex={setSelectedVertex} onEditFeature={editExistingFeature} onResizeObject={resizeSelected}
+          <div className="quick-palette" aria-label="Quick add garden objects">{KINDS.map(k=><button key={k.kind} className={tool===k.kind?'active':''} onClick={()=>{if(setNewTool(k.kind))setPresetId(defaultPreset(k.kind).id);}} title={`Place ${k.label}`}><Icon kind={k.kind} presetId={defaultPreset(k.kind).id} size={29}/><span>{k.label}</span></button>)}<button className={tool==='select'?'active':''} onClick={()=>setNewTool('select')} title="Select and drag">↖<span>Move</span></button></div>
+          <MapView garden={garden} mode={mode} tool={tool} onDraftCountChange={setDraftCount} terrain={ground} lineWidth={lineWidth} selectedId={selectedId} selectedGroupId={selectedGroupId} hidden={visibility} showReference={showReference} snapEnabled={snapEnabled} selectedIds={checkedIds} multiSelect={multiSelect} locked={locked} selectedFeature={selectedFeature} onSelectFeature={feature=>{setSelectedFeature(feature);setSelectedVertex(null);}} onSelectVertex={setSelectedVertex} onEditFeature={editExistingFeature} onResizeObject={resizeSelected}
             onPick={select} onTogglePick={togglePick} onMoveSelection={moveMultiple} onPlace={place} onMove={move} onBoundary={outline} onTerrain={addArea} onLine={addMapLine} onNotice={setNotice}/>
           {tool==='select'&&!multiSelect&&selected&&<div className="map-selection-bar" aria-label="Selected garden item"><span><strong>SELECTED</strong> · {selected.name}</span><button type="button" className="btn btn-highlight" onClick={showDetails}>EDIT DETAILS ↓</button></div>}
           <div className="map-bottom"><span>{tool==='select'?(multiSelect?'MULTI MODE · TAP TO SELECT · DRAG SELECTED ITEMS TOGETHER':'DRAG ITEMS · PAN EMPTY SPACE · PINCH TO ZOOM'):tool==='pan'?'DRAG MAP · PINCH TO ZOOM':tool==='feature-edit'?'TAP PATH OR TERRAIN · DRAG HANDLES · TAP EDGE TO ADD POINT':tool==='outline-edit'?'DRAG CORNERS · TAP EDGE MIDPOINTS TO INSERT':tool==='outline-draw'?'TAP CORNERS · FINISH TO CLOSE OUTLINE':tool==='freehand'?'DRAW A CLOSED BORDER WITH ONE FINGER':tool==='terrain'?'TAP AREA CORNERS · FINISH TO ADD TERRAIN':tool==='path'||tool==='fence'?'TAP LINE POINTS · FINISH TO CREATE':`TAP TO PLACE ${tool.toUpperCase()}`}</span></div>
@@ -526,6 +541,6 @@ export default function App(){
     <nav className="mobile-nav" aria-label="Mobile garden navigation">
       {([{id:'map',label:'⌖ MAP'},{id:'tools',label:'♣ OBJECTS'},{id:'inspector',label:'✎ DETAILS'},{id:'projects',label:'▧ GARDENS'}] as {id:'map'|'tools'|'inspector'|'projects';label:string}[]).map(item=><button key={item.id} type="button" className={selectedPanel===item.id?'active':''} aria-current={selectedPanel===item.id?'page':undefined} onClick={()=>navigateTo(item.id)}>{item.label}</button>)}
     </nav>
-    <footer className="footer">GARDEN ATLAS · P020 EDITING & NAVIGATION POLISH <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
+    <footer className="footer">GARDEN ATLAS · P021 EDITING & NAVIGATION POLISH <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
   </div><GardenReport garden={garden}/></>;
 }

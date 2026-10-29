@@ -1,3 +1,13 @@
+# Garden Atlas — P021 Map Controls & Draft Safety (2026-10-29)
+
+- Latest patch: **P021**, focused on drawing mode clarity and avoiding accidental loss of in-progress vertices.
+- Existing modes (path, fence, border, terrain) show an action area from the start: instruction, progress, Finish, Undo Point, Clear.
+- Unfinished drawings require confirmation before changing tools or switching the map presentation; Cancel keeps the draft. Keyboard Backspace removes one draft point, Escape clears the draft outside text inputs.
+- Mobile drawing control layout is compact and touch friendly. No changes to garden v6, IndexedDB, PWA, imported images, other editing tools or saved records.
+- The automated suite exercises current logic and guard wiring. GitHub Actions should validate the production build. Android interaction testing is still outstanding.
+
+---
+
 # Garden Atlas — P020 Editing & Navigation Polish (2026-10-29)
 
 - **Existing UI/UX fixes only:** no new map tools, garden data fields, objects or storage changes.
