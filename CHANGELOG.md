@@ -1,3 +1,12 @@
+## P012 — Plant Atlas and Specimen Records (2026-10-29)
+- Added shared species encyclopedia (common/botanical names, description and care notes) plus individual specimen profiles.
+- Added identification confidence, planting date, dated observations and dated maintenance history for planted object kinds.
+- Added compressed local photo upload with a three-thumbnail limit per specimen and editable captions.
+- Included specimen data and photos in garden JSON backups and printable report.
+- Reused existing v6 schema with optional validated fields, preserving old backups and stable object IDs.
+- Duplicating a plant no longer copies its personal history or photographs.
+- Added dedicated plant-atlas regression tests. Browser storage is not cloud synchronization; larger photo libraries will need IndexedDB.
+
 ## P008 — Visible Map Size & Surrounding Workspace
 - Added MAP SIZE button directly above the map, usable on phones.
 - Added custom map dimensions, 10–500 m, with preserve-position and explicit scale-all modes.

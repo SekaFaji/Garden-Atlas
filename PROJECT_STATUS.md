@@ -1,3 +1,12 @@
+## P012 — Plant Atlas & Specimen Records (2026-10-29)
+- Separate per-garden species encyclopedia entries from per-object specimen profiles; object IDs and coordinates unchanged.
+- Identification confidence, planting date, observation history, maintenance history and photo captions for trees/shrubs/flowers.
+- Up to three small, validated, compressed local JPEG photos per specimen; JSON garden/library backups include media.
+- Print report includes species profiles, histories and attached photos.
+- Optional fields preserve garden version 6; old P011 and older backups remain valid; no destructive migration.
+- Browser `localStorage` quota remains a substantial limitation. Watch save status, export JSON backups; IndexedDB and richer care schedules remain future work.
+- Local automated tests cover valid and invalid plant records, IDs, dates, photo validation, and P011 backward compatibility. GitHub Actions checks the full build.
+
 # Garden Atlas — Project status
 
 Current patch: **P011 — Pixel-art preset catalog**.

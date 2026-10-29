@@ -109,3 +109,30 @@
 .preset-button.active,.preset-button[aria-pressed=true]{background:#496e4d;border-color:#f6dfa5;box-shadow:inset 0 0 0 1px #b8d58f}
 .preset-button:focus-visible{outline:3px solid #f3dd91}
 @media(max-width:760px){.preset-grid{grid-template-columns:repeat(3,minmax(0,1fr));max-height:360px}.preset-button{min-height:100px;padding:6px 2px;font-size:10px}.preset-button .item-art{width:41px;height:41px}}
+
+/* P012: plant encyclopedia and permanent specimen timelines. */
+.plant-atlas {margin-top:16px;border:2px solid #688468;background:#1b3528;padding:12px;display:grid;gap:10px;min-width:0;}
+.plant-atlas .section-heading {margin:12px 0 2px;}
+.plant-atlas .section-heading:first-child {margin-top:0;}
+.atlas-species-card,.atlas-create {padding:10px;border:1px solid #4e7256;background:#233e2e;display:grid;gap:6px;}
+.atlas-species-card small {font-family:monospace;color:#c7d8a8;}
+.atlas-entry-form {display:grid;gap:8px;min-width:0;}
+.atlas-entry-form input,.atlas-entry-form select,.atlas-entry-form textarea {min-width:0;width:100%;background:#12291d;border:2px solid #517058;padding:10px;color:#f2f1d5;font-size:13px;}
+.atlas-entry-form .btn {min-height:42px;}
+.atlas-event-list {display:grid;gap:5px;max-height:250px;overflow-y:auto;}
+.atlas-event {display:grid;grid-template-columns:1fr auto;gap:4px 8px;padding:8px;background:#244431;border:1px solid #486d51;overflow-wrap:anywhere;font-size:12px;}
+.atlas-event b {grid-column:1;color:#e9e5ae;font:800 11px monospace;}
+.atlas-event span {grid-column:1;white-space:pre-wrap;}
+.atlas-event button {grid-column:2;grid-row:1 / 3;min-width:36px;min-height:36px;border:1px solid #6a8770;background:#334c38;color:#fff4d3;}
+.atlas-upload {display:block;text-align:center;background:#456b49;border:2px solid #a6bd7a;padding:12px;color:#ffefbc;font:bold 11px monospace;cursor:pointer;}
+.atlas-upload:has(input:disabled){opacity:.5;cursor:default;}
+.atlas-upload input {display:none;}
+.atlas-photos {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr));gap:9px;}
+.atlas-photo {display:grid;gap:6px;align-content:start;padding:6px;background:#294632;border:1px solid #5d7b61;min-width:0;}
+.atlas-photo img {width:100%;aspect-ratio:1;object-fit:cover;image-rendering:auto;}
+.atlas-photo .field {min-width:0;}
+.atlas-photo .btn {padding:9px 4px;font-size:10px;}
+.report-photo {display:inline-block;width:150px;margin:7px 10px 7px 0;break-inside:avoid;vertical-align:top;}
+.report-photo img {width:150px;height:120px;object-fit:cover;}
+.report-photo figcaption {font-size:10px;word-break:break-word;}
+@media(max-width:760px){.plant-atlas{padding:10px;}.atlas-entry-form input,.atlas-entry-form textarea,.atlas-entry-form select{font-size:16px;}}

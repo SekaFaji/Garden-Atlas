@@ -1,6 +1,7 @@
 import { Sprite } from './Sprite';
 import { polygonArea, type Garden, type Mode, type Ground } from './model';
 import { formatArea } from './geometry';
+import { isPlantKind } from './plantAtlas';
 
 const palette:Record<Ground,string>={grass:'#96c67e',soil:'#a77d55',gravel:'#acaea3',stone:'#c0bbb1',water:'#69aabe'};
 const points=(p:{x:number;y:number}[])=>p.map(v=>`${v.x*20},${v.y*20}`).join(' ');
@@ -47,6 +48,13 @@ export function GardenReport({garden}:{garden:Garden}){
         <p><strong>Group:</strong> {garden.groups.find(g=>g.id===o.groupId)?.name||'Ungrouped'}</p>
         <p><strong>Scale:</strong> {o.position?`${o.position.x.toFixed(1)} m, ${o.position.y.toFixed(1)} m`:'Unplaced'} · <strong>Both views linked</strong></p>
         {o.notes&&<p><strong>Notes:</strong> {o.notes}</p>}
+        {isPlantKind(o.kind)&&<>
+          <p><strong>Identification:</strong> {o.plant?.identification??'unidentified'} · <strong>Planted:</strong> {o.plant?.plantedOn||'Not recorded'}</p>
+          {(()=>{const species=garden.speciesLibrary?.find(s=>s.id===o.plant?.speciesId);return species?<p><strong>Species profile:</strong> {species.commonName} {species.scientificName&&<em>({species.scientificName})</em>}{species.careNotes&&<> · Care: {species.careNotes}</>}</p>:null;})()}
+          {o.plant?.observations.map(e=><p key={e.id}><strong>Observation {e.date}:</strong> {e.note}</p>)}
+          {o.plant?.maintenance.map(e=><p key={e.id}><strong>Maintenance {e.date} · {e.action}:</strong> {e.note}</p>)}
+          {o.plant?.photos.map(photo=><figure className="report-photo" key={photo.id}><img src={photo.dataUrl} alt={photo.caption||'Specimen photograph'}/><figcaption>{photo.caption}</figcaption></figure>)}
+        </>}
       </div>
     </section>)}
     <footer className="report-footer">Generated locally by Garden Atlas · Your records remain in your browser unless you export them.</footer>

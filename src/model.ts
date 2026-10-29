@@ -1,5 +1,7 @@
 /** Garden Atlas P007. One source of truth for geometry; Scale/Illustration are render styles. */
 import { getPreset, defaultPreset } from './catalog.ts';
+import { validPlantAtlas } from './plantAtlas.ts';
+import type { PlantSpecies, SpecimenProfile } from './plantAtlas.ts';
 import {
   parseGarden as parseLegacyGarden, isGarden as isLegacyGarden,
   type Garden as LegacyGarden,
@@ -9,7 +11,7 @@ export type Kind = 'tree' | 'shrub' | 'flower' | 'bed' | 'house' | 'rock' | 'pon
 export type Ground = 'grass' | 'soil' | 'gravel' | 'stone' | 'water';
 export interface Point { x:number; y:number }
 export interface GardenGroup { id:string; name:string; notes:string }
-export interface GardenObject { id:string; kind:Kind; name:string; species:string; groupId:string|null; notes:string; diameterM:number; position?:Point; rotation?:number; presetId?:string }
+export interface GardenObject { id:string; kind:Kind; name:string; species:string; groupId:string|null; notes:string; diameterM:number; position?:Point; rotation?:number; presetId?:string; plant?:SpecimenProfile }
 export interface Region { id:string; name:string; ground:Ground; points:Point[] }
 export type LineKind = 'path'|'fence';
 export interface LineFeature { id:string; kind:LineKind; name:string; points:Point[]; widthM:number }
@@ -18,7 +20,7 @@ export interface MapLayout { boundary:Point[]; ground:Ground; regions:Region[]; 
 export interface LinkMigration { original:LegacyGarden; source:Mode; confirmed:boolean }
 /** Compressed JPEG stored with the garden; also travels in JSON backups. */
 export interface ReferenceImage { dataUrl:string; name:string; x:number; y:number; widthM:number; heightM:number; opacity:number }
-export interface Garden { version:6; name:string; width:number; height:number; groups:GardenGroup[]; objects:GardenObject[]; layout:MapLayout; linkMigration?:LinkMigration; reference?:ReferenceImage }
+export interface Garden { version:6; name:string; width:number; height:number; groups:GardenGroup[]; objects:GardenObject[]; layout:MapLayout; linkMigration?:LinkMigration; reference?:ReferenceImage; speciesLibrary?:PlantSpecies[] }
 export const WORLD={width:40,height:26,pixelsPerUnit:20} as const;
 export const GROUNDS: {value:Ground;label:string}[]=[
  {value:'grass',label:'Grass'},{value:'soil',label:'Soil'},{value:'gravel',label:'Gravel'},
@@ -98,6 +100,7 @@ export function isGarden(value:unknown):value is Garden {
   oids.add(o.id);
  }
  if(g.reference!==undefined&&!validReference(g.reference,g))return false;
+ if(!validPlantAtlas(value,g.objects))return false;
  const l=g.layout;
  if(!GROUNDS.some(gr=>gr.value===l.ground)||!validPolygon(l.boundary,g)||!Array.isArray(l.regions)||l.regions.length>200||!Array.isArray(l.lines)||l.lines.length>200)return false;
  const ids=new Set<string>();

@@ -6,6 +6,19 @@
 
 Garden Atlas lets people illustrate their garden, maintain shared records for plants and structures, and use a dimensioned Scale view of the same shared garden. The included example contains **synthetic data only**—not a real address or parcel plan.
 
+## P012 — Plant encyclopedia and specimen history
+
+Select any **tree, shrub or flower** on the map, then open **Details → Plant Atlas** to document that individual plant. Garden beds, structures, rocks and furniture are not single plant specimens, so they retain their existing general notes instead.
+
+- **Separate species profiles:** create a shared entry with common/botanical names, a description and care notes; link multiple independent plants to it. Deleting a species unlinks its specimens but keeps them and their history.
+- **Identification confidence:** unidentified, tentative, or user-confirmed. The app does not identify species automatically and does not verify labels.
+- **Individual histories:** optional planting date, dated observations, and dated maintenance entries (watering, pruning, feeding, planting, inspection or other), each tied to the specimen's permanent object ID.
+- **Local photos:** add up to **three compressed JPEG thumbnails per plant**, imported from JPG/PNG/WebP files. Images are processed in the browser, stored with the garden, shown in the Inspector and included in garden JSON backups and print reports. Photo captions are editable.
+- **Undo:** editing notes, species profiles, specimen histories and photos uses the existing history mechanism; typing bursts are grouped.
+- **Compatibility:** still garden file **version 6**, with optional `speciesLibrary` and `plant` fields. Old gardens, object IDs, original species text, map placements and legacy imports remain intact. Duplicating a plant keeps its species association but starts with a clean specimen history, date and photos.
+
+**Storage warning:** Specimen thumbnails are deliberately compressed and limited because the application still uses browser `localStorage`; many plants/photos may exhaust a browser's quota. Watch the **NOT SAVED** indicator and export JSON backups regularly. Clearing browser storage or using another browser/device can remove local changes. Photos are not uploaded to any server, and there is no automatic cross-device sync. The next data-safety step is IndexedDB media storage and stronger export/recovery.
+
 ## P010 — Edit existing map features and lock layers
 
 - Use **EDIT FEATURES** in the map toolbar, then tap a drawn path, fence or terrain region to select it.
