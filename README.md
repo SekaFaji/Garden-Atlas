@@ -4,7 +4,7 @@
 
 **Live demo:** https://sekafaji.github.io/Garden-Atlas/
 
-Garden Atlas lets people illustrate their garden, maintain shared records for plants and structures, and create a separate dimensioned Scale map. The included example contains **synthetic data only**—not a real address or parcel plan.
+Garden Atlas lets people illustrate their garden, maintain shared records for plants and structures, and use a dimensioned Scale view of the same shared garden. The included example contains **synthetic data only**—not a real address or parcel plan.
 
 ## P007 — Two connected views, one garden
 
@@ -21,7 +21,7 @@ Garden Atlas is a mobile-friendly garden design web app. Its Scale and Illustrat
 - **Pan on empty ground** with one finger, or use the Pan tool.
 - **Pinch zoom** with two fingers; mouse wheel and zoom buttons also work.
 - **FIT** zooms to the property boundary; **AREA** shows more surrounding workspace. Zoom is continuous and considerably wider than P003.
-- **Undo / redo** garden edits; operations preserve independent map placements.
+- **Undo / redo** garden edits; both views use one shared garden layout.
 - **Object hit areas** are larger than their actual sprites for easier selection on a phone.
 - A bottom tab bar on small screens keeps the large map visible and places Objects / Details / Gardens in collapsible panels.
 
@@ -54,13 +54,25 @@ The **MAP SIZE** button is now in the toolbar immediately above the editor map, 
 - Use **EDIT BORDER** or **DRAW BORDER** to reshape the *actual property boundary*, which is separate from workspace width and height.
 - Size edits work in both linked Scale and Illustration views, are included in browser autosave and backups, and can be undone during the editor session.
 
+## P009 — Multi-object editing and trace-image overlay
+
+- **MULTI** directly above the map switches to touch-friendly multi-select: tap individual objects to select/deselect them. Drag any selected object to move the whole selection in one Undo step, preserving relative spacing. Use **SELECT ALL PLACED** or checkboxes in the object list for bulk selection.
+- Bulk operations in the Objects panel: align to left/right/top/bottom, distribute evenly on X/Y (3+ placed objects), assign selected objects to groups, or delete the selection after confirmation.
+- **SNAP** in the toolbar optionally snaps placements/movements to a 0.5 m grid. When off, the existing Scale view 0.1 m snapping is retained; Illustration stays freeform.
+- Each object's **rotation** can be edited in the Inspector (0–359 degrees). This changes its sprite's presentation, not its shared measured location or diameter.
+- Open **TRACE IMAGE** near the map to import a local JPG, PNG or WebP image. Images up to 15 MB are decoded and compressed locally into a bounded JPEG before saving; no upload or external image service is used.
+- Adjust reference **opacity, image width (metres), and X/Y offsets**, and toggle visibility. The same image alignment appears in Scale and Illustration. Importing a new photo replaces the previous one in the current garden.
+- The reference image is included in a garden's JSON backup and the full-library backup. Its size is restricted because this release still uses browser `localStorage`; **NOT SAVED** means you must export a backup immediately.
+- Tracing is **manually aligned**, not georeferenced or automatically calibrated. Know a real-world distance before using the overlaid image for measurements. The image overlay is deliberately excluded from printable maps.
+- Existing version-6 gardens remain valid without a migration; reference and rotation fields are optional. Older versions still migrate through the existing parser.
+
 ## How to use
 
 1. Start by opening **GARDENS** and creating an empty garden, or edit a copy of the sample.
 2. Drag an object; drag empty space to navigate. Pinch the map or use **AREA** to see beyond your property's outline.
 3. Select **EDIT BORDER**, and drag corners or touch a border edge to add a corner; for a completely new border use **DRAW BORDER** or **FREEHAND**.
 4. Use **TERRAIN**, select a ground type, then draw the corners of a region and press **FINISH**. For walkways and fences choose **PATH** or **FENCE** and tap points along a line; the sidebar lets you edit the resulting feature's width or delete it.
-5. Go to **DETAILS** to rename the selected tree, set species and notes, duplicate it or change map dimensions. Use the quick palette above the map for rapid planting.
+5. Go to **DETAILS** to rename the selected tree, set species, rotation and notes, or duplicate it. Use **MAP SIZE** above the canvas to change map dimensions. Use the quick palette above the map for rapid planting.
 6. Use the top bar **PDF / PRINT** button, then select **Save as PDF** in the browser print dialog.
 7. Export regular **BACKUP** files from the top bar, or go to GARDENS to export **all** projects.
 
@@ -68,7 +80,7 @@ The **MAP SIZE** button is now in the toolbar immediately above the editor map, 
 
 - The library is stored in **browser `localStorage`**. It has no cloud backend or cross-device synchronization. Clearing site data may delete it; backups are essential. The app warns when saving fails.
 - Project import **adds** a garden; whole-library import requires confirmation because it replaces the local library.
-- Advanced paginated PDF layout and automated PDF download, plant photo attachments/encyclopedia, real elevation, freehand paths with width, fence components, planned-vs-existing scenarios and richer multi-select/group tools are **not yet implemented**.
+- Advanced PDF output, plant encyclopedia and photo albums, real elevation, editable path/fence segments, planned-vs-existing scenarios and object resize handles are **not yet implemented**.
 - Undo history is scoped to the open garden editing session, not saved after a browser reload.
 - Neither map should be used as a legally accurate land survey without additional calibration and authoritative measurements.
 
@@ -87,7 +99,7 @@ Vite is configured with `base: '/Garden-Atlas/'`. The [deployment workflow](.git
 
 ## Data model and compatibility
 
-Project data format **v6** contains `width`, `height`, `groups`, `objects` (with one optional `position` each), and a shared `layout` with `boundary`, `ground`, `regions`, and editable `lines` (paths/fences). Older projects include a full original P006 archive that preserves both independent layouts. The browser library format is separately versioned as `version: 1` and contains garden projects with stable project IDs.
+Project data format **v6** (P009 extends it with optional `reference` and object `rotation`, without changing the version) contains `width`, `height`, `groups`, `objects` (with one optional `position` each), and a shared `layout` with `boundary`, `ground`, `regions`, and editable `lines` (paths/fences). Older projects include a full original P006 archive that preserves both independent layouts. The browser library format is separately versioned as `version: 1` and contains garden projects with stable project IDs.
 
 P001–P006 garden JSON is migrated without discarding specimen IDs, notes, groups or original independent map data. A source-view confirmation is required before editing. Use an exported JSON backup before editing or upgrading.
 

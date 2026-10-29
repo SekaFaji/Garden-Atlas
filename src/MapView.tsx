@@ -7,9 +7,11 @@ import { clampPoint, polygonArea, simplifyStroke, validPolygon, WORLD, type Gard
 
 export type Tool = 'select' | 'pan' | 'outline-edit' | 'outline-draw' | 'freehand' | 'terrain' | LineKind | Kind;
 interface Props {
-  garden: Garden; mode: Mode; tool: Tool; selectedId: string | null; selectedGroupId: string | null;
+  garden: Garden; mode: Mode; tool: Tool; selectedId: string | null; selectedGroupId: string | null; selectedIds: readonly string[]; multiSelect:boolean; snapEnabled:boolean; showReference:boolean;
   terrain: Ground; lineWidth: number; hidden: { objects: boolean; regions: boolean; boundary: boolean };
   onPick: (id: string|null) => void;
+  onTogglePick: (id:string)=>void;
+  onMoveSelection: (anchorId:string,point:Point)=>void;
   onPlace: (kind:Kind,point:Point) => void;
   onMove: (id:string,point:Point,together:boolean) => void;
   onBoundary: (points:Point[]) => void;
@@ -20,18 +22,18 @@ interface Props {
 type PointerInfo={x:number;y:number};
 type Activity =
   | {kind:'pan';x:number;y:number;camera:Camera}
-  | {kind:'object';id:string;start:Point;anchor:Point;together:boolean;moved:boolean}
+  | {kind:'object';id:string;start:Point;anchor:Point;together:boolean;moved:boolean;multiple:boolean}
   | {kind:'corner';index:number;point:Point;moved:boolean}
   | {kind:'freehand';points:Point[]}
   | {kind:'tap';start:PointerInfo};
 const ppu=WORLD.pixelsPerUnit;
 const color: Record<Ground,string>={grass:'#8ebc77',soil:'#a57c53',gravel:'#a8aca0',stone:'#bdb8a9',water:'#64a6bc'};
-const snap=(p:Point,mode:Mode):Point=>mode==='scale'?{x:Math.round(p.x*10)/10,y:Math.round(p.y*10)/10}:p;
+const snap=(p:Point,mode:Mode,force=false):Point=>force?{x:Math.round(p.x*2)/2,y:Math.round(p.y*2)/2}:mode==='scale'?{x:Math.round(p.x*10)/10,y:Math.round(p.y*10)/10}:p;
 const px=(p:Point)=>`${p.x*ppu},${p.y*ppu}`;
 const polygon=(pts:Point[])=>pts.map(px).join(' ');
 const midpoint=(a:PointerInfo,b:PointerInfo)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
 const distance=(a:PointerInfo,b:PointerInfo)=>Math.hypot(a.x-b.x,a.y-b.y);
-export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,lineWidth,hidden,onPick,onPlace,onMove,onBoundary,onTerrain,onLine,onNotice}:Props){
+export function MapView({garden,mode,tool,selectedId,selectedGroupId,selectedIds,multiSelect,snapEnabled,showReference,terrain,lineWidth,hidden,onPick,onTogglePick,onMoveSelection,onPlace,onMove,onBoundary,onTerrain,onLine,onNotice}:Props){
   const svgRef=useRef<SVGSVGElement>(null);
   const pointsRef=useRef(new Map<number,PointerInfo>());
   const activeRef=useRef<Activity|null>(null);
@@ -39,7 +41,7 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,lin
   const [size,setSize]=useState({width:0,height:0});
   const [camera,setCamera]=useState<Camera>({cx:20,cy:13,z:1});
   const cameraRef=useRef(camera);cameraRef.current=camera;
-  const [preview,setPreview]=useState<{id:string;point:Point;together:boolean}|null>(null);
+  const [preview,setPreview]=useState<{id:string;point:Point;together:boolean;many?:readonly string[]}|null>(null);
   const [cornerPreview,setCornerPreview]=useState<{index:number;point:Point}|null>(null);
   const [draft,setDraft]=useState<Point[]>([]);
   const [pinching,setPinching]=useState(false);
@@ -121,9 +123,10 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,lin
       const id=hit.dataset.object!;
       const obj=garden.objects.find(o=>o.id===id);
       if(obj?.position){
-        const together=Boolean(selectedGroupId&&obj.groupId===selectedGroupId);
-        if(!together)onPick(id);
-        activeRef.current={kind:'object',id,start:clampPoint(start,garden),anchor:obj.position!,together,moved:false};return;
+        const multiple=multiSelect&&selectedIds.includes(id);
+        const together=Boolean(!multiSelect&&selectedGroupId&&obj.groupId===selectedGroupId);
+        if(!multiSelect&&!together)onPick(id);
+        activeRef.current={kind:'object',id,start:clampPoint(start,garden),anchor:obj.position!,together,multiple,moved:false};return;
       }
     }
     if(tool==='pan'||tool==='select'||tool==='outline-edit')activeRef.current={kind:'pan',x:e.clientX,y:e.clientY,camera:cameraRef.current};
@@ -142,9 +145,9 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,lin
     if(a.kind==='pan')setCamera(panCamera(a.camera,e.clientX-a.x,e.clientY-a.y));
     if(a.kind==='object'&&p){
       if(Math.hypot(p.x-a.start.x,p.y-a.start.y)>.16)a.moved=true;
-      if(a.moved)setPreview({id:a.id,point:clampPoint(snap({x:a.anchor.x+p.x-a.start.x,y:a.anchor.y+p.y-a.start.y},mode),garden),together:a.together});
+      if(a.moved)setPreview({id:a.id,point:clampPoint(snap({x:a.anchor.x+p.x-a.start.x,y:a.anchor.y+p.y-a.start.y},mode,snapEnabled),garden),together:a.together,many:a.multiple?selectedIds:undefined});
     }
-    if(a.kind==='corner'&&p){a.moved=true;setCornerPreview({index:a.index,point:clampPoint(snap(p,mode),garden)});}
+    if(a.kind==='corner'&&p){a.moved=true;setCornerPreview({index:a.index,point:clampPoint(snap(p,mode,snapEnabled),garden)});}
     if(a.kind==='freehand'&&p){const next=clampPoint(p,garden),prev=a.points[a.points.length-1];if(Math.hypot(prev.x-next.x,prev.y-next.y)>.16){a.points.push(next);if(a.points.length%3===0)setDraft([...a.points]);}}
   };
   const pointerUp=(e:ReactPointerEvent<SVGSVGElement>)=>{
@@ -155,11 +158,15 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,lin
     activeRef.current=null;
     if(!a||!p)return;
     if(a.kind==='object'){
-      if(a.moved){const final=snap({x:a.anchor.x+p.x-a.start.x,y:a.anchor.y+p.y-a.start.y},mode);onMove(a.id,clampPoint(final,garden),a.together);}
+      if(a.moved){const final=clampPoint(snap({x:a.anchor.x+p.x-a.start.x,y:a.anchor.y+p.y-a.start.y},mode,snapEnabled),garden);
+        if(a.multiple)onMoveSelection(a.id,final);
+        else if(multiSelect)onTogglePick(a.id);
+        else onMove(a.id,final,a.together);
+      }else if(multiSelect)onTogglePick(a.id);
       setPreview(null);return;
     }
     if(a.kind==='corner'){
-      if(a.moved){const boundary=garden.layout.boundary.map((pt,i)=>i===a.index?clampPoint(snap(p,mode),garden):pt);if(validPolygon(boundary,garden))onBoundary(boundary);else onNotice('Invalid outline. Edit cancelled to keep your garden safe.');}
+      if(a.moved){const boundary=garden.layout.boundary.map((pt,i)=>i===a.index?clampPoint(snap(p,mode,snapEnabled),garden):pt);if(validPolygon(boundary,garden))onBoundary(boundary);else onNotice('Invalid outline. Edit cancelled to keep your garden safe.');}
       setCornerPreview(null);return;
     }
     if(a.kind==='freehand'){
@@ -171,8 +178,8 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,lin
     if(a.kind==='pan')return;
     if(a.kind==='tap'&&Math.hypot(e.clientX-a.start.x,e.clientY-a.start.y)>12)return;
     if(!inside(p))return;
-    if(tool==='outline-draw'||tool==='terrain'||tool==='path'||tool==='fence'){setDraft(d=>d.length<100?[...d,snap(p,mode)]:d);return;}
-    if(tool==='tree'||tool==='shrub'||tool==='flower'||tool==='bed'||tool==='house')onPlace(tool,snap(p,mode));
+    if(tool==='outline-draw'||tool==='terrain'||tool==='path'||tool==='fence'){setDraft(d=>d.length<100?[...d,snap(p,mode,snapEnabled)]:d);return;}
+    if(tool==='tree'||tool==='shrub'||tool==='flower'||tool==='bed'||tool==='house')onPlace(tool,snap(p,mode,snapEnabled));
   };
   const cancelPointer=(e:ReactPointerEvent<SVGSVGElement>)=>{
     pointsRef.current.delete(e.pointerId);activeRef.current=null;pinchRef.current=null;setPreview(null);setCornerPreview(null);setPinching(false);
@@ -181,7 +188,7 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,lin
     event.preventDefault();const r=event.currentTarget.getBoundingClientRect();zoomAt(Math.exp(-event.deltaY*.0012),event.clientX-r.left,event.clientY-r.top);
   };
   const layout=garden.layout,place=garden.objects.find(o=>o.id===preview?.id)?.position;
-  const groupIds=preview?.together?garden.objects.filter(o=>o.groupId&&o.groupId===garden.objects.find(x=>x.id===preview.id)?.groupId).map(o=>o.id):[];
+  const groupIds=preview?.many??(preview?.together?garden.objects.filter(o=>o.groupId&&o.groupId===garden.objects.find(x=>x.id===preview.id)?.groupId).map(o=>o.id):[]);
   const dx=preview&&place?preview.point.x-place.x:0,dy=preview&&place?preview.point.y-place.y:0;
   const vw=size.width/camera.z,vh=size.height/camera.z;
   const shape=(pts:Point[])=>polygon(pts);
@@ -204,6 +211,12 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,lin
         {Array.from({length:Math.floor(garden.height)+1},(_,i)=><line key={'y'+i} x1="0" x2={garden.width*ppu} y1={i*ppu} y2={i*ppu} stroke="#3f6950" strokeWidth={i%5===0?1.6:.7} opacity={i%5===0?.55:.3}/>)}
       </g>}
       {!hidden.regions&&layout.regions.map(reg=><polygon key={reg.id} points={shape(reg.points)} fill={color[reg.ground]} stroke="#3d634b" strokeWidth="2" opacity=".96"/>)}
+      {garden.reference&&showReference&&<image
+        href={garden.reference.dataUrl}
+        x={garden.reference.x*ppu} y={garden.reference.y*ppu}
+        width={garden.reference.widthM*ppu} height={garden.reference.heightM*ppu}
+        opacity={garden.reference.opacity} preserveAspectRatio="none"
+        pointerEvents="none" aria-label="Imported tracing reference" />}
       {!hidden.regions&&layout.lines.map(line=><g key={line.id} pointerEvents="none">
         <polyline points={shape(line.points)} stroke={line.kind==='fence'?'#4f3e31':'#6c614d'} strokeWidth={line.widthM*ppu+4} fill="none" strokeLinecap="square" strokeLinejoin="bevel" />
         <polyline points={shape(line.points)} stroke={line.kind==='fence'?'#bc9564':'#c9c0a8'} strokeWidth={line.widthM*ppu} strokeDasharray={line.kind==='fence'?'9 10':undefined} fill="none" strokeLinecap="square" strokeLinejoin="bevel" />
@@ -211,7 +224,7 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,lin
       {!hidden.boundary&&<polygon points={shape(outline)} fill="none" stroke="#fff3c1" strokeWidth={Math.max(1.5,3/camera.z)} strokeDasharray={mode==='scale'?'10 6':undefined} pointerEvents="none" />}
       {!hidden.objects&&garden.objects.map(item=>{
         const original=item.position;if(!original)return null;
-        const active=selectedId===item.id||Boolean(selectedGroupId&&selectedGroupId===item.groupId);
+        const active=selectedId===item.id||selectedIds.includes(item.id)||Boolean(selectedGroupId&&selectedGroupId===item.groupId);
         const dragged=Boolean(preview&&(item.id===preview.id||groupIds.includes(item.id)));
         const offset=dragged?{x:dx,y:dy}:{x:0,y:0};
         const p={x:original.x+offset.x,y:original.y+offset.y};
@@ -219,7 +232,7 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,lin
         const hit=Math.max(diameter,48/Math.max(.06,camera.z));
         return <g data-object={item.id} key={item.id} className="map-object" transform={`translate(${p.x*ppu} ${p.y*ppu})`}>
           {active&&<rect x={-diameter/2-7} y={-diameter/2-7} width={diameter+14} height={diameter+14} fill="none" stroke="#fff3ac" strokeWidth="3" strokeDasharray="7 4" pointerEvents="none" />}
-          <svg x={-diameter/2} y={-diameter/2} width={diameter} height={diameter} viewBox="0 0 64 64" pointerEvents="none"><Sprite kind={item.kind}/></svg>
+          <svg x={-diameter/2} y={-diameter/2} width={diameter} height={diameter} viewBox="0 0 64 64" pointerEvents="none"><g transform={`rotate(${item.rotation??0} 32 32)`}><Sprite kind={item.kind}/></g></svg>
           <rect x={-hit/2} y={-hit/2} width={hit} height={hit} fill="transparent" />
           {active&&<g pointerEvents="none"><rect x={-55} y={diameter/2+6} width="110" height="20" fill="#1f382f" stroke="#f6dfa4" strokeWidth="1.5"/><text textAnchor="middle" x="0" y={diameter/2+20} fontSize="11" fontFamily="monospace" fill="#fff7d4">{item.name.slice(0,15)}</text></g>}
         </g>;

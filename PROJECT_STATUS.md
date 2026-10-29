@@ -1,6 +1,6 @@
 # Garden Atlas — Project status
 
-Current patch: **P007 — Linked Scale/Illustration views & safer edit history**.
+Current patch: **P009 — Advanced multi-selection and tracing-image reference**.
 
 ## Source-of-truth decision
 - Scale and Illustration now display **the same** objects, coordinates, property boundary, ground regions, paths and fences.
@@ -40,3 +40,12 @@ Current patch: **P007 — Linked Scale/Illustration views & safer edit history**
 - Workspace resize refuses to clip objects, plot boundary, terrain or lines.
 - Add 10/25 metres of context around the garden without distorting geometry.
 - Existing P007 version-6 garden data remains unchanged; no migration required.
+
+## P009 — Touch multi-edit and optional tracing reference
+- Tap-to-multi-select on the map, bulk movement in one history step, bulk alignment/distribution/deletion, and optional 0.5 m snapping.
+- Object rotation field for both visual styles.
+- Local image import with in-browser JPEG compression, manual opacity/width/XY alignment, and shared viewing across both map styles.
+- Image is saved in project JSON and exported backups; no cloud upload. Browser localStorage limits still apply.
+- Reuse v6 data with optional validated fields, avoiding destructive conversion of existing gardens.
+- Reference image is a tracing aid only, not an authenticated survey or GPS georeference.
+- Remaining: direct reference image reposition gestures; photo galleries/IndexedDB; resizing handles, editable vertices on paths/fences/terrain, drawing layer lock/order and existing/planned garden variants.

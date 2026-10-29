@@ -15,7 +15,7 @@ function ReportMap({garden,mode}:{garden:Garden;mode:Mode}){
       const p=item.position;if(!p)return null;
       const d=Math.max(20,item.diameterM*20);
       return <g key={item.id} transform={`translate(${p.x*20} ${p.y*20})`}>
-        <svg x={-d/2} y={-d/2} width={d} height={d} viewBox="0 0 64 64"><Sprite kind={item.kind}/></svg>
+        <svg x={-d/2} y={-d/2} width={d} height={d} viewBox="0 0 64 64"><g transform={`rotate(${item.rotation??0} 32 32)`}><Sprite kind={item.kind}/></g></svg>
         <rect x={-55} y={d/2+4} width="110" height="15" fill="#ffffff" opacity=".85"/>
         <text x="0" y={d/2+15} textAnchor="middle" fontSize="10" fill="#1e3b26">{item.id.slice(0,14)}</text>
       </g>;

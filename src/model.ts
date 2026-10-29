@@ -8,14 +8,16 @@ export type Kind = 'tree' | 'shrub' | 'flower' | 'bed' | 'house';
 export type Ground = 'grass' | 'soil' | 'gravel' | 'stone' | 'water';
 export interface Point { x:number; y:number }
 export interface GardenGroup { id:string; name:string; notes:string }
-export interface GardenObject { id:string; kind:Kind; name:string; species:string; groupId:string|null; notes:string; diameterM:number; position?:Point }
+export interface GardenObject { id:string; kind:Kind; name:string; species:string; groupId:string|null; notes:string; diameterM:number; position?:Point; rotation?:number }
 export interface Region { id:string; name:string; ground:Ground; points:Point[] }
 export type LineKind = 'path'|'fence';
 export interface LineFeature { id:string; kind:LineKind; name:string; points:Point[]; widthM:number }
 export interface MapLayout { boundary:Point[]; ground:Ground; regions:Region[]; lines:LineFeature[] }
 /** Preserve the entire pre-link garden, including BOTH independently authored layouts. */
 export interface LinkMigration { original:LegacyGarden; source:Mode; confirmed:boolean }
-export interface Garden { version:6; name:string; width:number; height:number; groups:GardenGroup[]; objects:GardenObject[]; layout:MapLayout; linkMigration?:LinkMigration }
+/** Compressed JPEG stored with the garden; also travels in JSON backups. */
+export interface ReferenceImage { dataUrl:string; name:string; x:number; y:number; widthM:number; heightM:number; opacity:number }
+export interface Garden { version:6; name:string; width:number; height:number; groups:GardenGroup[]; objects:GardenObject[]; layout:MapLayout; linkMigration?:LinkMigration; reference?:ReferenceImage }
 export const WORLD={width:40,height:26,pixelsPerUnit:20} as const;
 export const GROUNDS: {value:Ground;label:string}[]=[
  {value:'grass',label:'Grass'},{value:'soil',label:'Soil'},{value:'gravel',label:'Gravel'},
@@ -33,6 +35,15 @@ const validSize=(n:unknown)=>typeof n==='number'&&Number.isFinite(n)&&n>=10&&n<=
 const isObj=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v);
 const isText=(v:unknown,max=10000):v is string=>typeof v==='string'&&v.length<=max;
 const isPoint=(v:unknown,g:Pick<Garden,'width'|'height'>):v is Point=>isObj(v)&&typeof v.x==='number'&&Number.isFinite(v.x)&&v.x>=0&&v.x<=g.width&&typeof v.y==='number'&&Number.isFinite(v.y)&&v.y>=0&&v.y<=g.height;
+/** Data URLs are tightly bounded because all projects are stored in browser localStorage. */
+function validReference(r:unknown,g:Pick<Garden,'width'|'height'>):boolean {
+ if(!isObj(r)||!isText(r.name,140)||!isText(r.dataUrl,360_000)||!/^data:image\/jpeg;base64,[a-zA-Z0-9+/]+={0,2}$/.test(r.dataUrl))return false;
+ const numbers=['x','y','widthM','heightM','opacity'] as const;
+ if(!numbers.every(k=>typeof r[k]==='number'&&Number.isFinite(r[k])))return false;
+ return (r.x as number)>=0&&(r.y as number)>=0&&(r.widthM as number)>.1&&(r.heightM as number)>.1&&
+   (r.x as number)+(r.widthM as number)<=g.width+1e-6&&(r.y as number)+(r.heightM as number)<=g.height+1e-6&&
+   (r.opacity as number)>=.05&&(r.opacity as number)<=1;
+}
 export const clampPoint=(p:Point,g:Pick<Garden,'width'|'height'>=WORLD):Point=>({x:Math.min(g.width,Math.max(0,p.x)),y:Math.min(g.height,Math.max(0,p.y))});
 export function defaultLayout(width=40,height=26):MapLayout {
  return { boundary:[{x:1,y:1},{x:width-1,y:1},{x:width-1,y:height-1},{x:1,y:height-1}], ground:'grass',regions:[],lines:[] };
@@ -79,9 +90,10 @@ export function isGarden(value:unknown):value is Garden {
  const gids=new Set<string>(),oids=new Set<string>();
  for(const gr of g.groups){if(!isObj(gr)||!isText(gr.id,80)||!gr.id||gids.has(gr.id)||!isText(gr.name)||!gr.name.trim()||!isText(gr.notes))return false;gids.add(gr.id);}
  for(const o of g.objects){
-  if(!isObj(o)||!isText(o.id,80)||!o.id||oids.has(o.id)||!KINDS.some(k=>k.kind===o.kind)||!isText(o.name)||!isText(o.species)||!isText(o.notes)||!Number.isFinite(o.diameterM)||o.diameterM<.5||o.diameterM>100||!(o.groupId===null||typeof o.groupId==='string'&&gids.has(o.groupId))||!(o.position===undefined||isPoint(o.position,g)))return false;
+  if(!isObj(o)||!isText(o.id,80)||!o.id||oids.has(o.id)||!KINDS.some(k=>k.kind===o.kind)||!isText(o.name)||!isText(o.species)||!isText(o.notes)||!Number.isFinite(o.diameterM)||o.diameterM<.5||o.diameterM>100||!(o.groupId===null||typeof o.groupId==='string'&&gids.has(o.groupId))||!(o.position===undefined||isPoint(o.position,g))||!(o.rotation===undefined||typeof o.rotation==='number'&&Number.isFinite(o.rotation)&&o.rotation>=0&&o.rotation<360))return false;
   oids.add(o.id);
  }
+ if(g.reference!==undefined&&!validReference(g.reference,g))return false;
  const l=g.layout;
  if(!GROUNDS.some(gr=>gr.value===l.ground)||!validPolygon(l.boundary,g)||!Array.isArray(l.regions)||l.regions.length>200||!Array.isArray(l.lines)||l.lines.length>200)return false;
  const ids=new Set<string>();
@@ -131,6 +143,47 @@ export function movePlaced(g:Garden,id:string,_mode:Mode,requested:Point,togethe
  const ids=new Set(members.map(o=>o.id));
  return {...g,objects:g.objects.map(o=>ids.has(o.id)&&o.position?{...o,position:{x:o.position.x+dx,y:o.position.y+dy}}:o)};
 }
+
+/** Move selected items in one operation, preserving distances and restricting the entire set to the workspace. */
+export function moveSelection(g:Garden,ids:readonly string[],anchorId:string,requested:Point):Garden {
+ const selected=new Set(ids);
+ const members=g.objects.filter(o=>selected.has(o.id)&&o.position);
+ const anchor=members.find(o=>o.id===anchorId);
+ if(!anchor||!anchor.position)return g;
+ const dx=Math.max(-Math.min(...members.map(o=>o.position!.x)),Math.min(g.width-Math.max(...members.map(o=>o.position!.x)),requested.x-anchor.position.x));
+ const dy=Math.max(-Math.min(...members.map(o=>o.position!.y)),Math.min(g.height-Math.max(...members.map(o=>o.position!.y)),requested.y-anchor.position.y));
+ if(!dx&&!dy)return g;
+ return {...g,objects:g.objects.map(o=>selected.has(o.id)&&o.position?{...o,position:{x:o.position.x+dx,y:o.position.y+dy}}:o)};
+}
+export type AlignMode='left'|'right'|'top'|'bottom'|'horizontal'|'vertical';
+/** Align selected objects to a common edge or distribute the interior objects evenly. */
+export function alignSelection(g:Garden,ids:readonly string[],operation:AlignMode):Garden {
+ const selected=new Set(ids);
+ const members=g.objects.filter(o=>selected.has(o.id)&&o.position);
+ if(members.length<2)return g;
+ const xs=members.map(o=>o.position!.x),ys=members.map(o=>o.position!.y);
+ const left=Math.min(...xs),right=Math.max(...xs),top=Math.min(...ys),bottom=Math.max(...ys);
+ const positions=new Map<string,Point>();
+ if(operation==='horizontal'||operation==='vertical'){
+   if(members.length<3)return g;
+   const axis=operation==='horizontal'?'x':'y',ordered=[...members].sort((a,b)=>a.position![axis]-b.position![axis]);
+   const low=ordered[0].position![axis],high=ordered[ordered.length-1].position![axis];
+   ordered.forEach((o,i)=>positions.set(o.id,{...o.position!,[axis]:low+(high-low)*i/(ordered.length-1)}));
+ }else{
+   members.forEach(o=>positions.set(o.id,{...o.position!,...(operation==='left'?{x:left}:operation==='right'?{x:right}:operation==='top'?{y:top}:{y:bottom})}));
+ }
+ return {...g,objects:g.objects.map(o=>positions.has(o.id)?{...o,position:positions.get(o.id)!}:o)};
+}
+/** Reference dimensions are bounded to the workspace; maintain the same pixel aspect ratio when resizing. */
+export function setReferenceWidth(g:Garden,widthM:number):Garden|null {
+ const r=g.reference;if(!r||!Number.isFinite(widthM)||widthM<=.1)return null;
+ const heightM=r.heightM*widthM/r.widthM;
+ const x=Math.min(r.x,Math.max(0,g.width-widthM)),y=Math.min(r.y,Math.max(0,g.height-heightM));
+ if(widthM>g.width||heightM>g.height)return null;
+ const next={...g,reference:{...r,x,y,widthM,heightM}};
+ return isGarden(next)?next:null;
+}
+
 export function nextGroupId(g:Garden):string {let n=1;const ids=new Set(g.groups.map(x=>x.id));while(ids.has('GROUP-'+String(n).padStart(3,'0')))n++;return 'GROUP-'+String(n).padStart(3,'0');}
 export function nextObjectId(g:Garden,kind:Kind):string {let n=1;const ids=new Set(g.objects.map(x=>x.id)),prefix=kind.toUpperCase()+'-';while(ids.has(prefix+String(n).padStart(3,'0')))n++;return prefix+String(n).padStart(3,'0');}
 export function nextLineId(g:Garden,_mode:Mode):string {let n=1;const ids=new Set(g.layout.lines.map(x=>x.id));while(ids.has('LINE-'+String(n).padStart(3,'0')))n++;return 'LINE-'+String(n).padStart(3,'0');}
@@ -168,7 +221,7 @@ export function resizeGarden(g:Garden,width:number,height:number):Garden|null {
  const fx=width/g.width,fy=height/g.height;
  const transform=(p:Point)=>({x:Number((p.x*fx).toFixed(5)),y:Number((p.y*fy).toFixed(5))});
  const l=g.layout;
- const next:Garden={...g,width,height,layout:{...l,boundary:l.boundary.map(transform),regions:l.regions.map(r=>({...r,points:r.points.map(transform)})),lines:l.lines.map(line=>({...line,points:line.points.map(transform)}))},objects:g.objects.map(o=>o.position?{...o,position:transform(o.position)}:o)};
+ const next:Garden={...g,width,height,layout:{...l,boundary:l.boundary.map(transform),regions:l.regions.map(r=>({...r,points:r.points.map(transform)})),lines:l.lines.map(line=>({...line,points:line.points.map(transform)}))},objects:g.objects.map(o=>o.position?{...o,position:transform(o.position)}:o),...(g.reference?{reference:{...g.reference,x:g.reference.x*fx,y:g.reference.y*fy,widthM:g.reference.widthM*fx,heightM:g.reference.heightM*fy}}:{})};
  return isGarden(next)?next:null;
 }
 /** Adjust the surrounding workspace, retaining exact measured garden coordinates.
@@ -177,6 +230,7 @@ export function resizeGarden(g:Garden,width:number,height:number):Garden|null {
 export function resizeWorkspace(g:Garden,width:number,height:number):Garden|null {
  if(!validSize(width)||!validSize(height))return null;
  const fits=(p:Point)=>p.x<=width&&p.y<=height;
+ if(g.reference&&(g.reference.x+g.reference.widthM>width||g.reference.y+g.reference.heightM>height))return null;
  if(g.layout.boundary.some(p=>!fits(p))||g.layout.regions.some(r=>r.points.some(p=>!fits(p)))||
     g.layout.lines.some(l=>l.points.some(p=>!fits(p)))||g.objects.some(o=>o.position&&!fits(o.position)))return null;
  const next={...g,width,height};
@@ -192,7 +246,7 @@ export function addSurroundings(g:Garden,margin:number):Garden|null {
  const next:Garden={...g,width:g.width+2*margin,height:g.height+2*margin,
    layout:{...l,boundary:l.boundary.map(shift),regions:l.regions.map(r=>({...r,points:r.points.map(shift)})),
      lines:l.lines.map(line=>({...line,points:line.points.map(shift)}))},
-   objects:g.objects.map(o=>o.position?{...o,position:shift(o.position)}:o)};
+   objects:g.objects.map(o=>o.position?{...o,position:shift(o.position)}:o),...(g.reference?{reference:{...g.reference,x:g.reference.x+margin,y:g.reference.y+margin}}:{})};
  return isGarden(next)?next:null;
 }
 export function loadGarden():Garden {

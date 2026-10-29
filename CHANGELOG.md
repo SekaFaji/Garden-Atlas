@@ -85,3 +85,19 @@
 - Added feature management controls and printable report representation.
 - Upgraded garden files to schema v5 and automatically migrates P001–P004 gardens and v4 browser libraries without changing stable IDs.
 - Expanded model and migration tests to 27 checks.
+
+## P009 — Multi-Select and Reference Tracing (2026-10-29)
+
+- Added multi-select for touching multiple items on the map; drag selected items together in one Undo step.
+- Added left/right/top/bottom alignment, spacing controls and confirmation-based bulk deletion.
+- Added optional 0.5-metre grid snapping and numeric sprite rotation.
+- Added compressed local reference JPG import, opacity and geometry controls, show/hide toggle, and shared overlay in both map styles.
+- Added safe validation for image data and workspace bounds; image follows world resize/expansion.
+- Kept existing v6 garden data and P001–P006 import/migration paths intact.
+- Added regression tests for bulk movement, alignment, reference validation and dimensions.
+
+### Limits
+
+- Reference photos are capped after compression and stored in localStorage; monitor the NOT SAVED indicator and download backups.
+- Tracing alignment is manual, not GPS calibrated; this is not a land survey.
+- No object rotation handles or on-map image-transform gestures yet; image sizing and offsets are edited numerically.

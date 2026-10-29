@@ -202,3 +202,78 @@ test('P008 surrounding margins retain precise distances and all shared map geome
  const restored=resizeWorkspace(large,70,50);assert.ok(restored);
  assert.equal(polygonArea(restored.layout.boundary),polygonArea(first.layout.boundary));
 });
+
+test('P009 selected objects move together while unselected objects stay unchanged',async()=>{
+ const {moveSelection}=await import('../src/model.ts');
+ const g=demoGarden();
+ const before=g.objects.map(o=>structuredClone(o));
+ const ids=[g.objects[0].id,g.objects[1].id];
+ const moved=moveSelection(g,ids,ids[0],p(30,9));
+ assert.deepEqual(moved.objects[0].position,p(30,9));
+ assert.deepEqual(moved.objects[1].position,p(10,9));
+ assert.deepEqual(moved.objects[2],before[2]);
+ assert.deepEqual(g.objects[0],before[0]);
+ assert.equal(isGarden(moved),true);
+});
+
+test('P009 group movement clamps without collapsing spacing',async()=>{
+ const {moveSelection}=await import('../src/model.ts');
+ const g=demoGarden(),a=g.objects[0],b=g.objects[1];
+ const moved=moveSelection(g,[a.id,b.id],a.id,p(40,26));
+ assert.deepEqual(moved.objects[0].position,p(40,26));
+ assert.deepEqual(moved.objects[1].position,p(20,26));
+ assert.equal(isGarden(moved),true);
+});
+
+test('P009 alignment distributes in one edit and keeps all permanent IDs',async()=>{
+ const {alignSelection}=await import('../src/model.ts');
+ const garden=demoGarden();
+ const ids=garden.objects.slice(0,3).map(o=>o.id);
+ const aligned=alignSelection(garden,ids,'left');
+ assert.deepEqual(aligned.objects.slice(0,3).map(o=>o.position.x),[7,7,7]);
+ assert.deepEqual(aligned.objects.slice(0,3).map(o=>o.id),ids);
+ const spaced=alignSelection(garden,ids,'horizontal');
+ assert.deepEqual(spaced.objects.slice(0,3).map(o=>o.position.x),[29,18,7]);
+ assert.equal(isGarden(spaced),true);
+ assert.equal(alignSelection(garden,ids.slice(0,1),'right'),garden);
+});
+
+test('P009 validates image safety, retaining legacy v6 compatibility',async()=>{
+ const {setReferenceWidth}=await import('../src/model.ts');
+ const plain=demoGarden();assert.ok(isGarden(plain));
+ const reference={dataUrl:'data:image/jpeg;base64,AA==',name:'layout.jpg',x:3,y:4,widthM:20,heightM:10,opacity:.55};
+ const withPhoto={...plain,reference};
+ assert.ok(isGarden(withPhoto));
+ assert.deepEqual(parseGarden(withPhoto),withPhoto);
+ const scaled=setReferenceWidth(withPhoto,30);assert.ok(scaled);
+ assert.equal(scaled.reference.heightM,15);
+ assert.equal(setReferenceWidth(withPhoto,300),null);
+ assert.equal(isGarden({...withPhoto,reference:{...reference,dataUrl:'data:image/svg+xml;base64,PHN2Zz4='}}),false);
+ assert.equal(isGarden({...withPhoto,reference:{...reference,x:35}}),false);
+ assert.equal(isGarden({...withPhoto,reference:{...reference,opacity:0}}),false);
+ assert.equal(isGarden({...withPhoto,reference:{...reference,dataUrl:'data:image/jpeg;base64,'+'A'.repeat(360001)}}),false);
+});
+
+test('P009 reference stays aligned during world resizing and surrounding expansion',async()=>{
+ const {resizeGarden,resizeWorkspace,addSurroundings}=await import('../src/model.ts');
+ const garden={...demoGarden(),reference:{dataUrl:'data:image/jpeg;base64,AA==',name:'plan',x:2,y:3,widthM:20,heightM:10,opacity:.6}};
+ assert.equal(resizeWorkspace(garden,15,15),null);
+ const preserved=resizeWorkspace(garden,60,50);assert.ok(preserved);
+ assert.deepEqual(preserved.reference,garden.reference);
+ const scaled=resizeGarden(garden,80,52);assert.ok(scaled);
+ assert.equal(scaled.reference.widthM,40);
+ assert.equal(scaled.reference.heightM,20);
+ const expanded=addSurroundings(garden,10);assert.ok(expanded);
+ assert.equal(expanded.reference.x,12);
+ assert.equal(expanded.reference.y,13);
+ assert.equal(expanded.reference.widthM,20);
+ assert.equal(isGarden(expanded),true);
+});
+
+test('P009 optional rotation is bounded and backed up as garden JSON',()=>{
+ const g=demoGarden();const edited={...g,objects:g.objects.map((o,i)=>i===0?{...o,rotation:225}:o)};
+ assert.equal(isGarden(edited),true);
+ assert.deepEqual(parseGarden(JSON.parse(JSON.stringify(edited))),edited);
+ assert.equal(isGarden({...edited,objects:[{...edited.objects[0],rotation:360},...edited.objects.slice(1)]}),false);
+ assert.equal(isGarden({...edited,objects:[{...edited.objects[0],rotation:-1},...edited.objects.slice(1)]}),false);
+});

@@ -3,9 +3,10 @@ import type { ChangeEvent } from 'react';
 import { MapView, type Tool } from './MapView';
 import { Sprite } from './Sprite';
 import { GardenReport } from './Report';
+import { imageToReference } from './reference';
 import { isSameEditBurst, type EditBurst } from './history';
 import {
-  GROUNDS, KINDS, addLine, addRegion, clampPoint, demoGarden, emptyGarden, info, isGarden,
+  GROUNDS, KINDS, addLine, addRegion, alignSelection, moveSelection, setReferenceWidth, clampPoint, demoGarden, emptyGarden, info, isGarden,
   movePlaced, nextGroupId, nextObjectId, polygonArea, removeGroup, resizeGarden, resizeWorkspace, addSurroundings, setBoundary, previewLinkedSource, chooseLinkedSource,
   type Garden, type GardenObject, type Ground, type Kind, type Mode, type Point, type LineKind
 } from './model';
@@ -37,6 +38,12 @@ export default function App(){
   const [visibility,setVisibility]=useState<Visibility>({objects:false,regions:false,boundary:false});
   const [newGroupName,setNewGroupName]=useState('');
   const [checkedIds,setCheckedIds]=useState<string[]>([]);
+  const [multiSelect,setMultiSelect]=useState(false);
+  const [snapEnabled,setSnapEnabled]=useState(false);
+  const [referenceOpen,setReferenceOpen]=useState(false);
+  const [showReference,setShowReference]=useState(true);
+  const [importingReference,setImportingReference]=useState(false);
+  const referenceFile=useRef<HTMLInputElement>(null);
   const [dims,setDims]=useState({width:String(garden.width),height:String(garden.height)});
   const [mapSizeOpen,setMapSizeOpen]=useState(false);
   const [resizeMode,setResizeMode]=useState<'preserve'|'scale'>('preserve');
@@ -64,7 +71,7 @@ export default function App(){
     const updated=updateActiveGarden(libraryRef.current,next);libraryRef.current=updated;setLibrary(updated);
   };
   const replaceLibrary=(next:ProjectLibrary)=>{
-    libraryRef.current=next;setLibrary(next);setPast([]);setFuture([]);historyGroup.current=null;setSelectedId(null);setSelectedGroupId(null);setTool('select');setSelectedPanel('tools');
+    libraryRef.current=next;setLibrary(next);setPast([]);setFuture([]);historyGroup.current=null;setSelectedId(null);setSelectedGroupId(null);setTool('select');setSelectedPanel('tools');setCheckedIds([]);setMultiSelect(false);
   };
   const undo=()=>{historyGroup.current=null;if(garden.linkMigration&&!garden.linkMigration.confirmed)return;if(!past.length)return;const prev=past[past.length-1];setPast(p=>p.slice(0,-1));setFuture(f=>[...f,garden]);applyGarden(prev,false);setNotice('Undid last edit.');};
   const redo=()=>{historyGroup.current=null;if(garden.linkMigration&&!garden.linkMigration.confirmed)return;if(!future.length)return;const next=future[future.length-1];setFuture(f=>f.slice(0,-1));setPast(p=>[...p,garden]);applyGarden(next,false);setNotice('Redid edit.');};
@@ -79,7 +86,8 @@ export default function App(){
     };
     window.addEventListener('keydown',listener);return ()=>window.removeEventListener('keydown',listener);
   });
-  const select=(id:string|null)=>{setSelectedId(id);setSelectedGroupId(null);if(id)setSelectedPanel('inspector');};
+  const select=(id:string|null)=>{setSelectedId(id);setSelectedGroupId(null);if(id&&!multiSelect)setSelectedPanel('inspector');};
+  const togglePick=(id:string)=>setCheckedIds(ids=>ids.includes(id)?ids.filter(x=>x!==id):[...ids,id]);
   const selectGroup=(id:string)=>{setSelectedGroupId(id);setSelectedId(null);setTool('select');setSelectedPanel('inspector');};
   const objectPatch=(id:string,patch:Partial<GardenObject>,key?:string)=>applyGarden({...garden,objects:garden.objects.map(o=>o.id===id?{...o,...patch}:o)},true,key?`object:${id}:${key}`:undefined);
   const place=(kind:Kind,p:Point)=>{
@@ -90,6 +98,42 @@ export default function App(){
     setNotice(`${detail.label} placed. Choose another spot to place more, or select the hand tool.`);
   };
   const move=(id:string,point:Point,together:boolean)=>applyGarden(movePlaced(garden,id,mode,point,together));
+  const moveMultiple=(anchorId:string,point:Point)=>applyGarden(moveSelection(garden,checkedIds,anchorId,point));
+  const alignChecked=(direction:'left'|'right'|'top'|'bottom'|'horizontal'|'vertical')=>{
+    const next=alignSelection(garden,checkedIds,direction);
+    if(next===garden){setNotice('Select more placed objects to align or distribute.');return;}
+    applyGarden(next);setNotice('Selected objects aligned. Use Undo to restore their positions.');
+  };
+  const deleteChecked=()=>{
+    if(!checkedIds.length||!window.confirm(`Delete ${checkedIds.length} selected objects from your garden? Undo can restore them.`))return;
+    const ids=new Set(checkedIds);
+    applyGarden({...garden,objects:garden.objects.filter(o=>!ids.has(o.id))});setCheckedIds([]);setSelectedId(null);
+  };
+  const referenceChange=async(event:ChangeEvent<HTMLInputElement>)=>{
+    const file=event.target.files?.[0];event.target.value='';if(!file)return;
+    if(garden.linkMigration&&!garden.linkMigration.confirmed){setNotice('Choose a linked map source before importing an image.');return;}
+    const originatingProjectId=libraryRef.current.activeId;
+    setImportingReference(true);
+    try {
+      const reference=await imageToReference(file,garden);
+      if(libraryRef.current.activeId!==originatingProjectId){setNotice('Import cancelled: you switched gardens while the image was processing.');return;}
+      const next={...garden,reference};
+      if(!isGarden(next))throw new Error('Image is outside the current workspace.');
+      applyGarden(next);setShowReference(true);setNotice('Local reference imported. It appears in both views and your JSON backups.');
+    }catch(error){setNotice(error instanceof Error?error.message:'Could not load this image.');}
+    finally{setImportingReference(false);}
+  };
+  const updateReference=(update:Partial<NonNullable<Garden['reference']>>)=>{
+    const r=garden.reference;if(!r)return;
+    const reference={...r,...update};
+    const candidate={...garden,reference};
+    if(isGarden(candidate))applyGarden(candidate,true,'reference:transform');
+    else setNotice('Reference image must remain inside the workspace. Expand the map or reduce its size.');
+  };
+  const referenceWidth=(n:number)=>{
+    const next=setReferenceWidth(garden,n);
+    if(next)applyGarden(next,true,'reference:transform');else setNotice('Reference does not fit at that width.');
+  };
   const outline=(points:Point[])=>{const next=setBoundary(garden,mode,points);if(next)applyGarden(next);else setNotice('Invalid boundary. Previous outline kept.');};
   const addMapLine=(points:Point[],kind:LineKind,widthM:number)=>{
     const next=addLine(garden,mode,points,kind,widthM);
@@ -156,7 +200,7 @@ export default function App(){
   };
   const onImport=(e:ChangeEvent<HTMLInputElement>,all:boolean)=>{
     const file=e.target.files?.[0];e.target.value='';if(!file)return;
-    if(file.size>4_000_000){setNotice('File too large (4 MB limit).');return;}
+    if(file.size>(all?20_000_000:8_000_000)){setNotice('Backup file exceeds the import size limit.');return;}
     void file.text().then(text=>{
       if(all){const next=importLibrary(text);if(!next){setNotice('Invalid Garden Atlas library backup.');return;}
         if(window.confirm('Replace ALL local gardens with this library backup?')){replaceLibrary(next);setNotice('Garden library restored.');}
@@ -166,10 +210,10 @@ export default function App(){
       }
     }).catch(()=>setNotice('Could not read the file.'));
   };
-  const setNewTool=(value:Tool)=>{setTool(value);if(value==='select'||value==='pan')setNotice(value==='select'?'Drag an object to move it, or drag empty ground to pan.':'Pan around the map; pinch with two fingers to zoom.');};
+  const setNewTool=(value:Tool)=>{setTool(value);if(value!=='select')setMultiSelect(false);if(value==='select'||value==='pan')setNotice(value==='select'?'Drag an object to move it, or drag empty ground to pan.':'Pan around the map; pinch with two fingers to zoom.');};
   return <><div className="app-shell">
     <header className="topbar">
-      <div className="brand"><span className="brand-icon">✿</span><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL LANDSCAPE EDITOR · P007</div></div></div>
+      <div className="brand"><span className="brand-icon">✿</span><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL LANDSCAPE EDITOR · P009</div></div></div>
       <div className="top-actions"><span className={`save-status ${saved?'':'danger'}`}>● {saved?'LOCAL SAVE':'NOT SAVED'}</span>
         <button className="btn btn-muted" onClick={()=>importFile.current?.click()}>IMPORT</button>
         <button className="btn btn-highlight" onClick={()=>download(`garden-atlas-${slug(garden.name)}-${date()}.json`,JSON.stringify(garden,null,2))}>↓ BACKUP</button><button className="btn btn-muted" onClick={()=>window.print()} title="Open your browser print dialog to save the garden book as a PDF">☷ PDF / PRINT</button>
@@ -184,6 +228,17 @@ export default function App(){
         <div className="palette-grid">{KINDS.map((k,i)=><button key={k.kind} className={`palette-item ${tool===k.kind?'active':''}`} onClick={()=>setNewTool(k.kind)}><Icon kind={k.kind}/><span>{k.label}</span><small>{ICONS[i]}</small></button>)}</div>
         <div className="section-heading list-heading">02 / GARDEN ITEMS <span className="pill">{garden.objects.length}</span></div>
         <div className="item-list">{garden.objects.map(o=><div key={o.id} className="object-row"><button className={`object-entry ${selectedId===o.id?'active':''}`} onClick={()=>{select(o.id);setNewTool('select');}}><Icon kind={o.kind} size={28}/><span>{o.name}<small>{o.id} {o.position?'●':'○'}</small></span></button><label title={`Select ${o.name} for grouping`} className="batch-check"><input type="checkbox" aria-label={`Batch-select ${o.name}`} checked={checkedIds.includes(o.id)} onChange={e=>setCheckedIds(ids=>e.target.checked?[...ids,o.id]:ids.filter(x=>x!==o.id))}/></label></div>)}</div>
+        <div className="batch-editor" aria-label="Multi-object editor">
+          <button className={`btn ${multiSelect?'btn-highlight':'btn-muted'}`} aria-pressed={multiSelect} onClick={()=>{setMultiSelect(v=>!v);setTool('select');setSelectedGroupId(null);setSelectedId(null);}}>◩ {multiSelect?'MULTI SELECT ON':'MULTI SELECT'}</button>
+          <button className="btn btn-muted" onClick={()=>{setCheckedIds(garden.objects.filter(o=>o.position).map(o=>o.id));setMultiSelect(true);setTool('select');setSelectedId(null);}}>SELECT ALL PLACED</button>
+          <button className="btn btn-muted" onClick={()=>setCheckedIds([])} disabled={!checkedIds.length}>CLEAR</button>
+          {checkedIds.length>0&&<><span>{checkedIds.length} selected · drag any selected item to move the set</span>
+            <div className="alignment-grid">
+              {([{id:'left',name:'◧ LEFT'},{id:'right',name:'◨ RIGHT'},{id:'top',name:'▔ TOP'},{id:'bottom',name:'▁ BOTTOM'},{id:'horizontal',name:'↔ SPACE X'},{id:'vertical',name:'↕ SPACE Y'}] as const).map(a=><button key={a.id} className="btn btn-muted" onClick={()=>alignChecked(a.id)}>{a.name}</button>)}
+            </div>
+            <button className="btn btn-danger" onClick={deleteChecked}>DELETE SELECTED</button>
+          </>}
+        </div>
         <div className="section-heading list-heading">03 / GROUPS <span className="pill">{garden.groups.length}</span></div>
         <div className="group-create"><input aria-label="New group name" value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} maxLength={120} placeholder="Group name" onKeyDown={e=>{if(e.key==='Enter')createGroup();}}/><button className="btn btn-highlight" onClick={createGroup}>+</button></div>
         {checkedIds.length>0&&<div className="batch-actions"><span>{checkedIds.length} selected</span><select aria-label="Assign selected items to group" defaultValue="choose" onChange={e=>{if(e.target.value!=='choose')assignChecked(e.target.value==='none'?null:e.target.value);}}><option value="choose">ASSIGN TO...</option><option value="none">UNGROUP</option>{garden.groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select><button className="btn btn-muted" onClick={()=>setCheckedIds([])}>CLEAR</button></div>}
@@ -223,6 +278,8 @@ export default function App(){
             <p className="map-size-footnote">Property outline: {polygonArea(garden.layout.boundary).toFixed(1)} m². To alter the actual land border, use DRAW BORDER or EDIT BORDER. All changes can be undone.</p>
           </section>}
           <div className="editor-history-bar" aria-label="Editing history">
+              <button className={multiSelect?'active-history':''} aria-pressed={multiSelect} onClick={()=>{setMultiSelect(v=>!v);setTool('select');setSelectedGroupId(null);setSelectedId(null);}} title="Tap objects to select multiple">◩ MULTI</button>
+              <button className={snapEnabled?'active-history':''} aria-pressed={snapEnabled} onClick={()=>setSnapEnabled(v=>!v)} title="Snap moves and placements to a 0.5 metre grid">⌗ SNAP {snapEnabled?'ON':'OFF'}</button>
               <button disabled={!past.length||Boolean(garden.linkMigration&&!garden.linkMigration.confirmed)} onClick={undo} title="Undo · Ctrl/Cmd+Z">↶ UNDO</button>
               <button disabled={!future.length||Boolean(garden.linkMigration&&!garden.linkMigration.confirmed)} onClick={redo} title="Redo · Ctrl/Cmd+Shift+Z">↷ REDO</button>
               <span>{garden.linkMigration&&!garden.linkMigration.confirmed?'CHOOSE MAP SOURCE FIRST':'BOTH MAPS LINKED'}</span>
@@ -232,13 +289,33 @@ export default function App(){
           </div>
           {(tool==='path'||tool==='fence')&&<div className="terrain-chooser"><span>{tool.toUpperCase()} WIDTH (M)</span><input aria-label="Path or fence width in metres" type="number" min="0.2" max="12" step="0.2" value={lineWidth} onChange={e=>{const n=Number(e.target.value);if(n>=.2&&n<=12)setLineWidth(n);}}/></div>}
           {tool==='terrain'&&<div className="terrain-chooser"><span>NEW REGION</span><select aria-label="Terrain brush" value={ground} onChange={e=>setGround(e.target.value as Ground)}>{GROUNDS.map(g=><option key={g.value} value={g.value}>{g.label}</option>)}</select></div>}
+          <div className="reference-toolbar">
+            <button className="btn btn-muted" onClick={()=>setReferenceOpen(o=>!o)} aria-expanded={referenceOpen} aria-controls="reference-panel">▧ TRACE IMAGE {referenceOpen?'▴':'▾'} {garden.reference?'●':''}</button>
+            {garden.reference&&<label><input type="checkbox" checked={showReference} onChange={e=>setShowReference(e.target.checked)}/> SHOW ON MAP</label>}
+          </div>
+          {referenceOpen&&<section id="reference-panel" className="reference-panel" aria-label="Local reference image controls">
+            <p>Import a JPG, PNG or WebP aerial photo or plan. The image stays on this device, and is included in JSON backups. No automatic geolocation or measurement accuracy is assumed.</p>
+            <input ref={referenceFile} hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={referenceChange}/>
+            <button className="btn btn-highlight" disabled={importingReference} onClick={()=>referenceFile.current?.click()}>{importingReference?'PROCESSING IMAGE…':garden.reference?'REPLACE REFERENCE IMAGE':'IMPORT REFERENCE IMAGE'}</button>
+            {garden.reference&&<>
+              <small>{garden.reference.name} · shown in BOTH map styles</small>
+              <label>OPACITY {Math.round(garden.reference.opacity*100)}%<input type="range" min="5" max="100" step="5" value={garden.reference.opacity*100} onChange={e=>updateReference({opacity:Number(e.target.value)/100})}/></label>
+              <label>IMAGE WIDTH (metres)<input type="number" min="0.5" max={garden.width} step="0.5" value={Number(garden.reference.widthM.toFixed(2))} onChange={e=>referenceWidth(Number(e.target.value))}/></label>
+              <div className="reference-coordinates">
+                <label>LEFT X (m)<input type="number" min="0" max={garden.width-garden.reference.widthM} step="0.5" value={Number(garden.reference.x.toFixed(2))} onChange={e=>updateReference({x:Number(e.target.value)})}/></label>
+                <label>TOP Y (m)<input type="number" min="0" max={garden.height-garden.reference.heightM} step="0.5" value={Number(garden.reference.y.toFixed(2))} onChange={e=>updateReference({y:Number(e.target.value)})}/></label>
+              </div>
+              <button className="btn btn-danger" onClick={()=>{if(window.confirm('Remove this tracing image from your garden? Undo can restore it.')){const {reference:_reference,...rest}=garden;void _reference;applyGarden(rest);}}}>REMOVE REFERENCE</button>
+              <p>Align the image using width and X/Y offsets. For accurate tracing, calibrate from a known real-world distance. This is a visual reference, not a legal survey.</p>
+            </>}
+          </section>}
           <div className="quick-palette" aria-label="Quick add garden objects">{KINDS.map(k=><button key={k.kind} className={tool===k.kind?'active':''} onClick={()=>setNewTool(k.kind)} title={`Place ${k.label}`}><Icon kind={k.kind} size={29}/><span>{k.label}</span></button>)}<button className={tool==='select'?'active':''} onClick={()=>setNewTool('select')} title="Select and drag">↖<span>Move</span></button></div>
-          <MapView garden={garden} mode={mode} tool={tool} terrain={ground} lineWidth={lineWidth} selectedId={selectedId} selectedGroupId={selectedGroupId} hidden={visibility}
-            onPick={select} onPlace={place} onMove={move} onBoundary={outline} onTerrain={addArea} onLine={addMapLine} onNotice={setNotice}/>
-          <div className="map-bottom"><span>{tool==='select'?'DRAG ITEMS · PAN EMPTY SPACE · PINCH TO ZOOM':tool==='pan'?'DRAG MAP · PINCH TO ZOOM':tool==='outline-edit'?'DRAG CORNERS · TAP EDGE MIDPOINTS TO INSERT':tool==='outline-draw'?'TAP CORNERS · FINISH TO CLOSE OUTLINE':tool==='freehand'?'DRAW A CLOSED BORDER WITH ONE FINGER':tool==='terrain'?'TAP AREA CORNERS · FINISH TO ADD TERRAIN':tool==='path'||tool==='fence'?'TAP LINE POINTS · FINISH TO CREATE':`TAP TO PLACE ${tool.toUpperCase()}`}</span></div>
+          <MapView garden={garden} mode={mode} tool={tool} terrain={ground} lineWidth={lineWidth} selectedId={selectedId} selectedGroupId={selectedGroupId} hidden={visibility} showReference={showReference} snapEnabled={snapEnabled} selectedIds={checkedIds} multiSelect={multiSelect}
+            onPick={select} onTogglePick={togglePick} onMoveSelection={moveMultiple} onPlace={place} onMove={move} onBoundary={outline} onTerrain={addArea} onLine={addMapLine} onNotice={setNotice}/>
+          <div className="map-bottom"><span>{tool==='select'?(multiSelect?'MULTI MODE · TAP TO SELECT · DRAG SELECTED ITEMS TOGETHER':'DRAG ITEMS · PAN EMPTY SPACE · PINCH TO ZOOM'):tool==='pan'?'DRAG MAP · PINCH TO ZOOM':tool==='outline-edit'?'DRAG CORNERS · TAP EDGE MIDPOINTS TO INSERT':tool==='outline-draw'?'TAP CORNERS · FINISH TO CLOSE OUTLINE':tool==='freehand'?'DRAW A CLOSED BORDER WITH ONE FINGER':tool==='terrain'?'TAP AREA CORNERS · FINISH TO ADD TERRAIN':tool==='path'||tool==='fence'?'TAP LINE POINTS · FINISH TO CREATE':`TAP TO PLACE ${tool.toUpperCase()}`}</span></div>
         </div>
         <div className="status-message" role="status">✦ {notice}</div>
-        <div className="feature-strip"><span>■ TOUCH-FIRST</span><span>■ LINKED SCALE + PIXEL VIEWS</span><span>■ LOCAL BACKUPS</span></div>
+        <div className="feature-strip"><span>■ P009 MULTI-SELECT + IMAGE TRACING</span><span>■ TOUCH-FIRST</span><span>■ LINKED SCALE + PIXEL VIEWS</span><span>■ LOCAL BACKUPS</span></div>
       </section>
       <aside className={`panel details-panel ${selectedPanel==='inspector'?'mobile-active':''}`}>
         <div className="section-heading">06 / INSPECTOR</div>
@@ -247,6 +324,7 @@ export default function App(){
           <label className="field">DISPLAY NAME<input maxLength={80} value={selected.name} onChange={e=>objectPatch(selected.id,{name:e.target.value},'name')}/></label>
           <label className="field">SPECIES / TYPE<input maxLength={140} value={selected.species} placeholder="Optional" onChange={e=>objectPatch(selected.id,{species:e.target.value},'species')}/></label>
           <label className="field">GROUP<select value={selected.groupId??''} onChange={e=>objectPatch(selected.id,{groupId:e.target.value||null})}><option value="">— UNGROUPED —</option>{garden.groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
+          <label className="field">ROTATION (DEGREES)<input type="number" min="0" max="359" step="5" value={selected.rotation??0} onChange={e=>{const n=Number(e.target.value);if(Number.isFinite(n)&&n>=0&&n<360)objectPatch(selected.id,{rotation:n});}}/></label>
           <label className="field">DIAMETER / WIDTH (METRES)<input type="number" min="0.5" max="100" step="0.5" value={selected.diameterM} onChange={e=>{const n=Number(e.target.value);if(Number.isFinite(n)&&n>=.5&&n<=100)objectPatch(selected.id,{diameterM:n});}}/></label>
           <label className="field">NOTES<textarea rows={4} maxLength={3000} value={selected.notes} onChange={e=>objectPatch(selected.id,{notes:e.target.value},'notes')}/></label>
           <div className="placement-box">SHARED POSITION: {selected.position?`${selected.position!.x.toFixed(1)} m × ${selected.position!.y.toFixed(1)} m`:'Not placed'}
@@ -277,6 +355,6 @@ export default function App(){
       </aside>
     </main>
     <nav className="mobile-nav" aria-label="Editor panels"><button className={selectedPanel==='tools'?'active':''} onClick={()=>setSelectedPanel('tools')}>♣ OBJECTS</button><button className={selectedPanel==='inspector'?'active':''} onClick={()=>setSelectedPanel('inspector')}>✎ DETAILS</button><button className={selectedPanel==='projects'?'active':''} onClick={()=>setSelectedPanel('projects')}>▧ GARDENS</button></nav>
-    <footer className="footer">GARDEN ATLAS · P008 MAP SIZE CONTROLS <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
+    <footer className="footer">GARDEN ATLAS · P009 MULTI-EDIT & IMAGE TRACING <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
   </div><GardenReport garden={garden}/></>;
 }
