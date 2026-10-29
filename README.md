@@ -1,3 +1,11 @@
+## P020 — Smoother editing and mobile navigation (2026-10-29)
+
+- **Garden, group and object name fields:** you can clear and retype freely; finishing with **Enter** or tapping away saves one edit, **Escape** cancels it. Empty finished garden/group names are rejected with the previous name retained. Objects retain their earlier optional-empty label behavior.
+- **Mobile map handoff:** changing/restoring/importing a garden returns you to the canvas; selecting **EDIT POINTS** for an existing path, fence or terrain region from Objects takes you straight to its editing handles.
+- **Narrow screens:** existing path/fence edit rows wrap rather than squeezing names, measurements and action buttons. No map/storage features, data formats or published artwork have been changed.
+
+---
+
 ## P019 — Mobile Inspector & Layout Polish (2026-10-29)
 
 Select a garden item, then open **DETAILS**. Its name, species/group and editable **width / length** are immediately visible. The same existing controls for **APPEARANCE & ROTATION**, **NOTES & MAP PLACEMENT** and **PLANT ATLAS · PHOTOS & HISTORY** are now in expandable sections to reduce scrolling. Use the Inspector's **MAP** action to return to the canvas.

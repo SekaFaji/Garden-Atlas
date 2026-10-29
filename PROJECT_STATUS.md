@@ -1,3 +1,15 @@
+# Garden Atlas — P020 Editing & Navigation Polish (2026-10-29)
+
+- **Existing UI/UX fixes only:** no new map tools, garden data fields, objects or storage changes.
+- Renaming gardens and groups now accepts intermediate blank text and commits the finished valid name once on blur/Enter. Escape discards the draft; invalid empty names revert instead of trapping the keyboard. Object names follow the same interaction while retaining the previous allowance for empty labels.
+- Switching gardens, restoring/importing gardens and creating/deleting projects now return the mobile view to the new garden map instead of leaving the user scrolled into a hidden Gardens panel.
+- Tapping **EDIT POINTS** on an existing path/fence or terrain region from Objects now opens the map so the handles are visible without another navigation step.
+- Narrow-screen path/fence item rows wrap their edit button, name, width and delete controls; touch targets are at least 44 px in the affected rows.
+- All P019 garden records, IDs, map geometry, photos, version-6 JSON, IndexedDB saves, PWA and backup interfaces are preserved.
+- Node regression tests and syntax checks pass locally; GitHub CI checks TypeScript and production build. Android physical-device usability remains unverified.
+
+---
+
 # Garden Atlas — P019 Inspector & Mobile Layout Polish (2026-10-29)
 
 - Existing-feature UI/UX patch only. No changes to version-6 garden records, saved data, sprites, map editing tools, local storage, PWA, or import/export.

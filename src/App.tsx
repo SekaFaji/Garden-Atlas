@@ -4,6 +4,7 @@ import { MapView, type Tool } from './MapView';
 import { Sprite } from './Sprite';
 import { PlantAtlasPanel } from './PlantAtlasPanel';
 import { ObjectDimensions } from './ObjectDimensions';
+import { NameDraftInput } from './NameDraftInput';
 import { MetricDraftInput } from './MetricDraftInput';
 import { OfflineTools } from './OfflineTools';
 import { PRESETS, findPresets, defaultPreset, getPreset } from './catalog';
@@ -143,7 +144,9 @@ export default function App(){
     const updated=updateActiveGarden(libraryRef.current,next);libraryRef.current=updated;setLibrary(updated);
   };
   const replaceLibrary=(next:ProjectLibrary)=>{
-    libraryRef.current=next;setLibrary(next);setPast([]);setFuture([]);historyGroup.current=null;setSelectedId(null);setSelectedGroupId(null);setTool('select');setSelectedPanel('map');setCheckedIds([]);setMultiSelect(false);setSelectedFeature(null);setSelectedVertex(null);
+    libraryRef.current=next;setLibrary(next);setPast([]);setFuture([]);historyGroup.current=null;setSelectedId(null);setSelectedGroupId(null);setTool('select');setCheckedIds([]);setMultiSelect(false);setSelectedFeature(null);setSelectedVertex(null);
+    // Projects, restores and imports must return to the new garden, not leave the user below a hidden panel.
+    navigateTo('map');
   };
   const undo=()=>{historyGroup.current=null;if(garden.linkMigration&&!garden.linkMigration.confirmed)return;if(!past.length)return;const prev=past[past.length-1];setPast(p=>p.slice(0,-1));setFuture(f=>[...f,garden]);applyGarden(prev,false);setNotice('Undid last edit.');};
   const redo=()=>{historyGroup.current=null;if(garden.linkMigration&&!garden.linkMigration.confirmed)return;if(!future.length)return;const next=future[future.length-1];setFuture(f=>f.slice(0,-1));setPast(p=>[...p,garden]);applyGarden(next,false);setNotice('Redid edit.');};
@@ -313,7 +316,7 @@ export default function App(){
   if(!hydrated)return <div className="app-shell"><div className="status-message" role="status">Loading saved gardens…</div></div>;
   return <><div className="app-shell">
     <header className="topbar">
-      <div className="brand"><span className="brand-icon">✿</span><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL LANDSCAPE EDITOR · P019</div></div></div>
+      <div className="brand"><span className="brand-icon">✿</span><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL LANDSCAPE EDITOR · P020</div></div></div>
       <div className="top-actions"><span role="status" aria-live="polite" className={`save-status ${saveStatus==='failed'?'danger':''}`}>● {saveStatus==='saved'?(backend==='indexeddb'?'INDEXEDDB SAVED':'LOCAL SAVE'):saveStatus==='saving'?'SAVING…':saveStatus==='failed'?'SAVE FAILED':'LOADING…'}</span>
         <button className="btn btn-muted" onClick={()=>importFile.current?.click()}>IMPORT</button>
         <button className="btn btn-highlight" onClick={()=>download(`garden-atlas-${slug(garden.name)}-${date()}.json`,JSON.stringify(garden,null,2))}>↓ BACKUP</button><button className="btn btn-muted" onClick={()=>window.print()} title="Open your browser print dialog to save the garden book as a PDF">☷ PDF / PRINT</button>
@@ -366,11 +369,11 @@ export default function App(){
         </div>)}</div>
         <p className="panel-hint">Layer locks prevent changes in this editing session; visibility affects display only. Both views share the same garden.</p>
         <div className="section-heading list-heading">05 / TERRAIN AREAS & LINES</div>
-        <div className="terrain-list">{garden.layout.regions.map(r=><div className="terrain-entry" key={r.id}><button className="feature-pick" onClick={()=>{setSelectedFeature({kind:'region',id:r.id});setSelectedVertex(null);setNewTool('feature-edit');}}>{r.name} · {r.id} · EDIT POINTS</button><button disabled={locked.regions} title="Delete terrain region" onClick={()=>applyGarden({...garden,layout:{...garden.layout,regions:garden.layout.regions.filter(x=>x.id!==r.id)}})}>×</button></div>)}</div>
-        <div className="terrain-list">{garden.layout.lines.map(line=><div className="line-entry" key={line.id}><button className="feature-pick" onClick={()=>{setSelectedFeature({kind:'line',id:line.id});setSelectedVertex(null);setNewTool('feature-edit');}}>✎ EDIT POINTS</button><input disabled={locked.lines} aria-label={`Name of ${line.id}`} maxLength={120} value={line.name} onChange={e=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.map(x=>x.id===line.id?{...x,name:e.target.value}:x)}})}/><label>WIDTH M<MetricDraftInput key={line.id} disabled={locked.lines} label={`${line.name} width in metres`} min={0.2} max={12} value={line.widthM} onCommit={n=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.map(x=>x.id===line.id?{...x,widthM:n}:x)}})} onNotice={setNotice}/></label><button disabled={locked.lines} className="btn btn-danger" title="Delete path or fence" onClick={()=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.filter(x=>x.id!==line.id)}})}>×</button></div>)}</div>
+        <div className="terrain-list">{garden.layout.regions.map(r=><div className="terrain-entry" key={r.id}><button className="feature-pick" onClick={()=>{setSelectedFeature({kind:'region',id:r.id});setSelectedVertex(null);setNewTool('feature-edit');navigateTo('map');}}>{r.name} · {r.id} · EDIT POINTS</button><button disabled={locked.regions} title="Delete terrain region" onClick={()=>applyGarden({...garden,layout:{...garden.layout,regions:garden.layout.regions.filter(x=>x.id!==r.id)}})}>×</button></div>)}</div>
+        <div className="terrain-list">{garden.layout.lines.map(line=><div className="line-entry" key={line.id}><button className="feature-pick" onClick={()=>{setSelectedFeature({kind:'line',id:line.id});setSelectedVertex(null);setNewTool('feature-edit');navigateTo('map');}}>✎ EDIT POINTS</button><input disabled={locked.lines} aria-label={`Name of ${line.id}`} maxLength={120} value={line.name} onChange={e=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.map(x=>x.id===line.id?{...x,name:e.target.value}:x)}})}/><label>WIDTH M<MetricDraftInput key={line.id} disabled={locked.lines} label={`${line.name} width in metres`} min={0.2} max={12} value={line.widthM} onCommit={n=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.map(x=>x.id===line.id?{...x,widthM:n}:x)}})} onNotice={setNotice}/></label><button disabled={locked.lines} className="btn btn-danger" title="Delete path or fence" onClick={()=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.filter(x=>x.id!==line.id)}})}>×</button></div>)}</div>
       </aside>
       <section ref={editorRef} className="editor-column">
-        <div className="editor-top"><div><div className="eyebrow">CURRENT GARDEN</div><input className="garden-name" aria-label="Garden name" value={garden.name} maxLength={80} onChange={e=>applyGarden({...garden,name:e.target.value},true,'garden-name')}/></div>
+        <div className="editor-top"><div><div className="eyebrow">CURRENT GARDEN</div><NameDraftInput className="garden-name" label="Garden name" value={garden.name} maxLength={80} onCommit={name=>{const current=libraryRef.current.projects.find(p=>p.id===libraryRef.current.activeId)!.garden;applyGarden({...current,name});}} onNotice={setNotice}/></div>
           <div className="mode-switch"><button className={mode==='illustration'?'on':''} onClick={()=>{setMode('illustration');setNewTool('select');}}>✦ ILLUSTRATION</button><button className={mode==='scale'?'on':''} onClick={()=>{setMode('scale');setNewTool('select');}}>▦ SCALE</button></div>
         </div>
         {garden.linkMigration&&!garden.linkMigration.confirmed&&<section className="migration-panel" role="alertdialog" aria-label="Choose your linked map source">
@@ -443,7 +446,7 @@ export default function App(){
           <div className="map-bottom"><span>{tool==='select'?(multiSelect?'MULTI MODE · TAP TO SELECT · DRAG SELECTED ITEMS TOGETHER':'DRAG ITEMS · PAN EMPTY SPACE · PINCH TO ZOOM'):tool==='pan'?'DRAG MAP · PINCH TO ZOOM':tool==='feature-edit'?'TAP PATH OR TERRAIN · DRAG HANDLES · TAP EDGE TO ADD POINT':tool==='outline-edit'?'DRAG CORNERS · TAP EDGE MIDPOINTS TO INSERT':tool==='outline-draw'?'TAP CORNERS · FINISH TO CLOSE OUTLINE':tool==='freehand'?'DRAW A CLOSED BORDER WITH ONE FINGER':tool==='terrain'?'TAP AREA CORNERS · FINISH TO ADD TERRAIN':tool==='path'||tool==='fence'?'TAP LINE POINTS · FINISH TO CREATE':`TAP TO PLACE ${tool.toUpperCase()}`}</span></div>
         </div>
         <div className="status-message" role="status">✦ {notice}</div>
-        <div className="feature-strip"><span>■ P019 INSPECTOR POLISH</span><span>■ TOUCH-FIRST</span><span>■ LINKED SCALE + PIXEL VIEWS</span><span>■ LOCAL BACKUPS</span></div>
+        <div className="feature-strip"><span>■ P020 EDITOR POLISH</span><span>■ TOUCH-FIRST</span><span>■ LINKED SCALE + PIXEL VIEWS</span><span>■ LOCAL BACKUPS</span></div>
       </section>
       <aside ref={inspectorRef} className={`panel details-panel ${selectedPanel==='inspector'?'mobile-active':''}`} aria-label="Garden item details">
         <div className="section-heading">06 / INSPECTOR</div>
@@ -454,7 +457,7 @@ export default function App(){
             <button type="button" className="inspector-map-link" onClick={()=>navigateTo('map')} aria-label="Return to garden map">⌖ MAP</button>
           </div>
           <div className="inspector-core-fields">
-            <label className="field inspector-name-field">DISPLAY NAME<input maxLength={80} value={selected.name} disabled={locked.objects} onChange={e=>objectPatch(selected.id,{name:e.target.value},'name')}/></label>
+            <label className="field inspector-name-field">DISPLAY NAME<NameDraftInput key={selected.id} label="Object name" value={selected.name} maxLength={80} allowEmpty disabled={locked.objects} onCommit={name=>objectPatch(selected.id,{name})} onNotice={setNotice}/></label>
             <label className="field">SPECIES / TYPE<input maxLength={140} value={selected.species} disabled={locked.objects} placeholder="Optional" onChange={e=>objectPatch(selected.id,{species:e.target.value},'species')}/></label>
             <label className="field">GROUP<select value={selected.groupId??''} disabled={locked.objects} onChange={e=>objectPatch(selected.id,{groupId:e.target.value||null})}><option value="">— UNGROUPED —</option>{garden.groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
           </div>
@@ -496,7 +499,7 @@ export default function App(){
             <div className="inspector-compact-title"><strong>{selectedGroup.name}</strong><span>{selectedGroup.id} · {garden.objects.filter(x=>x.groupId===selectedGroup.id).length} members</span></div>
             <button type="button" className="inspector-map-link" onClick={()=>navigateTo('map')}>⌖ MAP</button>
           </div>
-          <label className="field">GROUP NAME<input maxLength={120} value={selectedGroup.name} onChange={e=>{if(e.target.value.trim())applyGarden({...garden,groups:garden.groups.map(g=>g.id===selectedGroup.id?{...g,name:e.target.value}:g)},true,'group-name:'+selectedGroup.id);}}/></label>
+          <label className="field">GROUP NAME<NameDraftInput key={selectedGroup.id} label="Group name" value={selectedGroup.name} maxLength={120} onCommit={name=>{const current=libraryRef.current.projects.find(p=>p.id===libraryRef.current.activeId)!.garden;applyGarden({...current,groups:current.groups.map(g=>g.id===selectedGroup.id?{...g,name}:g)});}} onNotice={setNotice}/></label>
           <label className="field">GROUP NOTES<textarea maxLength={3000} value={selectedGroup.notes} onChange={e=>applyGarden({...garden,groups:garden.groups.map(g=>g.id===selectedGroup.id?{...g,notes:e.target.value}:g)},true,'group-notes:'+selectedGroup.id)}/></label>
           <p className="panel-hint">Drag any member on the map to move the entire group. Both views remain linked.</p>
           <div className="group-list">{garden.objects.filter(o=>o.groupId===selectedGroup.id).map(o=><button key={o.id} className="group-entry" onClick={()=>select(o.id)}><Icon kind={o.kind} presetId={o.presetId} size={25}/>{o.name}</button>)}</div>
@@ -523,6 +526,6 @@ export default function App(){
     <nav className="mobile-nav" aria-label="Mobile garden navigation">
       {([{id:'map',label:'⌖ MAP'},{id:'tools',label:'♣ OBJECTS'},{id:'inspector',label:'✎ DETAILS'},{id:'projects',label:'▧ GARDENS'}] as {id:'map'|'tools'|'inspector'|'projects';label:string}[]).map(item=><button key={item.id} type="button" className={selectedPanel===item.id?'active':''} aria-current={selectedPanel===item.id?'page':undefined} onClick={()=>navigateTo(item.id)}>{item.label}</button>)}
     </nav>
-    <footer className="footer">GARDEN ATLAS · P019 INSPECTOR & LAYOUT POLISH <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
+    <footer className="footer">GARDEN ATLAS · P020 EDITING & NAVIGATION POLISH <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
   </div><GardenReport garden={garden}/></>;
 }

@@ -1,3 +1,11 @@
+## P020 — Name Entry, Project Navigation & Mobile Row Polish (2026-10-29)
+
+- Added reusable draft-commit behavior to existing garden/group/object name fields, with Enter/blur to commit and Escape to revert; invalid required names no longer get stuck while typing.
+- Project switches, new/restored/imported gardens and deletion navigation return to the visible mobile map.
+- Editing an existing terrain region or path/fence from the object sidebar now navigates to the canvas.
+- Narrow-screen line editor controls wrap and maintain touch-friendly targets.
+- No schema version, garden fields, storage, map geometry or asset changes; tests cover name normalization, navigation wiring and mobile CSS.
+
 ## P019 — Inspector & Mobile Layout Polish (2026-10-29)
 
 - Condensed selected-item artwork/title/ID preview and added direct return-to-map action.

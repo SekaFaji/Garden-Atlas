@@ -253,3 +253,17 @@
  .inspector-compact-art .item-art{width:42px;height:42px}
  .inspector-map-link{min-width:48px;font-size:9px}
 }
+
+/* P020: name fields have the same deliberate edit/commit behavior as measurements. */
+.garden-name:focus-visible,.details-panel input[aria-label="Object name"]:focus-visible,.details-panel input[aria-label="Group name"]:focus-visible{outline:3px solid #f3dd91;outline-offset:2px}
+@media(max-width:760px){
+ .garden-name{max-width:100%;min-height:44px;font-size:20px}
+ .details-panel input[aria-label="Object name"],.details-panel input[aria-label="Group name"]{font-size:16px;min-height:44px}
+ /* Small-screen line/terrain entries must wrap rather than squeeze actions off-screen. */
+ .line-entry{flex-wrap:wrap;gap:7px}
+ .line-entry>.feature-pick{flex:0 0 auto;min-height:44px}
+ .line-entry>input{flex:1 1 115px;min-height:44px}
+ .line-entry>label{flex:1 1 90px;max-width:130px;min-width:90px}
+ .line-entry>.btn{min-width:44px;min-height:44px}
+ .terrain-entry>.feature-pick{min-height:44px}
+}
