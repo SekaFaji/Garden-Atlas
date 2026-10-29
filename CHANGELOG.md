@@ -138,3 +138,9 @@
 - Updated editor thumbnails, both linked map styles and printable maps to use the same selected sprite.
 - Added model tests covering catalog uniqueness, filtering, saved IDs, old backups, linked placement and bad preset rejection (39 tests in total).
 - These art presets are visual templates, not botanical identifications; no downloaded images, cloud accounts or external assets were added.
+
+
+## P014 — Offline PWA
+- Generated first-party-only versioned service worker caching final production app assets.
+- Standalone app manifest, install icons, offline status and user-controlled update actions.
+- Existing IndexedDB saving remains separate from software cache; JSON backups retained.

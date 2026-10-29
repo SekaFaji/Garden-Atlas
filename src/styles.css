@@ -136,3 +136,6 @@
 .report-photo img {width:150px;height:120px;object-fit:cover;}
 .report-photo figcaption {font-size:10px;word-break:break-word;}
 @media(max-width:760px){.plant-atlas{padding:10px;}.atlas-entry-form input,.atlas-entry-form textarea,.atlas-entry-form select{font-size:16px;}}
+
+/* P014 offline installation */
+.offline-tools{display:grid;gap:9px;border:1px solid #52775e;background:#203a2e;padding:12px;margin:8px 0 14px}.offline-summary{display:flex;flex-wrap:wrap;gap:8px 16px;color:#e1eac4;font:900 10px monospace}.offline-network{color:#b8de9e}.offline-network.disconnected{color:#f1d39c}.offline-actions{display:flex;gap:8px;flex-wrap:wrap}.offline-actions button{min-height:43px}.offline-tools .panel-hint{margin:0;line-height:1.5}.offline-feedback{margin:0;color:#f4dba3;font:12px monospace}@media(max-width:760px){.offline-actions button{flex:1 1 145px}}

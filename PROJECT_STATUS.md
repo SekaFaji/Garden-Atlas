@@ -87,3 +87,9 @@ Current patch: **P011 — Pixel-art preset catalog**.
 - Both map modes and printable overview now render the selected preset artwork.
 - 39 automated model tests pass locally; CI production build and physical-device interactions still require verification.
 - Remaining priorities: user-customized sprite imports, higher-detail asset library, real/planned plans, planting/species encyclopedia, photos, maintenance history, IndexedDB storage and PWA offline support.
+
+
+## P014 — Offline installation
+- Service worker precaches built editor shell scoped to /Garden-Atlas/; online once to install.
+- Install and update controls in My Gardens; updates wait for local saves.
+- Browser IndexedDB projects remain local; external JSON backup and device-specific PWA tests essential.

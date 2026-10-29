@@ -3,6 +3,7 @@ import type { ChangeEvent } from 'react';
 import { MapView, type Tool } from './MapView';
 import { Sprite } from './Sprite';
 import { PlantAtlasPanel } from './PlantAtlasPanel';
+import { OfflineTools } from './OfflineTools';
 import { PRESETS, findPresets, defaultPreset, getPreset } from './catalog';
 import { GardenReport } from './Report';
 import { imageToReference } from './reference';
@@ -249,7 +250,7 @@ export default function App(){
   };
   return <><div className="app-shell">
     <header className="topbar">
-      <div className="brand"><span className="brand-icon">✿</span><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL LANDSCAPE EDITOR · P013</div></div></div>
+      <div className="brand"><span className="brand-icon">✿</span><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL LANDSCAPE EDITOR · P014</div></div></div>
       <div className="top-actions"><span className={`save-status ${saved?'':'danger'}`}>● {saved?'LOCAL SAVE':'NOT SAVED'}</span>
         <button className="btn btn-muted" onClick={()=>importFile.current?.click()}>IMPORT</button>
         <button className="btn btn-highlight" onClick={()=>download(`garden-atlas-${slug(garden.name)}-${date()}.json`,JSON.stringify(garden,null,2))}>↓ BACKUP</button><button className="btn btn-muted" onClick={()=>window.print()} title="Open your browser print dialog to save the garden book as a PDF">☷ PDF / PRINT</button>
@@ -420,6 +421,8 @@ export default function App(){
         <p className="panel-hint">Your projects are stored in this browser only. Download regular backups.</p>
         <div className="project-list">{library.projects.map(p=><button key={p.id} className={`project-entry ${p.id===library.activeId?'active':''}`} onClick={()=>{replaceLibrary({...library,activeId:p.id});setNotice(`Opened ${p.garden.name}.`);}}><span>▧ {p.garden.name}</span><small>{p.garden.objects.length} items · {p.garden.width}×{p.garden.height} m</small></button>)}</div>
         <div className="project-actions"><button className="btn btn-highlight" onClick={()=>newProject(false)}>+ EMPTY GARDEN</button><button className="btn btn-muted" onClick={()=>newProject(true)}>+ DEMO COPY</button><button className="btn btn-danger" onClick={removeProject}>DELETE CURRENT GARDEN</button></div>
+        <div className="section-heading list-heading">OFFLINE APP & INSTALLATION</div>
+        <OfflineTools saved={saved}/>
         <div className="section-heading list-heading">BACKUP & RECOVERY</div>
         {garden.linkMigration&&<button className="btn btn-muted" onClick={()=>download(`garden-atlas-original-two-views-${slug(garden.name)}.json`,JSON.stringify(garden.linkMigration!.original,null,2))}>↓ EXPORT ORIGINAL PRE-LINK MAPS</button>}
         <div className="project-actions"><button className="btn btn-muted" onClick={()=>download(`garden-atlas-all-projects-${date()}.json`,JSON.stringify(library,null,2))}>↓ BACKUP ALL GARDENS</button><button className="btn btn-muted" onClick={()=>importAllFile.current?.click()}>↑ RESTORE ALL GARDENS</button><button className="btn btn-muted" onClick={recover}>↶ LOCAL RECOVERY COPY</button></div>

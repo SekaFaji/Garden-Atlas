@@ -1,0 +1,26 @@
+{
+  "name": "Garden Atlas — Pixel Garden Editor",
+  "short_name": "Garden Atlas",
+  "description": "Plan, map and document your garden. Works offline after the first online installation.",
+  "id": "/Garden-Atlas/",
+  "start_url": "/Garden-Atlas/",
+  "scope": "/Garden-Atlas/",
+  "display": "standalone",
+  "background_color": "#172b27",
+  "theme_color": "#172b27",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icons/atlas-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/atlas-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
