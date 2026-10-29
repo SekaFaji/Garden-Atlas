@@ -1,223 +1,157 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  WORLD, clampPoint, demoGarden, emptyGarden, isGarden, loadGarden, movePlaced,
-  addBoundaryCorner, moveBoundaryCorner, removeBoundaryCorner, polygonArea, validBoundary, loadRecoveryGarden,
-  nextGroupId, parseGarden, removeGroup, saveGarden,
+  addBoundaryCorner, addRegion, clampPoint, demoGarden, emptyGarden, isGarden,
+  moveBoundaryCorner, movePlaced, nextGroupId, nextObjectId, parseGarden, polygonArea,
+  removeBoundaryCorner, removeGroup, resizeGarden, setBoundary, simplifyStroke, validPolygon
 } from '../src/model.ts';
+import { closestEdge, formatArea } from '../src/geometry.ts';
+import { addProject, deleteProject, importGarden, importLibrary, loadLibrary, loadLibraryRecovery, newLibrary, parseLibrary, saveLibrary, updateActiveGarden } from '../src/storage.ts';
 
-function v1Example() {
-  return {
-    version: 1, name: 'My original garden',
-    objects: [
-      { id: 'TREE-123', kind: 'tree', name: 'Pine', species: 'Unknown', group: 'Back trees', notes: 'Original note', diameterM: 3,
-        placements: { scale: { x: 1, y: 2 }, illustration: { x: 8, y: 9 } } },
-      { id: 'TREE-124', kind: 'tree', name: 'Other pine', species: '', group: 'back trees', notes: '', diameterM: 4, placements: { scale: { x: 4, y: 5 } } },
-      { id: 'FLOWER-001', kind: 'flower', name: 'Wildflowers', species: '', group: '', notes: '', diameterM: 1.5, placements: { illustration: { x: 2, y: 3 } } },
-    ],
-  };
-}
+const makeV1=()=>({version:1,name:'Old personal garden',objects:[
+  {id:'TREE-123',kind:'tree',name:'Pine',species:'Unknown',group:'Back trees',notes:'Keep this',diameterM:3,placements:{scale:{x:1,y:2},illustration:{x:8,y:9}}},
+  {id:'TREE-124',kind:'tree',name:'Pine 2',species:'',group:'back trees',notes:'',diameterM:4,placements:{scale:{x:4,y:5}}}
+]});
+const v2=()=>{const old=parseGarden(makeV1());return {version:2,name:old.name,objects:old.objects,groups:old.groups};};
+const v3=()=>{const old=parseGarden(makeV1());return {version:3,name:old.name,objects:old.objects,groups:old.groups,layouts:{scale:{boundary:old.layouts.scale.boundary,ground:'gravel'},illustration:{boundary:old.layouts.illustration.boundary,ground:'grass'}}};};
+function mockStorage(){const map=new Map();globalThis.localStorage={getItem:k=>map.get(k)??null,setItem:(k,v)=>map.set(k,v),removeItem:k=>map.delete(k)};return map;}
 
-test('P003 demo has valid independent map layouts and shared groups', () => {
-  const garden = demoGarden();
-  assert.equal(isGarden(garden), true);
-  assert.equal(garden.version, 3);
-  assert.equal(garden.objects.length, 6);
-  assert.equal(garden.groups.length, 6);
-  assert.notDeepEqual(garden.objects[0].placements.scale, garden.objects[0].placements.illustration);
+test('demo and new empty garden are valid and distinct',()=>{
+  assert.ok(isGarden(demoGarden()));assert.equal(demoGarden().version,4);
+  assert.equal(emptyGarden().objects.length,0);assert.ok(isGarden(emptyGarden()));
+});
+test('migrate P001 without altering IDs, notes, both placements and distinct groups',()=>{
+  const g=parseGarden(makeV1());assert.ok(g);assert.equal(g.version,4);assert.equal(g.objects[0].id,'TREE-123');
+  assert.equal(g.objects[0].notes,'Keep this');assert.deepEqual(g.objects[0].placements,makeV1().objects[0].placements);
+  assert.equal(g.objects[0].groupId,g.objects[1].groupId);assert.equal(g.groups.length,1);
+});
+test('migrate P002 with intact groups and specimen records',()=>{
+  const v=v2(),g=parseGarden(v);assert.ok(g);assert.deepEqual(g.groups,v.groups);assert.deepEqual(g.objects,v.objects);
+});
+test('migrate P003 preserving independent outlines and ground styles',()=>{
+  const v=v3(),g=parseGarden(v);assert.ok(g);assert.equal(g.layouts.scale.ground,'gravel');
+  assert.deepEqual(g.layouts.scale.boundary,v.layouts.scale.boundary);assert.equal(g.layouts.scale.regions.length,0);
+  assert.deepEqual(g.objects,v.objects);
+});
+test('invalid and unsupported projects are rejected safely',()=>{
+  const g=demoGarden();assert.equal(parseGarden({version:8}),null);
+  assert.equal(isGarden({...g,objects:[...g.objects,g.objects[0]]}),false);
+  assert.equal(isGarden({...g,objects:[{...g.objects[0],groupId:'missing'}]}),false);
+  assert.equal(isGarden({...g,groups:[g.groups[0],g.groups[0]]}),false);
+  assert.equal(isGarden({...g,width:NaN}),false);
+  assert.equal(isGarden({...g,objects:[{...g.objects[0],diameterM:Infinity}]}),false);
+});
+test('move group preserves spacing and only modifies active map',()=>{
+  const g=parseGarden(makeV1()),m=movePlaced(g,'TREE-123','scale',{x:3,y:6},true);
+  assert.deepEqual(m.objects[0].placements.scale,{x:3,y:6});
+  assert.deepEqual(m.objects[1].placements.scale,{x:6,y:9});
+  assert.deepEqual(m.objects[0].placements.illustration,g.objects[0].placements.illustration);
+});
+test('moving group clamps uniformly to property workspace edges',()=>{
+  const g=parseGarden(makeV1()),m=movePlaced(g,'TREE-123','scale',{x:39,y:26},true);
+  assert.deepEqual(m.objects[0].placements.scale,{x:37,y:23});
+  assert.deepEqual(m.objects[1].placements.scale,{x:40,y:26});
+});
+test('single move does not affect group members',()=>{
+  const g=parseGarden(makeV1()),m=movePlaced(g,'TREE-123','scale',{x:10,y:10},false);
+  assert.deepEqual(m.objects[1].placements.scale,g.objects[1].placements.scale);
+});
+test('first placement of unplaced object is independent of group',()=>{
+  const g=parseGarden(makeV1()),m=movePlaced(g,'TREE-124','illustration',{x:7,y:7},true);
+  assert.deepEqual(m.objects[0].placements.illustration,g.objects[0].placements.illustration);
+});
+test('group deletion preserves every plant',()=>{
+  const g=demoGarden(),r=removeGroup(g,'GROUP-001');assert.equal(r.objects.length,g.objects.length);
+  assert.equal(r.objects[0].groupId,null);assert.equal(r.groups.length,g.groups.length-1);
+  assert.equal(nextGroupId(r),'GROUP-001');assert.equal(nextObjectId(g,'tree'),'TREE-003');
+});
+test('boundary creation supports irregular plots and independent layouts',()=>{
+  const g=emptyGarden(),pts=[{x:2,y:2},{x:25,y:4},{x:30,y:12},{x:18,y:22},{x:3,y:18}];
+  const next=setBoundary(g,'scale',pts);assert.ok(next);assert.deepEqual(next.layouts.scale.boundary,pts);
+  assert.deepEqual(next.layouts.illustration.boundary,g.layouts.illustration.boundary);
+  const inserted=addBoundaryCorner(next,'scale',0,{x:14,y:3});assert.ok(inserted);assert.equal(inserted.layouts.scale.boundary.length,6);
+  const removed=removeBoundaryCorner(inserted,'scale',1);assert.deepEqual(removed.layouts.scale.boundary,pts);
+});
+test('crossing boundary edits are rejected without mutation',()=>{
+  const g=emptyGarden(),old=g.layouts.scale.boundary;
+  const failed=setBoundary(g,'scale',[{x:1,y:1},{x:20,y:20},{x:1,y:20},{x:20,y:1}]);assert.equal(failed,null);
+  assert.equal(moveBoundaryCorner(g,'scale',0,{x:39,y:25}),null);
+  assert.deepEqual(g.layouts.scale.boundary,old);
+  assert.equal(validPolygon([{x:0,y:0},{x:2,y:0},{x:1,y:1}],g),true);
+});
+test('terrain regions can coexist without altering main plot or other mode',()=>{
+  const g=emptyGarden(),pts=[{x:3,y:3},{x:8,y:3},{x:8,y:7},{x:3,y:7}];
+  const r=addRegion(g,'illustration',pts,'water');assert.ok(r);assert.equal(r.layouts.illustration.regions[0].ground,'water');
+  assert.equal(r.layouts.scale.regions.length,0);assert.deepEqual(r.layouts.illustration.boundary,g.layouts.illustration.boundary);
+  assert.equal(addRegion(g,'scale',[{x:1,y:1},{x:20,y:20},{x:1,y:20},{x:20,y:1}],'soil'),null);
+});
+test('world can grow to 200 × 100 with proportionally rescaled positions',()=>{
+  const g=demoGarden(),r=resizeGarden(g,200,100);assert.ok(r);assert.equal(r.width,200);assert.equal(r.height,100);
+  assert.deepEqual(r.objects[0].placements.scale,{x:145,y:26.92308});
+  assert.equal(r.objects[0].id,g.objects[0].id);assert.equal(g.width,40);
+  assert.deepEqual(r.objects[0].placements.illustration,{x:155,y:30.76923});
+});
+test('invalid dimensions are rejected without touching original',()=>{
+  const g=demoGarden();assert.equal(resizeGarden(g,1,10),null);assert.equal(resizeGarden(g,600,600),null);
+  assert.deepEqual(clampPoint({x:-1,y:999},g),{x:0,y:26});
+});
+test('freehand simplification preserves endpoints and important bends',()=>{
+  const points=[{x:0,y:0},{x:1,y:.05},{x:2,y:0},{x:3,y:3},{x:4,y:3}];
+  const simplified=simplifyStroke(points,.2);assert.deepEqual(simplified[0],points[0]);
+  assert.deepEqual(simplified.at(-1),points.at(-1));assert.ok(simplified.length<points.length);
+});
+test('closest-edge calculation works anywhere around a polygon',()=>{
+  const rect=[{x:1,y:1},{x:4,y:1},{x:4,y:3},{x:1,y:3}];
+  const c=closestEdge(rect,{x:2,y:.5});assert.equal(c.index,0);assert.equal(c.point.y,1);
+  assert.equal(formatArea(25000),'2.50 ha');assert.equal(polygonArea(rect),6);
+});
+test('multi-garden project library supports creation, selection and safe deletion',()=>{
+  const l=newLibrary(),next=addProject(l,emptyGarden());assert.ok(next);assert.equal(next.projects.length,2);
+  assert.notEqual(next.activeId,l.activeId);assert.equal(parseLibrary(next).activeId,next.activeId);
+  assert.equal(deleteProject(l,l.activeId),null);
+  const deleted=deleteProject(next,next.activeId);assert.equal(deleted.projects.length,1);
+  assert.equal(deleted.projects[0].id,l.activeId);
+});
+test('project update preserves unrelated gardens',()=>{
+  const l=newLibrary(),next=addProject(l,emptyGarden());const edited={...next.projects[1].garden,name:'My trees'};
+  const updated=updateActiveGarden(next,edited);assert.equal(updated.projects[0].garden.name,l.projects[0].garden.name);
+  assert.equal(updated.projects[1].garden.name,'My trees');
+});
+test('saved library restores and recovery survives corrupt primary',()=>{
+  const store=mockStorage(),l=newLibrary();assert.equal(saveLibrary(l),true);
+  assert.equal(loadLibrary().activeId,l.activeId);
+  const next=addProject(l,emptyGarden());store.set('garden-atlas:library:checkpoint','0');assert.equal(saveLibrary(next),true);
+  assert.ok(loadLibraryRecovery());store.set('garden-atlas:library:v1','{broken json');
+  assert.equal(loadLibrary().projects.length,1);delete globalThis.localStorage;
+});
+test('first launch imports P003 locally without overwriting its original key',()=>{
+  const store=mockStorage(),old=v3();store.set('garden-atlas:p003:v3',JSON.stringify(old));
+  const l=loadLibrary();assert.equal(l.projects[0].garden.version,4);
+  assert.deepEqual(l.projects[0].garden.objects[0].placements,old.objects[0].placements);
+  assert.equal(store.get('garden-atlas:p003:v3'),JSON.stringify(old));delete globalThis.localStorage;
+});
+test('importGarden migrates legacy JSON while invalid library files are rejected',()=>{
+  assert.equal(importGarden(JSON.stringify(makeV1())).version,4);
+  assert.equal(importGarden('{bad'),null);assert.equal(importLibrary('{bad'),null);
+  assert.equal(importLibrary(JSON.stringify(newLibrary())).version,1);
 });
 
-test('migrates valid P001 records without losing IDs or placements', () => {
-  const legacy = v1Example();
-  const upgraded = parseGarden(legacy);
-  assert.ok(upgraded);
-  assert.equal(upgraded.version, 3);
-  assert.equal(upgraded.name, legacy.name);
-  assert.equal(upgraded.groups.length, 1);
-  assert.equal(upgraded.layouts.scale.ground, 'grass');
-  assert.equal(upgraded.groups[0].name, 'Back trees');
-  assert.equal(upgraded.objects[0].id, 'TREE-123');
-  assert.equal(upgraded.objects[0].notes, 'Original note');
-  assert.deepEqual(upgraded.objects[0].placements, legacy.objects[0].placements);
-  assert.equal(upgraded.objects[0].groupId, upgraded.objects[1].groupId);
-  assert.equal(upgraded.objects[2].groupId, null);
-  assert.equal('group' in upgraded.objects[0], false);
-  assert.deepEqual(parseGarden(upgraded), upgraded);
-});
-
-test('malformed group references, duplicate IDs and malformed legacy saves are rejected', () => {
-  const garden = demoGarden();
-  assert.equal(isGarden({ ...garden, objects: [...garden.objects, garden.objects[0]] }), false);
-  assert.equal(isGarden({ ...garden, objects: [{ ...garden.objects[0], groupId: 'missing-group' }] }), false);
-  assert.equal(isGarden({ ...garden, groups: [garden.groups[0], garden.groups[0]] }), false);
-  assert.equal(isGarden({ ...garden, groups: [{ ...garden.groups[0], name: '   ' }] }), false);
-  assert.equal(isGarden({ ...garden, objects: [{ ...garden.objects[0], diameterM: Infinity }] }), false);
-  assert.equal(parseGarden({ ...v1Example(), objects: [v1Example().objects[0], v1Example().objects[0]] }), null);
-  assert.equal(parseGarden({ version: 99 }), null);
-});
-
-test('group ID is stable and group deletion preserves every specimen', () => {
-  const garden = demoGarden();
-  const before = garden.objects.map(o => o.id);
-  const groupId = garden.groups[0].id;
-  const nextId = nextGroupId(garden);
-  assert.equal(nextId, 'GROUP-007');
-  const after = removeGroup(garden, groupId);
-  assert.deepEqual(after.objects.map(o => o.id), before);
-  assert.equal(after.objects[0].groupId, null);
-  assert.equal(after.groups.some(g => g.id === groupId), false);
-  assert.equal(garden.objects[0].groupId, groupId);
-});
-
-test('moving a whole group preserves spacing and the other map', () => {
-  const garden = parseGarden(v1Example());
-  assert.ok(garden);
-  const moved = movePlaced(garden, 'TREE-123', 'scale', { x: 3, y: 6 }, true);
-  assert.deepEqual(moved.objects[0].placements.scale, { x: 3, y: 6 });
-  assert.deepEqual(moved.objects[1].placements.scale, { x: 6, y: 9 });
-  assert.deepEqual(moved.objects[0].placements.illustration, { x: 8, y: 9 });
-  assert.deepEqual(garden.objects[0].placements.scale, { x: 1, y: 2 });
-});
-
-test('group move clamps uniformly at boundaries instead of collapsing spacing', () => {
-  const garden = parseGarden(v1Example());
-  assert.ok(garden);
-  const moved = movePlaced(garden, 'TREE-123', 'scale', { x: 39, y: 26 }, true);
-  assert.deepEqual(moved.objects[0].placements.scale, { x: 37, y: 23 });
-  assert.deepEqual(moved.objects[1].placements.scale, { x: 40, y: 26 });
-});
-
-test('moving a single object leaves its group members unchanged', () => {
-  const garden = parseGarden(v1Example());
-  assert.ok(garden);
-  const moved = movePlaced(garden, 'TREE-123', 'scale', { x: 3, y: 6 }, false);
-  assert.deepEqual(moved.objects[1].placements.scale, { x: 4, y: 5 });
-  assert.deepEqual(moved.objects[0].placements.scale, { x: 3, y: 6 });
-});
-
-test('placing an unplaced object in one mode does not affect other group members', () => {
-  const garden = parseGarden(v1Example());
-  assert.ok(garden);
-  const moved = movePlaced(garden, 'TREE-124', 'illustration', { x: 7, y: 9 }, true);
-  assert.deepEqual(moved.objects[1].placements.illustration, { x: 7, y: 9 });
-  assert.deepEqual(moved.objects[0].placements.illustration, { x: 8, y: 9 });
-});
-
-test('map coordinates stay inside boundaries', () => {
-  assert.deepEqual(clampPoint({ x: -100, y: 100 }), { x: 0, y: WORLD.height });
-});
-
-test('a P001 local save is upgraded, with original key untouched', () => {
-  const store = new Map();
-  globalThis.localStorage = {
-    getItem(key) { return store.get(key) ?? null; },
-    setItem(key, value) { store.set(key, value); },
-  };
-  const legacy = v1Example();
-  store.set('garden-atlas:p001:v1', JSON.stringify(legacy));
-  const upgraded = loadGarden();
-  assert.equal(upgraded.version, 3);
-  assert.equal(upgraded.groups.length, 1);
-  assert.equal(upgraded.layouts.scale.ground, 'grass');
-  assert.equal(saveGarden(upgraded), true);
-  assert.equal(store.get('garden-atlas:p001:v1'), JSON.stringify(legacy));
-  assert.equal(loadGarden().objects[0].id, 'TREE-123');
-  delete globalThis.localStorage;
-});
-
-
-test('new empty garden has no copied demo specimens and can be saved', () => {
-  const garden = emptyGarden();
-  assert.equal(garden.objects.length, 0);
-  assert.equal(garden.groups.length, 0);
-  assert.equal(isGarden(garden), true);
-});
-
-test('both maps keep their own outline and terrain without modifying shared specimens', () => {
-  const original = demoGarden();
-  const newer = moveBoundaryCorner(original, 'illustration', 0, { x: 4, y: 4 });
-  assert.ok(newer);
-  const updated = { ...newer, layouts: { ...newer.layouts, illustration: { ...newer.layouts.illustration, ground: 'soil' } } };
-  assert.equal(isGarden(updated), true);
-  assert.deepEqual(updated.layouts.scale, original.layouts.scale);
-  assert.deepEqual(updated.objects, original.objects);
-  assert.equal(updated.layouts.illustration.boundary[0].x, 4);
-  assert.equal(updated.layouts.illustration.ground, 'soil');
-});
-
-test('the outline can gain and lose corners without losing existing layout records', () => {
-  const garden = demoGarden();
-  const five = addBoundaryCorner(garden, 'scale');
-  assert.ok(five);
-  assert.equal(five.layouts.scale.boundary.length, 5);
-  assert.equal(isGarden(five), true);
-  const four = removeBoundaryCorner(five, 'scale', 1);
-  assert.ok(four);
-  assert.deepEqual(four.layouts.scale.boundary, garden.layouts.scale.boundary);
-  assert.deepEqual(four.layouts.illustration, garden.layouts.illustration);
-  assert.deepEqual(four.objects, garden.objects);
-});
-
-test('crossed and collapsed boundaries are refused and original stays intact', () => {
-  const garden = demoGarden();
-  assert.equal(moveBoundaryCorner(garden, 'scale', 0, { x: 39, y: 25 }), null);
-  assert.equal(moveBoundaryCorner(garden, 'scale', -1, { x: 4, y: 5 }), null);
-  assert.equal(validBoundary([{ x: 0, y: 0 }, { x: 3, y: 3 }, { x: 0, y: 3 }, { x: 3, y: 0 }]), false);
-  assert.equal(validBoundary([{ x: 1, y: 1 }, { x: 1, y: 1 }, { x: 4, y: 4 }]), false);
-  assert.deepEqual(garden.layouts.scale.boundary, demoGarden().layouts.scale.boundary);
-});
-
-test('polygon area is computed from actual scale outline', () => {
-  assert.equal(polygonArea([{x:0,y:0},{x:4,y:0},{x:4,y:3},{x:0,y:3}]), 12);
-});
-
-test('P002 backups upgrade to P003 with independent default outlines', () => {
-  const current = demoGarden();
-  const legacy = { version: 2, name: current.name, groups: current.groups, objects: current.objects };
-  const next = parseGarden(legacy);
-  assert.ok(next);
-  assert.equal(next.version, 3);
-  assert.equal(next.layouts.scale.ground, 'grass');
-  assert.deepEqual(next.objects, legacy.objects);
-  assert.deepEqual(next.groups, legacy.groups);
-});
-
-test('malformed terrain and invalid polygon are rejected', () => {
-  const garden = demoGarden();
-  assert.equal(isGarden({ ...garden, layouts: { ...garden.layouts, scale: { ...garden.layouts.scale, ground: 'water' } } }), false);
-  assert.equal(isGarden({ ...garden, layouts: { ...garden.layouts, scale: { ...garden.layouts.scale, boundary: [{ x: 0, y: 0 }] } } }), false);
-});
-
-test('browser save preserves a recovery snapshot and falls back from corrupt primary', () => {
-  const store = new Map();
-  globalThis.localStorage = {
-    getItem(key) { return store.get(key) ?? null; },
-    setItem(key, value) { store.set(key, value); },
-  };
-  try {
-    const first = demoGarden();
-    assert.equal(saveGarden(first), true);
-    const second = { ...first, name: 'Personal garden' };
-    assert.equal(saveGarden(second), true);
-    assert.equal(loadGarden().name, 'Personal garden');
-    assert.equal(loadRecoveryGarden()?.name, 'Sample Garden');
-    store.set('garden-atlas:p003:v3', 'invalid-json');
-    assert.equal(loadGarden().name, 'Sample Garden');
-    assert.equal(loadRecoveryGarden()?.name, 'Sample Garden');
-  } finally { delete globalThis.localStorage; }
-});
-
-test('invalid new save falls back to P002 saved content even when newer content is corrupt', () => {
-  const store = new Map();
-  globalThis.localStorage = {
-    getItem(key) { return store.get(key) ?? null; },
-    setItem(key, value) { store.set(key, value); },
-  };
-  try {
-    const prior = demoGarden();
-    store.set('garden-atlas:p002:v2', JSON.stringify({ version:2, name:'Old P002 project', groups:prior.groups, objects:prior.objects }));
-    store.set('garden-atlas:p003:v3', '{broken json');
-    assert.equal(loadGarden().name, 'Old P002 project');
-    assert.equal(loadGarden().version, 3);
-  } finally { delete globalThis.localStorage; }
+test('map camera fit and anchor-point zoom works on narrow mobile viewports',async()=>{
+  const {fitCamera, zoomCamera, panCamera, pinchCamera}=await import('../src/camera.ts');
+  const viewport={width:340,height:540},world={width:80,height:100};
+  const initial=fitCamera(world,viewport);
+  assert.ok(initial.z<.5);
+  const p={x:40,y:50};
+  const fit=fitCamera(world,viewport,[{x:5,y:5},{x:60,y:65}]);
+  assert.ok(fit.z>initial.z);
+  const beforeWorld={x:initial.cx+(80-170)/(20*initial.z),y:initial.cy+(180-270)/(20*initial.z)};
+  const next=zoomCamera(initial,viewport,1.8,80,180);
+  const afterWorld={x:next.cx+(80-170)/(20*next.z),y:next.cy+(180-270)/(20*next.z)};
+  assert.ok(Math.abs(beforeWorld.x-afterWorld.x)<1e-9);
+  assert.ok(Math.abs(beforeWorld.y-afterWorld.y)<1e-9);
+  const pan=panCamera(next,40,0);assert.ok(pan.cx<next.cx);
+  const pinch=pinchCamera(initial,viewport,{x:170,y:270},{x:190,y:290},2);
+  assert.equal(pinch.z,initial.z*2);
+  assert.ok(pinch.cx<initial.cx);assert.ok(pinch.cy<initial.cy);
+  assert.ok(p.x>0);
 });

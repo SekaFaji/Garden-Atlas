@@ -1,457 +1,206 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ChangeEvent, PointerEvent as ReactPointerEvent } from 'react';
+import type { ChangeEvent } from 'react';
+import { MapView, type Tool } from './MapView';
 import { Sprite } from './Sprite';
 import {
-  KINDS, GROUNDS, WORLD, clampPoint, demoGarden, emptyGarden, info, loadGarden, movePlaced, nextGroupId,
-  addBoundaryCorner, moveBoundaryCorner, removeBoundaryCorner, polygonArea, loadRecoveryGarden,
-  parseGarden, removeGroup, saveGarden,
-  type Garden, type GardenObject, type Kind, type Mode, type Point,
+  GROUNDS, KINDS, addRegion, clampPoint, demoGarden, emptyGarden, info, isGarden,
+  movePlaced, nextGroupId, nextObjectId, polygonArea, removeGroup, resizeGarden, setBoundary,
+  type Garden, type GardenObject, type Ground, type Kind, type Mode, type Point
 } from './model';
+import {
+  addProject, deleteProject, importGarden, importLibrary, loadLibrary,
+  loadLibraryRecovery, saveLibrary, updateActiveGarden, type ProjectLibrary
+} from './storage';
 
-type Drag = { id: string; pointerId: number; together: boolean };
-type Tap = { pointerId: number; x: number; y: number };
-const SIZE = { width: WORLD.width * WORLD.pixelsPerUnit, height: WORLD.height * WORLD.pixelsPerUnit };
-
-function nextId(kind: Kind, objects: GardenObject[]): string {
-  const prefix = kind.toUpperCase() + '-';
-  const numbers = objects
-    .filter(item => item.id.startsWith(prefix))
-    .map(item => Number(item.id.slice(prefix.length)))
-    .filter(Number.isInteger);
-  let number = Math.max(0, ...numbers) + 1;
-  while (objects.some(o => o.id === prefix + String(number).padStart(3, '0'))) number++;
-  return prefix + String(number).padStart(3, '0');
+type Visibility={objects:boolean;regions:boolean;boundary:boolean};
+const ICONS=['✥','✿','♣','▤','⌂'];
+function Icon({kind,size=38}:{kind:Kind;size?:number}){return <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true" className="item-art"><Sprite kind={kind}/></svg>;}
+function download(filename:string,data:string){
+  const url=URL.createObjectURL(new Blob([data],{type:'application/json'}));
+  const a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);
 }
-
-function PixelIcon({ kind, size = 34 }: { kind: Kind; size?: number }) {
-  return <svg className="pixel-icon" width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
-    <Sprite kind={kind} />
-  </svg>;
-}
-
-function MapCanvas({ garden, mode, selectedId, selectedGroupId, tool, zoom, moving, editingBoundary, selectedCorner,
-  onPick, onPlace, onMove, onMoveCorner, onCornerPick }: {
-  garden: Garden;
-  mode: Mode;
-  selectedId: string | null;
-  selectedGroupId: string | null;
-  tool: Kind | null;
-  zoom: number;
-  moving: { id: string; together: boolean } | null;
-  editingBoundary: boolean;
-  selectedCorner: number | null;
-  onPick: (id: string | null) => void;
-  onPlace: (point: Point) => void;
-  onMove: (id: string, point: Point, together: boolean) => void;
-  onMoveCorner: (index: number, point: Point) => void;
-  onCornerPick: (index: number) => void;
-}) {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const dragRef = useRef<Drag | null>(null);
-  const tapRef = useRef<Tap | null>(null);
-  const layout = garden.layouts[mode];
-  const toPoint = (event: ReactPointerEvent<SVGSVGElement>): Point | null => {
-    const svg = svgRef.current;
-    const matrix = svg?.getScreenCTM();
-    if (!svg || !matrix) return null;
-    const p = svg.createSVGPoint();
-    p.x = event.clientX;
-    p.y = event.clientY;
-    const local = p.matrixTransform(matrix.inverse());
-    const step = mode === 'scale' ? 0.5 : 0.25;
-    return clampPoint({
-      x: Math.round(local.x / WORLD.pixelsPerUnit / step) * step,
-      y: Math.round(local.y / WORLD.pixelsPerUnit / step) * step,
-    });
+const slug=(name:string)=>name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,50)||'garden';
+const date=()=>new Date().toISOString().slice(0,10);
+export default function App(){
+  const [library,setLibrary]=useState<ProjectLibrary>(loadLibrary);
+  const libraryRef=useRef(library);libraryRef.current=library;
+  const garden=library.projects.find(p=>p.id===library.activeId)!.garden;
+  const [mode,setMode]=useState<Mode>('illustration');
+  const [tool,setTool]=useState<Tool>('select');
+  const [ground,setGround]=useState<Ground>('soil');
+  const [selectedId,setSelectedId]=useState<string|null>('TREE-001');
+  const [selectedGroupId,setSelectedGroupId]=useState<string|null>(null);
+  const [selectedPanel,setSelectedPanel]=useState<'tools'|'inspector'|'projects'>('tools');
+  const [visibility,setVisibility]=useState<Visibility>({objects:false,regions:false,boundary:false});
+  const [newGroupName,setNewGroupName]=useState('');
+  const [dims,setDims]=useState({width:String(garden.width),height:String(garden.height)});
+  const [notice,setNotice]=useState('Drag objects directly · pinch to zoom · pan on open ground.');
+  const [saved,setSaved]=useState(true);
+  const [past,setPast]=useState<Garden[]>([]);
+  const [future,setFuture]=useState<Garden[]>([]);
+  const importFile=useRef<HTMLInputElement>(null),importAllFile=useRef<HTMLInputElement>(null);
+  const selected=garden.objects.find(o=>o.id===selectedId)??null;
+  const selectedGroup=garden.groups.find(g=>g.id===selectedGroupId)??null;
+  useEffect(()=>{setSaved(saveLibrary(library));},[library]);
+  useEffect(()=>{setDims({width:String(garden.width),height:String(garden.height)});},[library.activeId,garden.width,garden.height]);
+  const applyGarden=(next:Garden,withHistory=true)=>{
+    if(!isGarden(next)){setNotice('Change rejected: garden would become invalid.');return;}
+    const previous=libraryRef.current.projects.find(p=>p.id===libraryRef.current.activeId)!.garden;
+    if(JSON.stringify(previous)===JSON.stringify(next))return;
+    if(withHistory){setPast(list=>[...list.slice(-39),previous]);setFuture([]);}
+    const updated=updateActiveGarden(libraryRef.current,next);libraryRef.current=updated;setLibrary(updated);
   };
-  const pointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (event.button !== 0) return;
-    tapRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+  const replaceLibrary=(next:ProjectLibrary)=>{
+    libraryRef.current=next;setLibrary(next);setPast([]);setFuture([]);setSelectedId(null);setSelectedGroupId(null);setTool('select');setSelectedPanel('tools');
   };
-  const pointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (dragRef.current?.pointerId !== event.pointerId) return;
-    const point = toPoint(event);
-    if (point) onMove(dragRef.current.id, point, dragRef.current.together);
+  const undo=()=>{if(!past.length)return;const prev=past[past.length-1];setPast(p=>p.slice(0,-1));setFuture(f=>[...f,garden]);applyGarden(prev,false);setNotice('Undid last edit.');};
+  const redo=()=>{if(!future.length)return;const next=future[future.length-1];setFuture(f=>f.slice(0,-1));setPast(p=>[...p,garden]);applyGarden(next,false);setNotice('Redid edit.');};
+  const select=(id:string|null)=>{setSelectedId(id);setSelectedGroupId(null);if(id)setSelectedPanel('inspector');};
+  const selectGroup=(id:string)=>{setSelectedGroupId(id);setSelectedId(null);setTool('select');setSelectedPanel('inspector');};
+  const objectPatch=(id:string,patch:Partial<GardenObject>)=>applyGarden({...garden,objects:garden.objects.map(o=>o.id===id?{...o,...patch}:o)});
+  const place=(kind:Kind,p:Point)=>{
+    if(garden.objects.length>=3000){setNotice('Garden item limit reached.');return;}
+    const detail=info(kind),id=nextObjectId(garden,kind);
+    const item:GardenObject={id,kind,name:detail.initialName,species:'',notes:'',groupId:null,diameterM:detail.diameterM,placements:{[mode]:clampPoint(p,garden)}};
+    applyGarden({...garden,objects:[...garden.objects,item]});setSelectedId(id);setSelectedGroupId(null);
+    setNotice(`${detail.label} placed. Choose another spot to place more, or select the hand tool.`);
   };
-  const pointerUp = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (dragRef.current?.pointerId === event.pointerId) {
-      dragRef.current = null;
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-      tapRef.current = null;
-      return;
-    }
-    const tap = tapRef.current;
-    tapRef.current = null;
-    // Taps act only after pointer-up; normal touch scrolling cannot accidentally add/move objects.
-    if (!tap || tap.pointerId !== event.pointerId || Math.hypot(event.clientX - tap.x, event.clientY - tap.y) > 9) return;
-    const point = toPoint(event);
-    if (!point) return;
-    if (editingBoundary) {
-      if (selectedCorner !== null) onMoveCorner(selectedCorner, point);
-    } else if (tool) onPlace(point);
-    else if (moving) onMove(moving.id, point, moving.together);
-    else onPick(null);
+  const move=(id:string,point:Point,together:boolean)=>applyGarden(movePlaced(garden,id,mode,point,together));
+  const outline=(points:Point[])=>{const next=setBoundary(garden,mode,points);if(next)applyGarden(next);else setNotice('Invalid boundary. Previous outline kept.');};
+  const addArea=(points:Point[],type:Ground)=>{const next=addRegion(garden,mode,points,type);if(next)applyGarden(next);else setNotice('Could not add this region.');};
+  const createGroup=()=>{
+    const name=newGroupName.trim();if(!name)return;
+    if(garden.groups.some(g=>g.name.toLowerCase()===name.toLowerCase())){setNotice('That group already exists.');return;}
+    const id=nextGroupId(garden);
+    applyGarden({...garden,groups:[...garden.groups,{id,name,notes:''}]});setNewGroupName('');selectGroup(id);
   };
-  const stopPointer = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
-    tapRef.current = null;
+  const duplicate=()=>{
+    if(!selected||garden.objects.length>=3000)return;
+    const id=nextObjectId(garden,selected.kind);
+    const placements=Object.fromEntries(Object.entries(selected.placements).map(([key,pos])=>[key,clampPoint({x:pos!.x+1.2,y:pos!.y+1.2},garden)]));
+    applyGarden({...garden,objects:[...garden.objects,{...selected,id,name:selected.name+' copy',placements}]});select(id);
+    setNotice('Object duplicated 1.2 m away; drag it into place.');
   };
-  const grid = Array.from({ length: WORLD.width + 1 }, (_, i) => i);
-  const rows = Array.from({ length: WORLD.height + 1 }, (_, i) => i);
-  const polygon = layout.boundary.map(p => `${p.x * 20},${p.y * 20}`).join(' ');
-  const glints = Array.from({ length: 70 }, (_, i) => ({ x: (i * 137 + 29) % SIZE.width, y: (i * 83 + 17) % SIZE.height }));
-  const terrainColors = { grass: '#93bd7e', soil: '#a47d57', gravel: '#aeb3a3', stone: '#b6b9af' };
-  const fill = terrainColors[layout.ground];
-  return <div className="map-scroll" aria-label={`${mode} garden map`}>
-    <svg
-      ref={svgRef}
-      className={`garden-map ${tool || moving || editingBoundary ? 'placing' : ''}`}
-      viewBox={`0 0 ${SIZE.width} ${SIZE.height}`}
-      style={{ width: `${zoom}%` }}
-      role="group"
-      aria-label={`${mode} map; tap a tree to select, use MOVE then tap a new position; use OUTLINE to edit garden corners`}
-      onPointerDown={pointerDown}
-      onPointerMove={pointerMove}
-      onPointerUp={pointerUp}
-      onPointerCancel={stopPointer}
-    >
-      <defs>
-        <pattern id="terrain" width="40" height="40" patternUnits="userSpaceOnUse">
-          <rect width="40" height="40" fill={fill} />
-          <rect x="3" y="7" width="5" height="4" fill={layout.ground === 'grass' ? '#80b171' : '#ffffff'} opacity=".22" />
-          <rect x="26" y="28" width="5" height="5" fill="#1f3228" opacity=".12" />
-          <rect x="34" y="12" width="3" height="5" fill="#ffffff" opacity=".15" />
-        </pattern>
-        <clipPath id="garden-plot"><polygon points={polygon}/></clipPath>
-      </defs>
-      <rect width={SIZE.width} height={SIZE.height} fill="#304238" />
-      <polygon points={polygon} fill="url(#terrain)" />
-      <g clipPath="url(#garden-plot)" pointerEvents="none">
-        {mode === 'illustration' && <>
-          <path d="M90 520 L90 380 L115 345 L132 309 L150 276 L163 241" fill="none" stroke="#d4b88c" strokeWidth="46" strokeLinecap="square" strokeLinejoin="bevel" opacity=".8" />
-          <path d="M90 520 L90 380 L115 345 L132 309 L150 276 L163 241" fill="none" stroke="#e1cca2" strokeWidth="34" strokeLinecap="square" strokeLinejoin="bevel" />
-          {layout.ground === 'grass' && glints.map((p, i) => <rect key={i} x={p.x} y={p.y} width={i % 4 === 0 ? 6 : 3} height="3" fill={i % 3 === 0 ? '#b6d88b' : '#75ac64'} opacity=".7" />)}
-        </>}
-        {mode === 'scale' && <g aria-hidden="true">
-          {grid.map(x => <line key={`x${x}`} x1={x * 20} y1="0" x2={x * 20} y2={SIZE.height} stroke="#35584a" opacity={x % 5 === 0 ? '.6' : '.35'} strokeWidth={x % 5 === 0 ? 1.7 : 1} />)}
-          {rows.map(y => <line key={`y${y}`} x1="0" y1={y * 20} x2={SIZE.width} y2={y * 20} stroke="#35584a" opacity={y % 5 === 0 ? '.6' : '.35'} strokeWidth={y % 5 === 0 ? 1.7 : 1} />)}
-          {grid.filter(x => x > 0 && x % 5 === 0).map(x => <text key={x} x={x * 20 + 4} y="15" fill="#28483a" fontSize="11" fontFamily="monospace">{x}m</text>)}
-        </g>}
-      </g>
-      <polygon points={polygon} fill="none" stroke="#f3e3a7" strokeWidth="4" strokeDasharray={mode === 'scale' ? '9 5' : undefined} pointerEvents="none" />
-      {garden.objects.map(item => {
-        const pos = item.placements[mode];
-        if (!pos) return null;
-        const groupSelected = Boolean(selectedGroupId && item.groupId === selectedGroupId);
-        const selected = item.id === selectedId || groupSelected;
-        const diameter = item.diameterM * WORLD.pixelsPerUnit * (mode === 'illustration' ? 1.05 : 1);
-        return <g key={item.id} className={`map-object ${selected ? 'selected' : ''}`}
-          transform={`translate(${pos.x * 20} ${pos.y * 20})`}
-          onPointerDown={event => {
-            event.stopPropagation();
-            tapRef.current = null;
-            if (editingBoundary || event.button !== 0) return;
-            if (!groupSelected) onPick(item.id);
-            // Direct dragging remains for mouse/pen. On touch, choose MOVE and tap the destination.
-            if (event.pointerType !== 'touch' && !tool && !moving) {
-              dragRef.current = { id: item.id, pointerId: event.pointerId, together: groupSelected };
-              svgRef.current?.setPointerCapture(event.pointerId);
-            }
-          }}
-        >
-          {selected && <rect x={-diameter / 2 - 8} y={-diameter / 2 - 8} width={diameter + 16} height={diameter + 16} fill="none" stroke="#fff8c8" strokeWidth="3" strokeDasharray="8 5" pointerEvents="none" />}
-          <svg x={-diameter / 2} y={-diameter / 2} width={diameter} height={diameter} viewBox="0 0 64 64" style={{ overflow: 'visible' }} pointerEvents="none"><Sprite kind={item.kind} /></svg>
-          <rect x={-Math.max(42, diameter / 2)} y={-Math.max(42, diameter / 2)} width={Math.max(84, diameter)} height={Math.max(84, diameter)} fill="transparent" />
-          {selected && <g pointerEvents="none">
-            <rect x={-Math.min(108, item.name.length * 3.5 + 15)} y={diameter / 2 + 4} width={Math.min(216, item.name.length * 7 + 30)} height="25" fill="#213c33" stroke="#f4d995" strokeWidth="2" />
-            <text x="0" y={diameter / 2 + 21} fill="#fff5d9" fontSize="12" textAnchor="middle" fontFamily="monospace">{item.name.slice(0, 27)}</text>
-          </g>}
-        </g>;
-      })}
-      {editingBoundary && layout.boundary.map((p, i) => <g key={i}
-        transform={`translate(${p.x * 20} ${p.y * 20})`}
-        onPointerDown={event => { event.stopPropagation(); tapRef.current = null; onCornerPick(i); }}>
-        <rect x="-23" y="-23" width="46" height="46" fill="transparent" />
-        <rect x="-11" y="-11" width="22" height="22" fill={selectedCorner === i ? '#ffe49b' : '#233f33'} stroke="#fff2ca" strokeWidth="3" pointerEvents="none" />
-        <text x="0" y="4" textAnchor="middle" fontFamily="monospace" fontSize="11" fontWeight="bold" fill={selectedCorner === i ? '#243f33' : '#fff2ca'} pointerEvents="none">{i + 1}</text>
-      </g>)}
-      {mode === 'scale' && <g transform={`translate(18 ${SIZE.height - 23})`} pointerEvents="none">
-        <rect x="-5" y="-24" width="128" height="34" fill="#fff8da" opacity=".92" />
-        <path d="M0 0H100M0 -5V5M100 -5V5" stroke="#27493b" strokeWidth="3" />
-        <text x="50" y="-9" textAnchor="middle" fill="#27493b" fontSize="12" fontFamily="monospace">5 metres</text>
-      </g>}
-    </svg>
-  </div>;
-}
-
-export default function App() {
-  const [garden, setGarden] = useState<Garden>(loadGarden);
-  const [mode, setMode] = useState<Mode>('illustration');
-  const [tool, setTool] = useState<Kind | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>('TREE-001');
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-  const [newGroupName, setNewGroupName] = useState('');
-  const [zoom, setZoom] = useState(100);
-  const [moving, setMoving] = useState<{ id: string; together: boolean } | null>(null);
-  const [editingBoundary, setEditingBoundary] = useState(false);
-  const [selectedCorner, setSelectedCorner] = useState<number | null>(null);
-  const [saved, setSaved] = useState(true);
-  const [notice, setNotice] = useState('Sample garden loaded. This is not your actual property.');
-  const fileRef = useRef<HTMLInputElement>(null);
-  const selected = garden.objects.find(item => item.id === selectedId) ?? null;
-  const selectedGroup = garden.groups.find(group => group.id === selectedGroupId) ?? null;
-  const selectObject = (id: string | null) => { setSelectedId(id); setSelectedGroupId(null); if (moving && moving.id !== id) setMoving(null); };
-  const selectGroup = (id: string) => { setSelectedGroupId(id); setSelectedId(null); setTool(null); setMoving(null); };
-
-  useEffect(() => { setSaved(saveGarden(garden)); }, [garden]);
-  const updateObject = (id: string, patch: Partial<GardenObject>) => {
-    setGarden(old => ({ ...old, objects: old.objects.map(o => o.id === id ? { ...o, ...patch } : o) }));
+  const removeObject=()=>{
+    if(!selected||!window.confirm(`Delete ${selected.name} from both map layouts and its record?`))return;
+    applyGarden({...garden,objects:garden.objects.filter(x=>x.id!==selected.id)});select(null);
   };
-  const moveObject = (id: string, point: Point, together = false) => {
-    setGarden(old => movePlaced(old, id, mode, point, together));
-    if (moving) { setMoving(null); setNotice('Position updated in this map only. Saved automatically.'); }
+  const changeDimensions=()=>{
+    const width=Number(dims.width),height=Number(dims.height);
+    if(!Number.isFinite(width)||!Number.isFinite(height)||width<10||height<10||width>500||height>500){setNotice('Workspace dimensions must be from 10 to 500 metres.');return;}
+    if(!window.confirm('Resize map dimensions? Existing object and boundary positions will scale proportionally; species data and IDs stay unchanged.'))return;
+    const next=resizeGarden(garden,width,height);if(next){applyGarden(next);setNotice(`Workspace resized to ${width} × ${height} metres.`);}else setNotice('Cannot resize: result would contain invalid geometry.');
   };
-  const startMove = () => {
-    const groupAnchor = selectedGroup && garden.objects.find(o => o.groupId === selectedGroup.id && o.placements[mode]);
-    const id = selected?.id ?? groupAnchor?.id;
-    if (!id) { setNotice('Select a placed object or a group with placed members first.'); return; }
-    setMoving({ id, together: Boolean(selectedGroup) });
-    setTool(null);
-    setEditingBoundary(false);
-    setNotice('MOVE MODE: tap any open spot on the map to reposition. Scroll normally or press Cancel.');
+  const newProject=(demo=false)=>{
+    if(!window.confirm('Create a new garden? Your current garden is saved in this browser. Download a backup for long-term safekeeping.'))return;
+    const next=addProject(library,demo?demoGarden():emptyGarden());
+    if(!next){setNotice('The local library currently supports 20 gardens.');return;}
+    replaceLibrary(next);setNotice('New garden created. Drag on the map to begin editing.');
   };
-  const setTerrain = (ground: Garden['layouts'][Mode]['ground']) => {
-    setGarden(old => ({ ...old, layouts: { ...old.layouts, [mode]: { ...old.layouts[mode], ground } } }));
+  const removeProject=()=>{
+    if(!window.confirm(`Delete “${garden.name}” from this browser? Export it first. This cannot be undone.`))return;
+    const next=deleteProject(library,library.activeId);
+    if(!next){setNotice('Keep at least one garden. Create another first.');return;}
+    replaceLibrary(next);setNotice('Local garden deleted. Other projects preserved.');
   };
-  const toggleBoundary = () => {
-    setEditingBoundary(!editingBoundary);
-    setSelectedCorner(null);
-    setTool(null);
-    setMoving(null);
-    setNotice(!editingBoundary ? 'OUTLINE MODE: choose a numbered corner, then tap its new position on the map.' : 'Outline editing closed.');
+  const recover=()=>{
+    const restored=loadLibraryRecovery();
+    if(!restored){setNotice('No valid previous local recovery snapshot found.');return;}
+    if(!window.confirm('Restore the previous local library snapshot? Back up current data first.'))return;
+    replaceLibrary(restored);setNotice('Restored a previous local snapshot.');
   };
-  const shiftCorner = (index: number, point: Point) => {
-    const changed = moveBoundaryCorner(garden, mode, index, point);
-    if (!changed) { setNotice('Invalid outline: corners cannot cross, overlap or collapse. Nothing changed.'); return; }
-    setGarden(changed);
-    setNotice('Corner updated for the active map only.');
+  const onImport=(e:ChangeEvent<HTMLInputElement>,all:boolean)=>{
+    const file=e.target.files?.[0];e.target.value='';if(!file)return;
+    if(file.size>4_000_000){setNotice('File too large (4 MB limit).');return;}
+    void file.text().then(text=>{
+      if(all){const next=importLibrary(text);if(!next){setNotice('Invalid Garden Atlas library backup.');return;}
+        if(window.confirm('Replace ALL local gardens with this library backup?')){replaceLibrary(next);setNotice('Garden library restored.');}
+      }else{const nextGarden=importGarden(text);if(!nextGarden){setNotice('Invalid garden file. P001–P004 backups are supported.');return;}
+        const next=addProject(library,nextGarden);if(!next){setNotice('Maximum 20 projects.');return;}
+        replaceLibrary(next);setNotice('Garden imported as a separate project. Existing gardens were preserved.');
+      }
+    }).catch(()=>setNotice('Could not read the file.'));
   };
-  const addCorner = () => {
-    const changed = addBoundaryCorner(garden, mode);
-    if (!changed) { setNotice('Unable to add another corner.'); return; }
-    setGarden(changed);
-    setSelectedCorner(null);
-    setNotice('New corner added on the longest edge. Select its number to position it.');
-  };
-  const deleteCorner = () => {
-    if (selectedCorner === null) return;
-    const changed = removeBoundaryCorner(garden, mode, selectedCorner);
-    if (!changed) { setNotice('Keep at least three corners and a valid non-crossing outline.'); return; }
-    setGarden(changed);
-    setSelectedCorner(null);
-    setNotice('Outline corner removed. Your objects are unchanged.');
-  };
-  const createGroup = () => {
-    const name = newGroupName.trim();
-    if (!name) { setNotice('Enter a group name first.'); return; }
-    if (garden.groups.some(g => g.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
-      setNotice('A group with that name already exists.'); return;
-    }
-    if (garden.groups.length >= 1000) { setNotice('Maximum group count reached.'); return; }
-    const id = nextGroupId(garden);
-    setGarden(old => ({ ...old, groups: [...old.groups, { id, name, notes: '' }] }));
-    selectGroup(id);
-    setNewGroupName('');
-    setNotice(`Created group “${name}”. Choose objects to assign to it.`);
-  };
-  const updateGroup = (id: string, patch: { name?: string; notes?: string }) => {
-    setGarden(old => ({ ...old, groups: old.groups.map(g => g.id === id ? { ...g, ...patch } : g) }));
-  };
-  const deleteGroup = () => {
-    if (!selectedGroup || !window.confirm(`Delete group “${selectedGroup.name}”? Its members will be ungrouped, not deleted.`)) return;
-    setGarden(old => removeGroup(old, selectedGroup.id));
-    setSelectedGroupId(null);
-    setNotice('Group deleted. All its objects and map placements were preserved.');
-  };
-  const addObject = (point: Point) => {
-    if (!tool) return;
-    const kind = info(tool);
-    const id = nextId(tool, garden.objects);
-    const object: GardenObject = {
-      id, kind: tool, name: kind.initialName, diameterM: kind.diameterM,
-      groupId: null, species: '', notes: '', placements: { [mode]: point },
-    };
-    setGarden(old => ({ ...old, objects: [...old.objects, object] }));
-    selectObject(id);
-    setTool(null);
-    setNotice(`${kind.label} placed in ${mode} map. The other map's position remains independent.`);
-  };
-  const removeObject = () => {
-    if (!selected || !window.confirm(`Delete ${selected.name} from both maps and its shared record?`)) return;
-    setGarden(old => ({ ...old, objects: old.objects.filter(o => o.id !== selected.id) }));
-    setSelectedId(null);
-    setNotice('Object deleted from shared records.');
-  };
-  const newGarden = () => {
-    if (!window.confirm("Create an empty garden and replace this browser\'s current project? Export a JSON backup first.")) return;
-    setGarden(emptyGarden());
-    selectObject(null);
-    setTool(null); setMoving(null); setEditingBoundary(false);
-    setNotice('Empty garden created. Rename it and draw your own outline.');
-  };
-  const recover = () => {
-    const backup = loadRecoveryGarden();
-    if (!backup) { setNotice('No previous local save is available to restore.'); return; }
-    if (!window.confirm('Restore the previous local recovery snapshot? This replaces your current garden. Export a backup first.')) return;
-    setGarden(backup);
-    selectObject(null); setMoving(null); setEditingBoundary(false);
-    setNotice('Previous local snapshot restored. Export a new JSON backup for safety.');
-  };
-  const reset = () => {
-    if (!window.confirm('Replace this garden with the sample garden? Export a backup first if needed.')) return;
-    setGarden(demoGarden());
-    selectObject('TREE-001');
-    setTool(null);
-    setNotice('Demo restored. Your previous local changes were replaced.');
-  };
-  const exportJSON = () => {
-    const blob = new Blob([JSON.stringify(garden, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `garden-atlas-${garden.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 35) || 'garden'}-${new Date().toISOString().slice(0, 10)}.json`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setNotice('JSON backup exported. Keep it somewhere safe.');
-  };
-  const importJSON = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    if (file.size > 2_000_000) { setNotice('Import failed: file exceeds 2 MB.'); return; }
-    try {
-      const imported: unknown = JSON.parse(await file.text());
-      const parsed = parseGarden(imported);
-      if (!parsed) throw new Error('Unsupported or invalid Garden Atlas file');
-      if (!window.confirm('Replace current garden with imported data? Export a backup first if needed.')) return;
-      setGarden(parsed);
-      selectObject(null);
-      setTool(null); setMoving(null); setEditingBoundary(false);
-      setNotice('Garden imported and automatically saved in this browser.');
-    } catch { setNotice('Import failed: invalid or unsupported Garden Atlas JSON.'); }
-  };
-
+  const setNewTool=(value:Tool)=>{setTool(value);if(value==='select'||value==='pan')setNotice(value==='select'?'Drag an object to move it, or drag empty ground to pan.':'Pan around the map; pinch with two fingers to zoom.');};
   return <div className="app-shell">
     <header className="topbar">
-      <div className="brand"><div className="brand-icon">✿</div><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL GARDEN EDITOR <span className="version">P003</span></div></div></div>
-      <div className="top-actions">
-        <span className={`save-status ${saved ? '' : 'danger'}`}><span className="status-dot" /> {saved ? 'LOCAL SAVE' : 'NOT SAVED'}</span>
-        <button className="btn btn-muted" onClick={() => fileRef.current?.click()} title="Import a previously exported garden backup">↑ IMPORT</button>
-        <button className="btn btn-highlight" onClick={exportJSON} title="Export garden JSON backup">↓ BACKUP</button>
-        <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={importJSON} />
+      <div className="brand"><span className="brand-icon">✿</span><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL LANDSCAPE EDITOR · P004</div></div></div>
+      <div className="top-actions"><span className={`save-status ${saved?'':'danger'}`}>● {saved?'LOCAL SAVE':'NOT SAVED'}</span>
+        <button className="btn btn-muted" onClick={()=>importFile.current?.click()}>IMPORT</button>
+        <button className="btn btn-highlight" onClick={()=>download(`garden-atlas-${slug(garden.name)}-${date()}.json`,JSON.stringify(garden,null,2))}>↓ BACKUP</button>
+        <input hidden ref={importFile} type="file" accept=".json,application/json" onChange={e=>onImport(e,false)}/>
+        <input hidden ref={importAllFile} type="file" accept=".json,application/json" onChange={e=>onImport(e,true)}/>
       </div>
     </header>
-
     <main className="workspace">
-      <aside className="panel library-panel">
-        <div className="section-heading"><span>01 / TOOLBOX</span><span className="keycap">ADD</span></div>
-        <p className="panel-hint">Choose an item, then tap the map to place it. Select an item and choose MOVE to reposition on mobile.</p>
-        <div className="palette-grid">
-          {KINDS.map(entry => <button key={entry.kind} className={`palette-item ${tool === entry.kind ? 'active' : ''}`} onClick={() => { setTool(old => old === entry.kind ? null : entry.kind); setMoving(null); setEditingBoundary(false); }} aria-pressed={tool === entry.kind}>
-            <PixelIcon kind={entry.kind} /><span>{entry.label}</span>
-          </button>)}
-        </div>
-        <div className="section-heading list-heading"><span>02 / GARDEN ITEMS</span><span className="pill">{garden.objects.length}</span></div>
-        <div className="item-list">
-          {garden.objects.map(o => <button key={o.id} className={`object-entry ${selectedId === o.id ? 'active' : ''}`} onClick={() => { selectObject(o.id); setTool(null); }}>
-            <PixelIcon kind={o.kind} size={29} /><span className="object-title">{o.name}<small>{o.id}{o.groupId && <> · {garden.groups.find(g => g.id === o.groupId)?.name}</>}</small></span><span className="presence">{o.placements[mode] ? '●' : '○'}</span>
-          </button>)}
-        </div>
-        <p className="library-footnote">● placed on this map &nbsp; ○ unplaced</p>
-        <div className="section-heading list-heading"><span>03 / GROUPS</span><span className="pill">{garden.groups.length}</span></div>
-        <p className="panel-hint">Select a group to edit it. Select a group, then press MOVE GROUP above the map. Mouse users can also drag highlighted members.</p>
-        <div className="group-create">
-          <input aria-label="New group name" maxLength={120} placeholder="New group name" value={newGroupName} onChange={e => setNewGroupName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') createGroup(); }} />
-          <button className="btn btn-highlight" onClick={createGroup} disabled={!newGroupName.trim()}>+ ADD</button>
-        </div>
-        <div className="group-list">
-          {garden.groups.map(group => <button key={group.id} className={`group-entry ${selectedGroupId === group.id ? 'active' : ''}`} onClick={() => selectGroup(group.id)} aria-pressed={selectedGroupId === group.id}>
-            <span className="group-symbol">▦</span><span className="group-title">{group.name}<small>{group.id}</small></span>
-            <span className="group-count">{garden.objects.filter(o => o.groupId === group.id).length}</span>
-          </button>)}
-        </div>
+      <aside className={`panel library-panel ${selectedPanel==='tools'?'mobile-active':''}`}>
+        <div className="section-heading">01 / OBJECT LIBRARY</div>
+        <p className="panel-hint">Choose an item, then tap repeatedly to place. Switch to SELECT to drag it.</p>
+        <div className="palette-grid">{KINDS.map((k,i)=><button key={k.kind} className={`palette-item ${tool===k.kind?'active':''}`} onClick={()=>setNewTool(k.kind)}><Icon kind={k.kind}/><span>{k.label}</span><small>{ICONS[i]}</small></button>)}</div>
+        <div className="section-heading list-heading">02 / GARDEN ITEMS <span className="pill">{garden.objects.length}</span></div>
+        <div className="item-list">{garden.objects.map(o=><button key={o.id} className={`object-entry ${selectedId===o.id?'active':''}`} onClick={()=>{select(o.id);setNewTool('select');}}><Icon kind={o.kind} size={28}/><span>{o.name}<small>{o.id} {o.placements[mode]?'●':'○'}</small></span></button>)}</div>
+        <div className="section-heading list-heading">03 / GROUPS <span className="pill">{garden.groups.length}</span></div>
+        <div className="group-create"><input aria-label="New group name" value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} maxLength={120} placeholder="Group name" onKeyDown={e=>{if(e.key==='Enter')createGroup();}}/><button className="btn btn-highlight" onClick={createGroup}>+</button></div>
+        <div className="group-list">{garden.groups.map(group=><button className={`group-entry ${selectedGroupId===group.id?'active':''}`} key={group.id} onClick={()=>selectGroup(group.id)}><span>▦</span><span>{group.name}<small>{garden.objects.filter(o=>o.groupId===group.id).length} members</small></span></button>)}</div>
+        <div className="section-heading list-heading">04 / LAYERS</div>
+        <div className="layer-list">{([{key:'objects',label:'Plants & structures'},{key:'regions',label:'Terrain regions'},{key:'boundary',label:'Property outline'}] as const).map(x=><label key={x.key}><input type="checkbox" checked={!visibility[x.key]} onChange={e=>setVisibility(v=>({...v,[x.key]:!e.target.checked}))}/>{x.label}</label>)}</div>
+        <div className="section-heading list-heading">05 / TERRAIN AREAS</div>
+        <div className="terrain-list">{garden.layouts[mode].regions.map(r=><div className="terrain-entry" key={r.id}><span>{r.name} · {r.id}</span><button onClick={()=>applyGarden({...garden,layouts:{...garden.layouts,[mode]:{...garden.layouts[mode],regions:garden.layouts[mode].regions.filter(x=>x.id!==r.id)}}})}>×</button></div>)}</div>
       </aside>
-
       <section className="editor-column">
-        <div className="editor-top">
-          <div><div className="eyebrow">CURRENT PROJECT</div><input className="garden-name" aria-label="Garden name" maxLength={80} value={garden.name} onChange={e => setGarden(old => ({ ...old, name: e.target.value }))} /></div>
-          <div className="mode-switch" role="group" aria-label="Map mode">
-            <button className={mode === 'illustration' ? 'on' : ''} onClick={() => { setMode('illustration'); setTool(null); setMoving(null); setEditingBoundary(false); setSelectedCorner(null); }}>✦ ILLUSTRATION</button>
-            <button className={mode === 'scale' ? 'on' : ''} onClick={() => { setMode('scale'); setTool(null); setMoving(null); setEditingBoundary(false); setSelectedCorner(null); }}>▦ SCALE</button>
-          </div>
+        <div className="editor-top"><div><div className="eyebrow">CURRENT GARDEN</div><input className="garden-name" aria-label="Garden name" value={garden.name} maxLength={80} onChange={e=>applyGarden({...garden,name:e.target.value})}/></div>
+          <div className="mode-switch"><button className={mode==='illustration'?'on':''} onClick={()=>{setMode('illustration');setNewTool('select');}}>✦ ILLUSTRATION</button><button className={mode==='scale'?'on':''} onClick={()=>{setMode('scale');setNewTool('select');}}>▦ SCALE</button></div>
         </div>
-        <div className="map-frame">
-          <div className="map-toolbar"><span><span className="live-dot" /> {mode === 'scale' ? 'SCALE · 40 × 26 M WORKSPACE' : 'ILLUSTRATED MAP · FREEFORM'}</span><span>PIXEL VIEW / TOP DOWN</span></div>
-          <div className="map-edit-controls" role="toolbar" aria-label="Map editing tools">
-            <button className={`btn btn-muted ${moving ? 'active' : ''}`} onClick={moving ? () => setMoving(null) : startMove} disabled={!moving && !selected && !selectedGroup}> {moving ? '✕ CANCEL MOVE' : selectedGroup ? '↗ MOVE GROUP' : '↗ MOVE SELECTED'} </button>
-            <button className={`btn btn-muted ${editingBoundary ? 'active' : ''}`} onClick={toggleBoundary}>▱ {editingBoundary ? 'DONE OUTLINE' : 'EDIT OUTLINE'}</button>
-            <label className="terrain-label">GROUND <select aria-label="Garden ground style" value={garden.layouts[mode].ground} onChange={e => setTerrain(e.target.value as Garden['layouts'][Mode]['ground'])}>
-              {GROUNDS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
-            </select></label>
+        <div className="map-frame"><div className="map-toolbar"><span>● {mode==='scale'?'MEASURED MAP':'PIXEL MAP'} · {garden.width} × {garden.height} m</span><span>DRAG · PAN · PINCH</span></div>
+          <div className="primary-tools" role="toolbar" aria-label="Editor interaction tools">
+            {([{id:'select',label:'↖ SELECT'},{id:'pan',label:'✋ PAN'},{id:'outline-edit',label:'◇ EDIT BORDER'},{id:'outline-draw',label:'✎ DRAW BORDER'},{id:'freehand',label:'〰 FREEHAND'},{id:'terrain',label:'▧ TERRAIN'}] as {id:Tool;label:string}[]).map(x=><button key={x.id} className={tool===x.id?'active':''} onClick={()=>setNewTool(x.id)}>{x.label}</button>)}
           </div>
-          {editingBoundary && <div className="outline-controls">
-            <span>{garden.layouts[mode].boundary.length} corners · {mode === 'scale' ? `${polygonArea(garden.layouts.scale.boundary).toFixed(1)} m² approximate plan area` : 'freeform layout'}</span>
-            <button className="btn btn-muted" onClick={addCorner}>+ CORNER</button>
-            <button className="btn btn-muted" disabled={selectedCorner === null} onClick={deleteCorner}>− CORNER</button>
-          </div>}
-          <MapCanvas garden={garden} mode={mode} selectedId={selectedId} selectedGroupId={selectedGroupId}
-            tool={tool} zoom={zoom} moving={moving} editingBoundary={editingBoundary} selectedCorner={selectedCorner}
-            onPick={selectObject} onPlace={addObject} onMove={moveObject} onMoveCorner={shiftCorner} onCornerPick={setSelectedCorner} />
-          <div className="map-bottom"><span>{editingBoundary ? selectedCorner === null ? 'TAP A NUMBERED CORNER TO EDIT' : `CORNER ${selectedCorner + 1} · TAP ITS NEW LOCATION` : moving ? 'TAP MAP TO MOVE · SCROLLING WILL NOT MOVE ITEMS' : tool ? `PLACE ${info(tool).label.toUpperCase()} · TAP MAP` : 'TAP TO SELECT · CHOOSE MOVE TO REPOSITION · MOUSE DRAG SUPPORTED'}</span><div className="zoom-controls"><button aria-label="Zoom out" onClick={() => setZoom(x => Math.max(75, x - 25))}>−</button><span>{zoom}%</span><button aria-label="Zoom in" onClick={() => setZoom(x => Math.min(250, x + 25))}>+</button></div></div>
+          {tool==='terrain'&&<div className="terrain-chooser"><span>NEW REGION</span><select aria-label="Terrain brush" value={ground} onChange={e=>setGround(e.target.value as Ground)}>{GROUNDS.map(g=><option key={g.value} value={g.value}>{g.label}</option>)}</select></div>}
+          <MapView garden={garden} mode={mode} tool={tool} terrain={ground} selectedId={selectedId} selectedGroupId={selectedGroupId} hidden={visibility}
+            onPick={select} onPlace={place} onMove={move} onBoundary={outline} onTerrain={addArea} onNotice={setNotice}/>
+          <div className="map-bottom"><span>{tool==='select'?'DRAG ITEMS · PAN EMPTY SPACE · PINCH TO ZOOM':tool==='pan'?'DRAG MAP · PINCH TO ZOOM':tool==='outline-edit'?'DRAG CORNERS · TAP EDGE MIDPOINTS TO INSERT':tool==='outline-draw'?'TAP CORNERS · FINISH TO CLOSE OUTLINE':tool==='freehand'?'DRAW A CLOSED BORDER WITH ONE FINGER':tool==='terrain'?'TAP AREA CORNERS · FINISH TO ADD TERRAIN':`TAP TO PLACE ${tool.toUpperCase()}`}</span><div className="history"><button disabled={!past.length} onClick={undo}>↶ UNDO</button><button disabled={!future.length} onClick={redo}>↷ REDO</button></div></div>
         </div>
-        <div className="status-message" role="status"><span>✦</span> {notice}</div>
-        <div className="feature-strip"><span>■ OFFLINE FIRST</span><span>■ SEPARATE MAP POSITIONS</span><span>■ YOUR LOCAL BACKUPS</span></div>
+        <div className="status-message" role="status">✦ {notice}</div>
+        <div className="feature-strip"><span>■ TOUCH-FIRST</span><span>■ INDEPENDENT MAPS</span><span>■ LOCAL BACKUPS</span></div>
       </section>
-
-      <aside className="panel details-panel">
-        <div className="section-heading"><span>04 / INSPECTOR</span><span className="keycap">EDIT</span></div>
-        {selected ? <>
-          <div className="selected-preview"><div className="preview-art"><PixelIcon kind={selected.kind} size={88} /></div><div className="preview-id">{selected.id}</div><div className="preview-kind">{info(selected.kind).label.toUpperCase()} / SHARED RECORD</div></div>
-          <div className="field"><label htmlFor="obj-name">DISPLAY NAME</label><input id="obj-name" maxLength={80} value={selected.name} onChange={e => updateObject(selected.id, { name: e.target.value })} /></div>
-          <div className="field"><label htmlFor="obj-species">SPECIES / TYPE</label><input id="obj-species" maxLength={140} placeholder="Unknown / optional" value={selected.species} onChange={e => updateObject(selected.id, { species: e.target.value })} /></div>
-          <div className="field"><label htmlFor="obj-group">GROUP</label><select id="obj-group" value={selected.groupId ?? ''} onChange={e => updateObject(selected.id, { groupId: e.target.value || null })}>
-            <option value="">— UNGROUPED —</option>
-            {garden.groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select></div>
-          <div className="field"><label htmlFor="obj-size">{mode === 'scale' ? 'DIAMETER / WIDTH (METRES)' : 'OBJECT SIZE (METRES · SHARED)'}</label><input id="obj-size" type="number" min="0.5" max="20" step="0.5" value={selected.diameterM} onChange={e => { const size = Number(e.target.value); if (Number.isFinite(size) && size >= 0.5 && size <= 20) updateObject(selected.id, { diameterM: size }); }} /></div>
-          <div className="field"><label htmlFor="obj-notes">NOTES</label><textarea id="obj-notes" rows={3} maxLength={3000} placeholder="Observations, planting notes..." value={selected.notes} onChange={e => updateObject(selected.id, { notes: e.target.value })} /></div>
-          <div className="placement-box"><div className="placement-title">{mode.toUpperCase()} PLACEMENT</div>{selected.placements[mode] ? <>
-            <span> X: {selected.placements[mode]!.x.toFixed(1)} {mode === 'scale' ? 'm' : 'units'} / Y: {selected.placements[mode]!.y.toFixed(1)} {mode === 'scale' ? 'm' : 'units'}</span>
-            <button className="btn btn-highlight" onClick={startMove}>↗ MOVE ON MAP</button>
-            <button className="text-button" onClick={() => { const placements = { ...selected.placements }; delete placements[mode]; updateObject(selected.id, { placements }); }}>REMOVE FROM THIS MAP</button>
-          </> : <><span>Not placed in this layout.</span><button className="btn btn-highlight place-button" onClick={() => moveObject(selected.id, { x: WORLD.width / 2, y: WORLD.height / 2 })}>PLACE AT CENTRE</button></>}</div>
-          <button className="btn btn-danger delete-button" onClick={removeObject}>DELETE SHARED RECORD</button>
-        </> : selectedGroup ? <>
-          <div className="group-inspector-heading"><span className="group-inspector-icon">▦</span><div><strong>{selectedGroup.id}</strong><p>{garden.objects.filter(o => o.groupId === selectedGroup.id).length} linked object(s)</p></div></div>
-          <div className="field"><label htmlFor="group-name">GROUP NAME</label><input id="group-name" maxLength={120} value={selectedGroup.name} onChange={e => { if (e.target.value.trim()) updateGroup(selectedGroup.id, { name: e.target.value }); }} /></div>
-          <div className="field"><label htmlFor="group-notes">GROUP NOTES</label><textarea id="group-notes" rows={4} maxLength={3000} value={selectedGroup.notes} placeholder="Common care notes, purpose, location..." onChange={e => updateGroup(selectedGroup.id, { notes: e.target.value })} /></div>
-          <div className="placement-box"><div className="placement-title">GROUP MOVEMENT</div><span>Use MOVE GROUP above the map, then tap the destination. The other map stays unchanged.</span></div>
-          <div className="group-members"><div className="placement-title">MEMBERS</div>
-            {garden.objects.filter(o => o.groupId === selectedGroup.id).map(o => <button key={o.id} className="member-button" onClick={() => selectObject(o.id)}><PixelIcon kind={o.kind} size={26}/><span>{o.name}</span><span>›</span></button>)}
-            {!garden.objects.some(o => o.groupId === selectedGroup.id) && <p className="panel-hint">No members yet. Select a garden item and assign it using its GROUP field.</p>}
-          </div>
-          <button className="btn btn-danger delete-button" onClick={deleteGroup}>DELETE GROUP · KEEP OBJECTS</button>
-        </> : <div className="empty-inspector"><div className="empty-art">✦</div><strong>NO ITEM SELECTED</strong><p>Tap a tree, shrub, flower, bed or structure to edit its shared record.</p></div>}
-        <div className="side-bottom">
-          <div className="garden-file-actions">
-            <button className="btn btn-muted" onClick={newGarden}>+ EMPTY GARDEN</button>
-            <button className="btn btn-muted" onClick={recover}>↶ RECOVER PREVIOUS</button>
-          </div>
-          <button className="text-button" onClick={reset}>↺ RESET SAMPLE GARDEN</button>
-          <p>Your edits save automatically in this browser. Download JSON backups to transfer gardens between devices or protect against browser data clearing. No accounts or cloud sync.</p>
-        </div>
+      <aside className={`panel details-panel ${selectedPanel==='inspector'?'mobile-active':''}`}>
+        <div className="section-heading">06 / INSPECTOR</div>
+        {selected?<>
+          <div className="selected-preview"><div className="preview-art"><Icon kind={selected.kind} size={80}/></div><strong>{selected.id}</strong><p>{info(selected.kind).label} · shared record</p></div>
+          <label className="field">DISPLAY NAME<input maxLength={80} value={selected.name} onChange={e=>objectPatch(selected.id,{name:e.target.value})}/></label>
+          <label className="field">SPECIES / TYPE<input maxLength={140} value={selected.species} placeholder="Optional" onChange={e=>objectPatch(selected.id,{species:e.target.value})}/></label>
+          <label className="field">GROUP<select value={selected.groupId??''} onChange={e=>objectPatch(selected.id,{groupId:e.target.value||null})}><option value="">— UNGROUPED —</option>{garden.groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
+          <label className="field">DIAMETER / WIDTH (METRES)<input type="number" min="0.5" max="100" step="0.5" value={selected.diameterM} onChange={e=>{const n=Number(e.target.value);if(Number.isFinite(n)&&n>=.5&&n<=100)objectPatch(selected.id,{diameterM:n});}}/></label>
+          <label className="field">NOTES<textarea rows={4} maxLength={3000} value={selected.notes} onChange={e=>objectPatch(selected.id,{notes:e.target.value})}/></label>
+          <div className="placement-box">{mode.toUpperCase()} POSITION: {selected.placements[mode]?`${selected.placements[mode]!.x.toFixed(1)} m × ${selected.placements[mode]!.y.toFixed(1)} m`:'Not placed'}
+            {!selected.placements[mode]&&<button className="btn btn-highlight" onClick={()=>move(selected.id,{x:garden.width/2,y:garden.height/2},false)}>PLACE AT CENTER</button>}
+            {selected.placements[mode]&&<button className="btn btn-muted" onClick={()=>{const placements={...selected.placements};delete placements[mode];objectPatch(selected.id,{placements});}}>UNPLACE ON THIS MAP</button>}
+          </div><div className="inspector-actions"><button className="btn btn-highlight" onClick={duplicate}>DUPLICATE</button><button className="btn btn-danger" onClick={removeObject}>DELETE</button></div>
+        </>:selectedGroup?<>
+          <div className="selected-preview">▦ <strong>{selectedGroup.id}</strong> · {garden.objects.filter(x=>x.groupId===selectedGroup.id).length} members</div>
+          <label className="field">GROUP NAME<input maxLength={120} value={selectedGroup.name} onChange={e=>{if(e.target.value.trim())applyGarden({...garden,groups:garden.groups.map(g=>g.id===selectedGroup.id?{...g,name:e.target.value}:g)});}}/></label>
+          <label className="field">GROUP NOTES<textarea maxLength={3000} value={selectedGroup.notes} onChange={e=>applyGarden({...garden,groups:garden.groups.map(g=>g.id===selectedGroup.id?{...g,notes:e.target.value}:g)})}/></label>
+          <p className="panel-hint">With the group selected, drag any of its members on the map to move them together. Other map positions remain unchanged.</p>
+          <div className="group-list">{garden.objects.filter(o=>o.groupId===selectedGroup.id).map(o=><button key={o.id} className="group-entry" onClick={()=>select(o.id)}><Icon kind={o.kind} size={25}/>{o.name}</button>)}</div>
+          <button className="btn btn-danger" onClick={()=>{if(window.confirm('Delete group? All its objects will be kept.')){applyGarden(removeGroup(garden,selectedGroup.id));setSelectedGroupId(null);}}}>DELETE GROUP · KEEP ITEMS</button>
+        </>:<p className="empty-inspector">Tap an item on the map to inspect its shared record. Drag directly to move it.</p>}
+        <div className="section-heading list-heading">WORKSPACE DIMENSIONS</div>
+        <p className="panel-hint">Actual scale dimensions. Changing dimensions proportionally rescales positions and outlines.</p>
+        <div className="dimension-row"><label>WIDTH (M)<input type="number" min="10" max="500" value={dims.width} onChange={e=>setDims(d=>({...d,width:e.target.value}))}/></label><label>HEIGHT (M)<input type="number" min="10" max="500" value={dims.height} onChange={e=>setDims(d=>({...d,height:e.target.value}))}/></label></div>
+        <button className="btn btn-muted" onClick={changeDimensions}>APPLY SIZE</button>
+        <p className="panel-hint">Plot area (Scale): {polygonArea(garden.layouts.scale.boundary).toFixed(1)} m². Not a geospatial survey.</p>
+      </aside>
+      <aside className={`panel project-panel ${selectedPanel==='projects'?'mobile-active':''}`}>
+        <div className="section-heading">07 / MY GARDENS</div>
+        <p className="panel-hint">Your projects are stored in this browser only. Download regular backups.</p>
+        <div className="project-list">{library.projects.map(p=><button key={p.id} className={`project-entry ${p.id===library.activeId?'active':''}`} onClick={()=>{replaceLibrary({...library,activeId:p.id});setNotice(`Opened ${p.garden.name}.`);}}><span>▧ {p.garden.name}</span><small>{p.garden.objects.length} items · {p.garden.width}×{p.garden.height} m</small></button>)}</div>
+        <div className="project-actions"><button className="btn btn-highlight" onClick={()=>newProject(false)}>+ EMPTY GARDEN</button><button className="btn btn-muted" onClick={()=>newProject(true)}>+ DEMO COPY</button><button className="btn btn-danger" onClick={removeProject}>DELETE CURRENT GARDEN</button></div>
+        <div className="section-heading list-heading">BACKUP & RECOVERY</div>
+        <div className="project-actions"><button className="btn btn-muted" onClick={()=>download(`garden-atlas-all-projects-${date()}.json`,JSON.stringify(library,null,2))}>↓ BACKUP ALL GARDENS</button><button className="btn btn-muted" onClick={()=>importAllFile.current?.click()}>↑ RESTORE ALL GARDENS</button><button className="btn btn-muted" onClick={recover}>↶ LOCAL RECOVERY COPY</button></div>
+        <p className="panel-hint">JSON backups contain personal garden data. This version uses browser localStorage; clearing site data may erase it. No cloud sync.</p>
       </aside>
     </main>
-    <footer className="footer">GARDEN ATLAS / P003 · PIXEL GARDEN EDITOR <span>FUTURE: DRAW TOOLS · LAYERS · PLANT ENCYCLOPEDIA · PDF BOOK</span></footer>
+    <nav className="mobile-nav" aria-label="Editor panels"><button className={selectedPanel==='tools'?'active':''} onClick={()=>setSelectedPanel('tools')}>♣ OBJECTS</button><button className={selectedPanel==='inspector'?'active':''} onClick={()=>setSelectedPanel('inspector')}>✎ DETAILS</button><button className={selectedPanel==='projects'?'active':''} onClick={()=>setSelectedPanel('projects')}>▧ GARDENS</button></nav>
+    <footer className="footer">GARDEN ATLAS · P004 TOUCH-FIRST EDITOR <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
   </div>;
 }

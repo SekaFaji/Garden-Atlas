@@ -50,3 +50,9 @@
 - Ground style applies to the whole plot, not multiple terrain regions, slopes or elevations.
 - LocalStorage and previous-save recovery cannot survive browser data clearing or guarantee no data loss; export JSON regularly.
 - P003 is not a finished landscape surveying tool; full UI/device interaction must be verified after GitHub Pages deployment.
+
+## P004 — Mobile editor and flexible garden workspace
+- Rebuilt map navigation around direct pointer drag and two-finger pinch zoom, eliminating P003's tap-to-move requirement.
+- Added boundary tracing, corner drag, arbitrary edge points, editable independent terrain regions, resizable canvas and a separate map camera.
+- Introduced a multi-garden browser library, backup-all/restore-all, safe legacy migrations and local recovery.
+- Added undo/redo, duplicate/repeat-place and mobile panel navigation; no fabricated survey or private sample data.

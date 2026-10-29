@@ -1,34 +1,26 @@
 # Garden Atlas — Project status
 
-Current patch: **P003 — Mobile Controls, Garden Outline & Backup Safety**
+Current release: **P004 — Touch-first editor and workspace overhaul**
 
-## Core decisions
-- Public TypeScript + React + SVG pixel-art-inspired web app, deployed to GitHub Pages.
-- Mobile and desktop editing in the browser, no hosting/backend for user garden data.
-- Scale and Illustration keep independent positions and outlines; both share object/group records.
-- User-controlled local autosaving and JSON backups. No automatic cross-device sync.
-- Public sample property data is synthetic, not the user's real property survey.
+## Confirmed design
+- TypeScript / React / SVG, pixel-art UI hosted on GitHub Pages; works on desktop and phone.
+- One shared record per item; independently edited Scale and Illustration map placements.
+- Map viewport and camera independent of the property's editable outline.
+- Browser-local projects and JSON backup. No account, cloud sync or geographic survey claim.
 
-## Implemented
-- Pixel SVG objects, editable shared records, drag-and-place controls, group creation and movement.
-- Touch-first tap-to-move action for objects and groups; scroll-friendly, mobile-fitting map.
-- Polygon plot per mode with selectable corners, add/remove, invalid polygon rejection, area in Scale mode.
-- Whole-plot ground style per mode: grass/soil/gravel/stone.
-- Blank garden option; JSON import/export, autosaving and limited local previous-save recovery.
-- P001/P002 → P003 model migration using new browser key; prior saved keys preserved.
-- 19 model tests verifying groups, migration, geometry, storage and independence.
+## P004 implemented
+- Pointer-based object drag, map panning, pinch/wheel zoom, fit/area, large touch targets, visible map selection.
+- New polygon and freehand outline tools; direct vertex editing and arbitrary edge insertion.
+- Resizable metric workspaces and independent ground terrain polygon regions.
+- Duplicate, repeat-placement, groups and group dragging, show/hide layers, undo/redo.
+- Up to 20 saved local garden projects, JSON garden or library import/export and a recovery snapshot.
+- V1/V2/V3 garden migration; preserves old browser keys.
 
-## Known limitations
-- Plot editor works only inside fixed sample 40 × 26 m canvas; not arbitrary garden dimensions yet.
-- Only one polygon and one ground texture per map; slopes, elevation and internal patches are not modeled.
-- Browser storage is not durable after clearing site data, and isn't synchronized across devices. Download JSON backups.
-- Touch drag gestures intentionally use tap-to-move for reliability; mouse/pen can drag.
-- No browser-based screenshot test in the automated model test suite.
+## Not implemented yet
+- IndexedDB/media storage and photo attachments; real geospatial/altitude data.
+- Existing/Planned layers, multi-select, fences with width, custom object symbols, plant encyclopedia and PDF garden book.
+- Full phone-device touch regression testing; release automation build alone cannot guarantee gesture quality.
 
-## Planned
-- Configurable map dimensions, region painting, path/fence polygons, undo/redo and layers.
-- Multi-garden library, IndexedDB photo support, plant encyclopedia, care histories.
-- Existing/planned scenarios and PDF garden-book export.
-
-## Deployment
-`main` is the requested release branch. GitHub Actions runs tests, production build and GitHub Pages deployment. Check workflow status before claiming a release is live.
+## Testing
+- Node model/storage tests and GitHub Actions TypeScript build/deploy.
+- Browser save and recovery must be tested after deployment on an actual phone.
