@@ -1,3 +1,15 @@
+# Garden Atlas — P019 Inspector & Mobile Layout Polish (2026-10-29)
+
+- Existing-feature UI/UX patch only. No changes to version-6 garden records, saved data, sprites, map editing tools, local storage, PWA, or import/export.
+- Replaced tall inspector artwork preview with a compact selected-object heading and an explicit return-to-map action.
+- Name, species/type, group, and editable width/length remain immediately visible. Existing pixel-art appearance, rotation, notes, position, and Plant Atlas records are organized under native keyboard-accessible expandable sections.
+- Folded Plant Atlas is mounted on demand while the same specimen ID, history and actions are preserved; changing selected specimens creates fresh fold states.
+- Map Size shortcut now opens the existing map settings and scrolls to the map frame, rather than jumping to the top of the document.
+- Narrow-screen spacing, input touch targets, responsive identity fields and keyboard focus outlines improved.
+- Physical Android touch and screen-reader verification remain necessary. Local tests and GitHub production build must pass before release claims.
+
+---
+
 # Garden Atlas — P018 Touch & Mobile Navigation Polish (2026-10-29)
 
 - Current patch: **P018**. No new garden functions, objects, storage formats or data fields.

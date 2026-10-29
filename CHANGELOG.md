@@ -1,3 +1,12 @@
+## P019 — Inspector & Mobile Layout Polish (2026-10-29)
+
+- Condensed selected-item artwork/title/ID preview and added direct return-to-map action.
+- Kept editable name, species/group and independent width/length visible in the main Inspector; grouped other existing editing fields into keyboard-accessible expandable sections.
+- Reduced default scroll through Plant Atlas photos and maintenance logs without removing any records or actions.
+- Corrected Map Size shortcut to navigate to the map and open the actual settings panel.
+- Improved input hit areas, fold focus styles, spacing and responsive Inspector layout.
+- No change to garden data format, IndexedDB, PWA, map tools or older backups. Added Inspector source-contract regression tests.
+
 # P018 — Mobile navigation and safe touch gestures (2026-10-29)
 
 - Focused UI/UX patch only; no new garden data fields or gardening features.

@@ -206,3 +206,50 @@
  .map-surface{touch-action:none;-webkit-user-select:none;user-select:none}
 }
 @media(max-width:360px){.mobile-nav button{font-size:9px;letter-spacing:-.35px}}
+
+/* P019: existing Inspector controls are grouped into discoverable, keyboard-usable sections. */
+.details-panel{min-width:0;overflow-wrap:anywhere}
+.inspector-compact-header{display:flex;align-items:center;gap:9px;min-width:0;padding:8px;margin-bottom:12px;background:#294938;border:1px solid #608568}
+.inspector-compact-art{flex:none;display:grid;place-items:center;width:60px;height:60px;background:#345740;border:1px solid #668b65}
+.inspector-compact-art .item-art{width:54px;height:54px}
+.inspector-group-icon{flex:none;display:grid;place-items:center;width:52px;height:52px;background:#345740;font-size:28px;color:#d6e9ad}
+.inspector-compact-title{min-width:0;flex:1;display:grid;gap:4px}
+.inspector-compact-title strong{font-size:13px;color:#f3e7b4;line-height:1.25;overflow-wrap:anywhere}
+.inspector-compact-title span{font:10px monospace;color:#b6d0af;overflow-wrap:anywhere}
+.inspector-map-link{flex:none;padding:8px 6px;min-height:42px;border:1px solid #9cb48a;background:#365e46;color:#f3f0d3;font:900 10px monospace}
+.inspector-core-fields{display:grid;gap:0;min-width:0}
+.inspector-core-fields .field{min-width:0;margin:6px 0}
+.inspector-subheading{font:900 10px monospace;letter-spacing:.45px;color:#e4e8ae;margin:16px 0 8px;padding-bottom:5px;border-bottom:1px solid #52745a}
+.inspector-fold{min-width:0;border:1px solid #55785d;background:#20392c;margin:10px 0}
+.inspector-fold>summary{display:flex;align-items:center;gap:9px;list-style:none;cursor:pointer;min-height:46px;padding:10px 12px;color:#e8e9bc;font:900 11px monospace;letter-spacing:.15px;user-select:none}
+.inspector-fold>summary::-webkit-details-marker{display:none}
+.inspector-fold>summary::after{content:'+';margin-left:auto;font:900 20px monospace;line-height:1;color:#c0dda7}
+.inspector-fold[open]>summary{background:#31533e;border-bottom:1px solid #567a5c}
+.inspector-fold[open]>summary::after{content:'−'}
+.inspector-fold>summary:focus-visible,.inspector-map-link:focus-visible{outline:3px solid #f3dd91;outline-offset:2px}
+.inspector-fold-body{padding:8px 10px 10px;min-width:0}
+.inspector-fold-body .field{margin:6px 0 12px}
+.inspector-atlas-fold .inspector-fold-body{padding:8px}
+.inspector-atlas-fold .plant-atlas{margin:0;min-width:0}
+.inspector-map-size-link{width:100%;text-align:center;min-height:44px}
+.details-panel .field small{font:11px/1.45 system-ui;color:#bed1b0}
+.details-panel .inspector-actions{margin:12px 0}
+.details-panel .inspector-actions .btn{min-height:44px}
+@media(min-width:520px) and (max-width:760px){
+ .inspector-core-fields{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:12px}
+ .inspector-name-field{grid-column:1/-1}
+}
+@media(max-width:760px){
+ .details-panel{padding-bottom:20px}
+ .inspector-compact-header{gap:10px;padding:8px}
+ .inspector-compact-title strong{font-size:14px}
+ .inspector-fold>summary{min-height:48px;font-size:12px}
+ .inspector-fold-body .field input,.inspector-fold-body .field textarea,.inspector-fold-body .field select{font-size:16px}
+ .inspector-map-link{min-height:44px;min-width:54px}
+ .details-panel .field input,.details-panel .field select{min-height:44px}
+}
+@media(max-width:360px){
+ .inspector-compact-art{width:46px;height:46px}
+ .inspector-compact-art .item-art{width:42px;height:42px}
+ .inspector-map-link{min-width:48px;font-size:9px}
+}

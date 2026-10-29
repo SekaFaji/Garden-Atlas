@@ -1,3 +1,11 @@
+## P019 — Mobile Inspector & Layout Polish (2026-10-29)
+
+Select a garden item, then open **DETAILS**. Its name, species/group and editable **width / length** are immediately visible. The same existing controls for **APPEARANCE & ROTATION**, **NOTES & MAP PLACEMENT** and **PLANT ATLAS · PHOTOS & HISTORY** are now in expandable sections to reduce scrolling. Use the Inspector's **MAP** action to return to the canvas.
+
+**OPEN MAP SIZE SETTINGS** opens the existing controls above the map and takes you there. The Inspector header is smaller and inputs remain finger-friendly. The folds initially start closed; open one whenever you need to edit its fields. This patch changes layout and accessibility only, not garden schema version 6, existing IDs, photos, storage, offline behavior, or backup formats. Manual device tests remain important.
+
+---
+
 ## P018 — Mobile navigation and gesture reliability
 
 - On phones, the bottom navigation now provides **MAP · OBJECTS · DETAILS · GARDENS**. Selecting a tab opens its corresponding section without long manual scrolling; choosing a preset jumps to the map ready for placement.

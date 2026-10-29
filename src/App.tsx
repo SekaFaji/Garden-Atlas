@@ -313,7 +313,7 @@ export default function App(){
   if(!hydrated)return <div className="app-shell"><div className="status-message" role="status">Loading saved gardens…</div></div>;
   return <><div className="app-shell">
     <header className="topbar">
-      <div className="brand"><span className="brand-icon">✿</span><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL LANDSCAPE EDITOR · P018</div></div></div>
+      <div className="brand"><span className="brand-icon">✿</span><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL LANDSCAPE EDITOR · P019</div></div></div>
       <div className="top-actions"><span role="status" aria-live="polite" className={`save-status ${saveStatus==='failed'?'danger':''}`}>● {saveStatus==='saved'?(backend==='indexeddb'?'INDEXEDDB SAVED':'LOCAL SAVE'):saveStatus==='saving'?'SAVING…':saveStatus==='failed'?'SAVE FAILED':'LOADING…'}</span>
         <button className="btn btn-muted" onClick={()=>importFile.current?.click()}>IMPORT</button>
         <button className="btn btn-highlight" onClick={()=>download(`garden-atlas-${slug(garden.name)}-${date()}.json`,JSON.stringify(garden,null,2))}>↓ BACKUP</button><button className="btn btn-muted" onClick={()=>window.print()} title="Open your browser print dialog to save the garden book as a PDF">☷ PDF / PRINT</button>
@@ -443,42 +443,68 @@ export default function App(){
           <div className="map-bottom"><span>{tool==='select'?(multiSelect?'MULTI MODE · TAP TO SELECT · DRAG SELECTED ITEMS TOGETHER':'DRAG ITEMS · PAN EMPTY SPACE · PINCH TO ZOOM'):tool==='pan'?'DRAG MAP · PINCH TO ZOOM':tool==='feature-edit'?'TAP PATH OR TERRAIN · DRAG HANDLES · TAP EDGE TO ADD POINT':tool==='outline-edit'?'DRAG CORNERS · TAP EDGE MIDPOINTS TO INSERT':tool==='outline-draw'?'TAP CORNERS · FINISH TO CLOSE OUTLINE':tool==='freehand'?'DRAW A CLOSED BORDER WITH ONE FINGER':tool==='terrain'?'TAP AREA CORNERS · FINISH TO ADD TERRAIN':tool==='path'||tool==='fence'?'TAP LINE POINTS · FINISH TO CREATE':`TAP TO PLACE ${tool.toUpperCase()}`}</span></div>
         </div>
         <div className="status-message" role="status">✦ {notice}</div>
-        <div className="feature-strip"><span>■ P018 MOBILE POLISH</span><span>■ TOUCH-FIRST</span><span>■ LINKED SCALE + PIXEL VIEWS</span><span>■ LOCAL BACKUPS</span></div>
+        <div className="feature-strip"><span>■ P019 INSPECTOR POLISH</span><span>■ TOUCH-FIRST</span><span>■ LINKED SCALE + PIXEL VIEWS</span><span>■ LOCAL BACKUPS</span></div>
       </section>
-      <aside ref={inspectorRef} className={`panel details-panel ${selectedPanel==='inspector'?'mobile-active':''}`}>
+      <aside ref={inspectorRef} className={`panel details-panel ${selectedPanel==='inspector'?'mobile-active':''}`} aria-label="Garden item details">
         <div className="section-heading">06 / INSPECTOR</div>
         {selected?<>
-          <div className="selected-preview"><div className="preview-art"><Icon kind={selected.kind} presetId={selected.presetId} size={80}/></div><strong>{selected.id}</strong><p>{info(selected.kind).label} · shared record</p></div>
-          <label className="field">PIXEL-ART APPEARANCE
-            <select value={selected.presetId??defaultPreset(selected.kind).id} disabled={locked.objects}
-              onChange={e=>{const updated=changeObjectPreset(garden,selected.id,e.target.value);if(updated)applyGarden(updated);}}>
-              {PRESETS.filter(p=>p.kind===selected.kind).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-            <small>Change the look without replacing this record or altering its size.</small>
-          </label>
-          <label className="field">DISPLAY NAME<input maxLength={80} value={selected.name} onChange={e=>objectPatch(selected.id,{name:e.target.value},'name')}/></label>
-          <label className="field">SPECIES / TYPE<input maxLength={140} value={selected.species} placeholder="Optional" onChange={e=>objectPatch(selected.id,{species:e.target.value},'species')}/></label>
-          <label className="field">GROUP<select value={selected.groupId??''} onChange={e=>objectPatch(selected.id,{groupId:e.target.value||null})}><option value="">— UNGROUPED —</option>{garden.groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
-          <label className="field">ROTATION (DEGREES)<MetricDraftInput key={selected.id} disabled={locked.objects} label="Rotation in degrees" min={0} max={359} decimals={0} value={selected.rotation??0} onCommit={n=>objectPatch(selected.id,{rotation:n})} onNotice={setNotice}/></label>
+          <div className="inspector-compact-header">
+            <div className="inspector-compact-art"><Icon kind={selected.kind} presetId={selected.presetId} size={56}/></div>
+            <div className="inspector-compact-title"><strong>{selected.name}</strong><span>{selected.id} · {info(selected.kind).label}</span></div>
+            <button type="button" className="inspector-map-link" onClick={()=>navigateTo('map')} aria-label="Return to garden map">⌖ MAP</button>
+          </div>
+          <div className="inspector-core-fields">
+            <label className="field inspector-name-field">DISPLAY NAME<input maxLength={80} value={selected.name} disabled={locked.objects} onChange={e=>objectPatch(selected.id,{name:e.target.value},'name')}/></label>
+            <label className="field">SPECIES / TYPE<input maxLength={140} value={selected.species} disabled={locked.objects} placeholder="Optional" onChange={e=>objectPatch(selected.id,{species:e.target.value},'species')}/></label>
+            <label className="field">GROUP<select value={selected.groupId??''} disabled={locked.objects} onChange={e=>objectPatch(selected.id,{groupId:e.target.value||null})}><option value="">— UNGROUPED —</option>{garden.groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
+          </div>
+          <div className="inspector-subheading">SIZE · METRES</div>
           <ObjectDimensions key={selected.id} object={selected} disabled={locked.objects} onNotice={setNotice} onChange={axes=>{const updated=resizeObjectAxes(garden,selected.id,axes);if(updated)applyGarden(updated);else setNotice('Invalid dimension. Previous measurements preserved.');}}/>
-          <label className="field">NOTES<textarea rows={4} maxLength={3000} value={selected.notes} onChange={e=>objectPatch(selected.id,{notes:e.target.value},'notes')}/></label>
-          <div className="placement-box">SHARED POSITION: {selected.position?`${selected.position!.x.toFixed(1)} m × ${selected.position!.y.toFixed(1)} m`:'Not placed'}
-            {!selected.position&&<button className="btn btn-highlight" onClick={()=>move(selected.id,{x:garden.width/2,y:garden.height/2},false)}>PLACE AT CENTER</button>}
-            {selected.position&&<button className="btn btn-muted" onClick={()=>objectPatch(selected.id,{position:undefined})}>REMOVE FROM BOTH MAPS</button>}
-          </div><div className="inspector-actions"><button disabled={locked.objects} className="btn btn-highlight" onClick={duplicate}>DUPLICATE</button><button disabled={locked.objects} className="btn btn-danger" onClick={removeObject}>DELETE</button></div>
-          <PlantAtlasPanel key={selected.id} garden={garden} objectId={selected.id} disabled={locked.objects||Boolean(garden.linkMigration&&!garden.linkMigration.confirmed)} onNotice={setNotice}
-            onChange={(edit,key)=>{if(locked.objects||libraryRef.current.activeId!==library.activeId)return;const current=libraryRef.current.projects.find(p=>p.id===libraryRef.current.activeId)!.garden;applyGarden(edit(current),true,key);}}/>
+          <details key={`appearance-${selected.id}`} className="inspector-fold">
+            <summary>APPEARANCE & ROTATION</summary>
+            <div className="inspector-fold-body">
+              <label className="field">PIXEL-ART APPEARANCE
+                <select value={selected.presetId??defaultPreset(selected.kind).id} disabled={locked.objects}
+                  onChange={e=>{const updated=changeObjectPreset(garden,selected.id,e.target.value);if(updated)applyGarden(updated);}}>
+                  {PRESETS.filter(p=>p.kind===selected.kind).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                <small>Changes the artwork, not the record or measurements.</small>
+              </label>
+              <label className="field">ROTATION (DEGREES)<MetricDraftInput key={selected.id} disabled={locked.objects} label="Rotation in degrees" min={0} max={359} decimals={0} value={selected.rotation??0} onCommit={n=>objectPatch(selected.id,{rotation:n})} onNotice={setNotice}/></label>
+            </div>
+          </details>
+          <details key={`notes-${selected.id}`} className="inspector-fold">
+            <summary>NOTES & MAP PLACEMENT</summary>
+            <div className="inspector-fold-body">
+              <label className="field">NOTES<textarea rows={4} maxLength={3000} disabled={locked.objects} value={selected.notes} onChange={e=>objectPatch(selected.id,{notes:e.target.value},'notes')}/></label>
+              <div className="placement-box">SHARED POSITION: {selected.position?`${selected.position.x.toFixed(1)} m × ${selected.position.y.toFixed(1)} m`:'Not placed'}
+                {!selected.position&&<button disabled={locked.objects} className="btn btn-highlight" onClick={()=>move(selected.id,{x:garden.width/2,y:garden.height/2},false)}>PLACE AT CENTER</button>}
+                {selected.position&&<button disabled={locked.objects} className="btn btn-muted" onClick={()=>objectPatch(selected.id,{position:undefined})}>REMOVE FROM BOTH MAPS</button>}
+              </div>
+            </div>
+          </details>
+          <div className="inspector-actions"><button disabled={locked.objects} className="btn btn-highlight" onClick={duplicate}>DUPLICATE</button><button disabled={locked.objects} className="btn btn-danger" onClick={removeObject}>DELETE</button></div>
+          {(selected.kind==='tree'||selected.kind==='shrub'||selected.kind==='flower')&&<details key={`atlas-${selected.id}`} className="inspector-fold inspector-atlas-fold">
+            <summary>PLANT ATLAS · PHOTOS & HISTORY</summary>
+            <div className="inspector-fold-body">
+              <PlantAtlasPanel garden={garden} objectId={selected.id} disabled={locked.objects||Boolean(garden.linkMigration&&!garden.linkMigration.confirmed)} onNotice={setNotice}
+                onChange={(edit,key)=>{if(locked.objects||libraryRef.current.activeId!==library.activeId)return;const current=libraryRef.current.projects.find(p=>p.id===libraryRef.current.activeId)!.garden;applyGarden(edit(current),true,key);}}/>
+            </div>
+          </details>}
         </>:selectedGroup?<>
-          <div className="selected-preview">▦ <strong>{selectedGroup.id}</strong> · {garden.objects.filter(x=>x.groupId===selectedGroup.id).length} members</div>
+          <div className="inspector-compact-header inspector-group-header"><div className="inspector-group-icon">▦</div>
+            <div className="inspector-compact-title"><strong>{selectedGroup.name}</strong><span>{selectedGroup.id} · {garden.objects.filter(x=>x.groupId===selectedGroup.id).length} members</span></div>
+            <button type="button" className="inspector-map-link" onClick={()=>navigateTo('map')}>⌖ MAP</button>
+          </div>
           <label className="field">GROUP NAME<input maxLength={120} value={selectedGroup.name} onChange={e=>{if(e.target.value.trim())applyGarden({...garden,groups:garden.groups.map(g=>g.id===selectedGroup.id?{...g,name:e.target.value}:g)},true,'group-name:'+selectedGroup.id);}}/></label>
           <label className="field">GROUP NOTES<textarea maxLength={3000} value={selectedGroup.notes} onChange={e=>applyGarden({...garden,groups:garden.groups.map(g=>g.id===selectedGroup.id?{...g,notes:e.target.value}:g)},true,'group-notes:'+selectedGroup.id)}/></label>
-          <p className="panel-hint">With the group selected, drag any of its members on the map to move them together. Both views update together.</p>
+          <p className="panel-hint">Drag any member on the map to move the entire group. Both views remain linked.</p>
           <div className="group-list">{garden.objects.filter(o=>o.groupId===selectedGroup.id).map(o=><button key={o.id} className="group-entry" onClick={()=>select(o.id)}><Icon kind={o.kind} presetId={o.presetId} size={25}/>{o.name}</button>)}</div>
           <button disabled={locked.objects} className="btn btn-danger" onClick={()=>{if(!locked.objects&&window.confirm('Delete group? All its objects will be kept.')){applyGarden(removeGroup(garden,selectedGroup.id));setSelectedGroupId(null);}}}>DELETE GROUP · KEEP ITEMS</button>
-        </>:<p className="empty-inspector">Tap an item on the map to inspect its shared record. Drag directly to move it.</p>}
+        </>:<p className="empty-inspector">Tap an item on the map or select one from OBJECTS to edit its shared record.</p>}
         <div className="section-heading list-heading">MAP DIMENSIONS</div>
-        <p className="panel-hint">Workspace: {garden.width} × {garden.height} m · Property outline: {polygonArea(garden.layout.boundary).toFixed(1)} m² (approximate). Map dimensions can now be changed above the map without stretching the garden.</p>
-        <button className="btn btn-muted" onClick={()=>{setMapSizeOpen(true);window.scrollTo({top:0,behavior:'smooth'});}}>OPEN MAP SIZE SETTINGS ↑</button>
+        <p className="panel-hint">Workspace: {garden.width} × {garden.height} m · Property outline: {polygonArea(garden.layout.boundary).toFixed(1)} m² (approximate).</p>
+        <button className="btn btn-muted inspector-map-size-link" onClick={()=>{setMapSizeOpen(true);navigateTo('map');window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>mapFrameRef.current?.scrollIntoView({behavior:'auto',block:'start'})));}}>OPEN MAP SIZE SETTINGS ↑</button>
       </aside>
       <aside ref={projectsPanelRef} className={`panel project-panel ${selectedPanel==='projects'?'mobile-active':''}`}>
         <div className="section-heading">07 / MY GARDENS</div>
@@ -497,6 +523,6 @@ export default function App(){
     <nav className="mobile-nav" aria-label="Mobile garden navigation">
       {([{id:'map',label:'⌖ MAP'},{id:'tools',label:'♣ OBJECTS'},{id:'inspector',label:'✎ DETAILS'},{id:'projects',label:'▧ GARDENS'}] as {id:'map'|'tools'|'inspector'|'projects';label:string}[]).map(item=><button key={item.id} type="button" className={selectedPanel===item.id?'active':''} aria-current={selectedPanel===item.id?'page':undefined} onClick={()=>navigateTo(item.id)}>{item.label}</button>)}
     </nav>
-    <footer className="footer">GARDEN ATLAS · P018 TOUCH & NAVIGATION POLISH <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
+    <footer className="footer">GARDEN ATLAS · P019 INSPECTOR & LAYOUT POLISH <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
   </div><GardenReport garden={garden}/></>;
 }
