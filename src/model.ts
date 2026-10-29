@@ -171,6 +171,30 @@ export function resizeGarden(g:Garden,width:number,height:number):Garden|null {
  const next:Garden={...g,width,height,layout:{...l,boundary:l.boundary.map(transform),regions:l.regions.map(r=>({...r,points:r.points.map(transform)})),lines:l.lines.map(line=>({...line,points:line.points.map(transform)}))},objects:g.objects.map(o=>o.position?{...o,position:transform(o.position)}:o)};
  return isGarden(next)?next:null;
 }
+/** Adjust the surrounding workspace, retaining exact measured garden coordinates.
+ * Shrinks that would clip ANY boundary, path, region or placed object are rejected.
+ */
+export function resizeWorkspace(g:Garden,width:number,height:number):Garden|null {
+ if(!validSize(width)||!validSize(height))return null;
+ const fits=(p:Point)=>p.x<=width&&p.y<=height;
+ if(g.layout.boundary.some(p=>!fits(p))||g.layout.regions.some(r=>r.points.some(p=>!fits(p)))||
+    g.layout.lines.some(l=>l.points.some(p=>!fits(p)))||g.objects.some(o=>o.position&&!fits(o.position)))return null;
+ const next={...g,width,height};
+ return isGarden(next)?next:null;
+}
+/** Add an equal margin on all sides, translating geometry but keeping size/spacing unchanged.
+ * This creates space for roads and neighbouring plots without stretching the property.
+ */
+export function addSurroundings(g:Garden,margin:number):Garden|null {
+ if(!Number.isFinite(margin)||margin<=0||g.width+2*margin>500||g.height+2*margin>500)return null;
+ const shift=(p:Point):Point=>({x:Number((p.x+margin).toFixed(5)),y:Number((p.y+margin).toFixed(5))});
+ const l=g.layout;
+ const next:Garden={...g,width:g.width+2*margin,height:g.height+2*margin,
+   layout:{...l,boundary:l.boundary.map(shift),regions:l.regions.map(r=>({...r,points:r.points.map(shift)})),
+     lines:l.lines.map(line=>({...line,points:line.points.map(shift)}))},
+   objects:g.objects.map(o=>o.position?{...o,position:shift(o.position)}:o)};
+ return isGarden(next)?next:null;
+}
 export function loadGarden():Garden {
  try{for(const key of ['garden-atlas:p003:v3','garden-atlas:p003:recovery','garden-atlas:p002:v2','garden-atlas:p001:v1']){
   const raw=localStorage.getItem(key);if(!raw)continue;try{const found=parseGarden(JSON.parse(raw));if(found)return found;}catch{/* next */}

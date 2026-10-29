@@ -45,3 +45,24 @@
 .editor-history-bar button:disabled { opacity:.38; cursor:not-allowed; }
 .editor-history-bar span { color:#b8d3a9; margin-left:auto; font:900 10px monospace; }
 @media(max-width:760px) { .editor-history-bar { position:sticky; top:0; z-index:6; } .editor-history-bar span { font-size:9px; text-align:right; } }
+
+/* P008: prominently exposed workspace resizing, usable on narrow touch screens. */
+.map-size-toggle { background:#d1e8a7; color:#233e2c; border:2px solid #f1f5c7; padding:9px 12px; min-height:42px; font:900 12px monospace; cursor:pointer; white-space:nowrap; }
+.map-size-panel { padding:13px; background:#284737; border-bottom:3px solid #769c6f; color:#e7efd3; display:grid; gap:10px; }
+.map-size-heading { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; font:900 12px monospace; }
+.map-size-heading strong { color:#f4ebbd; }
+.map-size-heading span { font:10px monospace; color:#b1cfb2; }
+.map-size-panel p { margin:0; font:12px/1.5 system-ui; color:#c8dec2; }
+.map-size-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.map-size-fields label { display:grid; gap:5px; font:900 11px monospace; }
+.map-size-fields input { width:100%; min-width:0; background:#10271e; color:#fff9e2; border:2px solid #789b79; padding:10px; font:16px system-ui; }
+.map-size-modes { border:1px solid #66896c; padding:11px; display:grid; gap:10px; margin:0; }
+.map-size-modes legend { padding:0 5px; font:900 10px monospace; color:#e6e3a5; }
+.map-size-modes label { display:grid; grid-template-columns:23px minmax(0,1fr); gap:3px 7px; font-size:13px; font-weight:700; align-items:start; }
+.map-size-modes input { width:19px; height:19px; accent-color:#c6df91; }
+.map-size-modes small { grid-column:2; color:#abc3a9; font:11px/1.45 system-ui; }
+.map-size-actions,.map-margin-controls { display:flex; gap:7px; align-items:center; flex-wrap:wrap; }
+.map-margin-controls { border-top:1px solid #517657; padding-top:10px; }
+.map-margin-controls span { color:#e6e3a5; font:900 10px monospace; margin-right:auto; }
+.map-size-panel .map-size-footnote { font-size:11px; color:#b5cea8; }
+@media(max-width:760px){ .map-size-toggle { min-height:46px; padding:11px; } .map-size-actions .btn { flex:1; } .map-margin-controls span { flex:0 0 100%; } .map-margin-controls .btn { flex:1; font-size:10px; padding:10px 5px; } }

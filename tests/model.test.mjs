@@ -4,7 +4,7 @@ import {
   demoGarden, emptyGarden, isGarden, parseGarden, movePlaced, setBoundary,
   addBoundaryCorner, removeBoundaryCorner, addRegion, addLine, nextLineId,
   nextObjectId, nextGroupId, removeGroup, resizeGarden, clampPoint, validPolygon,
-  polygonArea, previewLinkedSource, chooseLinkedSource, simplifyStroke,
+  polygonArea, previewLinkedSource, chooseLinkedSource, simplifyStroke, resizeWorkspace, addSurroundings,
 } from '../src/model.ts';
 import { demoGarden as oldDemo } from '../src/legacy.ts';
 import { newLibrary, parseLibrary, saveLibrary, loadLibrary, addProject, deleteProject, updateActiveGarden, importGarden, loadLibraryRecovery } from '../src/storage.ts';
@@ -166,4 +166,39 @@ test('undo history groups consecutive text edits, but never distinct operations'
  assert.equal(isSameEditBurst({key:'obj:notes',time:1000},'obj:name',1500),false);
  assert.equal(isSameEditBurst({key:'obj:notes',time:1000},'obj:notes',2500),false);
  assert.equal(isSameEditBurst({key:'obj:notes',time:1000},undefined,1200),false);
+});
+
+test('P008 workspace resizing preserves measured geometry, objects, terrain and paths',()=>{
+ const g=addLine(addRegion(demoGarden(),'scale',[p(2,2),p(5,2),p(5,5),p(2,5)],'soil'),'scale',[p(6,6),p(12,6)],'path',1);
+ assert.ok(g);
+ const changed=resizeWorkspace(g,120,80);assert.ok(changed);assert.equal(changed.width,120);assert.equal(changed.height,80);
+ assert.deepEqual(changed.objects,g.objects);assert.deepEqual(changed.layout,g.layout);
+ assert.equal(isGarden(changed),true);assert.equal(g.width,40);
+ assert.equal(resizeWorkspace(g,25,20),null); // would clip land and plants
+ assert.equal(resizeWorkspace(g,2000,300),null);
+ assert.equal(resizeWorkspace(g,9,30),null);
+});
+test('P008 refuses shrinking if any object, region or path would be clipped',()=>{
+ const base=emptyGarden();
+ const inner={...base,layout:{...base.layout,boundary:[p(2,2),p(12,2),p(12,12),p(2,12)]}};
+ assert.ok(resizeWorkspace(inner,20,20));
+ const withObject={...inner,objects:[{...demoGarden().objects[0],position:p(35,5)}]};
+ assert.equal(resizeWorkspace(withObject,20,20),null);
+ const withRegion=addRegion(inner,'scale',[p(25,2),p(30,2),p(30,8),p(25,8)],'stone');
+ assert.ok(withRegion);assert.equal(resizeWorkspace(withRegion,20,20),null);
+ const withLine=addLine(inner,'scale',[p(19,2),p(28,7)],'fence',.5);
+ assert.ok(withLine);assert.equal(resizeWorkspace(withLine,20,20),null);
+});
+test('P008 surrounding margins retain precise distances and all shared map geometry',()=>{
+ const first=addLine(demoGarden(),'illustration',[p(2,2),p(20,20)],'path',1.2);
+ assert.ok(first);
+ const large=addSurroundings(first,10);assert.ok(large);
+ assert.equal(large.width,60);assert.equal(large.height,46);
+ assert.deepEqual(large.objects[0].position,p(39,17));
+ assert.deepEqual(large.layout.boundary[0],p(11,11));
+ assert.deepEqual(large.layout.lines[0].points,[p(12,12),p(30,30)]);
+ assert.equal(polygonArea(large.layout.boundary),polygonArea(first.layout.boundary));
+ assert.ok(isGarden(large));assert.equal(addSurroundings(first,500),null);
+ const restored=resizeWorkspace(large,70,50);assert.ok(restored);
+ assert.equal(polygonArea(restored.layout.boundary),polygonArea(first.layout.boundary));
 });

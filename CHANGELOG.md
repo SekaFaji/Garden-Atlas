@@ -1,3 +1,10 @@
+## P008 — Visible Map Size & Surrounding Workspace
+- Added MAP SIZE button directly above the map, usable on phones.
+- Added custom map dimensions, 10–500 m, with preserve-position and explicit scale-all modes.
+- Added +10m / +25m surrounding context controls, preserving all relative geometry.
+- Refuse destructive workspace shrinking that would clip any feature.
+- Reused existing v6 storage and linked views, with Undo/Redo for map size edits.
+
 ## P007 — Linked Maps & Safer Undo/Redo (2026-10-29)
 
 - Linked Scale and Illustration views through one authoritative layout and one location per specimen.

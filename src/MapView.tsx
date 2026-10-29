@@ -52,6 +52,16 @@ export function MapView({garden,mode,tool,selectedId,selectedGroupId,terrain,lin
   useEffect(()=>{
     if(!initialFit.current&&size.width>2&&size.height>2){initialFit.current=true;setCamera(fitCamera(garden,size));}
   },[size.width,size.height,garden]);
+  // Workspace dimensions change independently of garden geometry. Fit the newly sized area
+  // once after each resize; don't reset the camera for ordinary edits or zoom gestures.
+  const dimensionsRef=useRef({width:garden.width,height:garden.height});
+  useEffect(()=>{
+    const previous=dimensionsRef.current;
+    if(previous.width!==garden.width||previous.height!==garden.height){
+      dimensionsRef.current={width:garden.width,height:garden.height};
+      if(size.width>2&&size.height>2)setCamera(fitCamera(garden,size,undefined,1.2));
+    }
+  },[garden.width,garden.height,size.width,size.height,garden]);
   useEffect(()=>{setDraft([]);setPreview(null);setCornerPreview(null);activeRef.current=null;pointsRef.current.clear();pinchRef.current=null;},[mode,tool,garden.width,garden.height]);
   const fit=(outer=false)=>{setCamera(fitCamera(garden,size,outer?undefined:garden.layout.boundary,outer?1.75:1.17));};
   const zoomAt=(factor:number,x:number,y:number)=>{

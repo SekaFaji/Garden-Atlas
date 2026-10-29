@@ -33,3 +33,10 @@ Current patch: **P007 — Linked Scale/Illustration views & safer edit history**
 - Model/storage/geometry/camera/history tests run with `npm test`.
 - CI runs `npm test` then `npm run build` on `main` before GitHub Pages deployment.
 - Actual mobile gesture testing remains important; automated tests do not prove a physical phone's touch feel.
+
+## P008 — Workspace size discoverability and safer editing
+- Dedicated MAP SIZE panel next to the canvas, available on mobile and desktop.
+- Explicit preserve-measurements versus scale-everything resize choices.
+- Workspace resize refuses to clip objects, plot boundary, terrain or lines.
+- Add 10/25 metres of context around the garden without distorting geometry.
+- Existing P007 version-6 garden data remains unchanged; no migration required.

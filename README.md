@@ -43,6 +43,17 @@ Garden Atlas is a mobile-friendly garden design web app. Its Scale and Illustrat
 - Automatic browser-local saving, periodic previous-save recovery, JSON export/import of a garden **as a new project**, plus whole-library JSON backup/restore.
 - On first load P001–P003 local gardens are upgraded; importing old JSON backups also works. Prior localStorage keys are not modified.
 
+## P008 — Map size and surroundings
+
+The **MAP SIZE** button is now in the toolbar immediately above the editor map, including on mobile. The inspector no longer hides the only way to change the workspace dimensions.
+
+- Enter a custom **workspace width and height**, 10–500 metres each. These are editable map dimensions, **not** zoom percentages or the property's land area.
+- **Keep actual garden size and positions** (recommended): change the surrounding workspace without affecting any existing measured tree, boundary, path or terrain coordinates. Shrinking is rejected if it would cut off anything.
+- **Scale entire garden to fit**: explicitly stretch all positions and shapes to the new width and height. This changes measurements; it requires confirmation and can be undone.
+- **+10 m each side** or **+25 m each side** adds room for surrounding roads, neighbouring land and context without distorting the garden; all coordinates translate together so spacing remains unchanged.
+- Use **EDIT BORDER** or **DRAW BORDER** to reshape the *actual property boundary*, which is separate from workspace width and height.
+- Size edits work in both linked Scale and Illustration views, are included in browser autosave and backups, and can be undone during the editor session.
+
 ## How to use
 
 1. Start by opening **GARDENS** and creating an empty garden, or edit a copy of the sample.

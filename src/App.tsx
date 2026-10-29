@@ -6,7 +6,7 @@ import { GardenReport } from './Report';
 import { isSameEditBurst, type EditBurst } from './history';
 import {
   GROUNDS, KINDS, addLine, addRegion, clampPoint, demoGarden, emptyGarden, info, isGarden,
-  movePlaced, nextGroupId, nextObjectId, polygonArea, removeGroup, resizeGarden, setBoundary, previewLinkedSource, chooseLinkedSource,
+  movePlaced, nextGroupId, nextObjectId, polygonArea, removeGroup, resizeGarden, resizeWorkspace, addSurroundings, setBoundary, previewLinkedSource, chooseLinkedSource,
   type Garden, type GardenObject, type Ground, type Kind, type Mode, type Point, type LineKind
 } from './model';
 import {
@@ -38,6 +38,8 @@ export default function App(){
   const [newGroupName,setNewGroupName]=useState('');
   const [checkedIds,setCheckedIds]=useState<string[]>([]);
   const [dims,setDims]=useState({width:String(garden.width),height:String(garden.height)});
+  const [mapSizeOpen,setMapSizeOpen]=useState(false);
+  const [resizeMode,setResizeMode]=useState<'preserve'|'scale'>('preserve');
   const [notice,setNotice]=useState('Linked maps: edits to either view update both · pinch to zoom.');
   const [saved,setSaved]=useState(true);
   const [past,setPast]=useState<Garden[]>([]);
@@ -119,9 +121,20 @@ export default function App(){
   };
   const changeDimensions=()=>{
     const width=Number(dims.width),height=Number(dims.height);
-    if(!Number.isFinite(width)||!Number.isFinite(height)||width<10||height<10||width>500||height>500){setNotice('Workspace dimensions must be from 10 to 500 metres.');return;}
-    if(!window.confirm('Resize map dimensions? Existing object and boundary positions will scale proportionally; species data and IDs stay unchanged.'))return;
-    const next=resizeGarden(garden,width,height);if(next){applyGarden(next);setNotice(`Workspace resized to ${width} × ${height} metres.`);}else setNotice('Cannot resize: result would contain invalid geometry.');
+    if(!Number.isFinite(width)||!Number.isFinite(height)||width<10||height<10||width>500||height>500){setNotice('Map width and height must be between 10 and 500 metres.');return;}
+    if(width===garden.width&&height===garden.height){setNotice('Map size is already set to those dimensions.');return;}
+    if(resizeMode==='scale'&&!window.confirm('Scale everything? This changes measured distances, object positions and boundaries. Undo can restore the previous layout.'))return;
+    const next=resizeMode==='scale'?resizeGarden(garden,width,height):resizeWorkspace(garden,width,height);
+    if(!next){setNotice('Map size rejected: this would clip the plot, plants, paths or terrain. Increase the dimensions, use Expand Surroundings or explicitly choose Scale Entire Design.');return;}
+    applyGarden(next);
+    setNotice(resizeMode==='scale'?`Entire garden scaled to ${width} × ${height} m. Use Undo to reverse.`:`Workspace changed to ${width} × ${height} m without moving or resizing your garden.`);
+  };
+  const expandAroundGarden=(margin:number)=>{
+    const next=addSurroundings(garden,margin);
+    if(!next){setNotice('Could not expand map: maximum workspace dimension is 500 m.');return;}
+    applyGarden(next);
+    setDims({width:String(next.width),height:String(next.height)});
+    setNotice(`Added ${margin} m of space around all sides. Your garden remains the same size.`);
   };
   const newProject=(demo=false)=>{
     if(!window.confirm('Create a new garden? Your current garden is saved in this browser. Download a backup for long-term safekeeping.'))return;
@@ -193,7 +206,22 @@ export default function App(){
           <button className="btn btn-muted" onClick={()=>download(`garden-atlas-pre-link-${slug(garden.name)}.json`,JSON.stringify(garden.linkMigration!.original,null,2))}>↓ DOWNLOAD ORIGINAL TWO-VIEW BACKUP</button>
           <p className="migration-note">Choose a source before editing. Your original P006 browser storage remains recoverable using the previous local recovery snapshot or a backup.</p>
         </section>}
-        <div className={`map-frame ${garden.linkMigration&&!garden.linkMigration.confirmed?'migration-locked':''}`}><div className="map-toolbar"><span>● {mode==='scale'?'MEASURED MAP':'PIXEL MAP'} · {garden.width} × {garden.height} m</span><span>DRAG · PAN · PINCH</span></div>
+        <div className={`map-frame ${garden.linkMigration&&!garden.linkMigration.confirmed?'migration-locked':''}`}><div className="map-toolbar"><span>● {mode==='scale'?'MEASURED MAP':'PIXEL MAP'} · {garden.width} × {garden.height} m</span><button type="button" className="map-size-toggle" aria-expanded={mapSizeOpen} aria-controls="map-size-panel" onClick={()=>setMapSizeOpen(o=>!o)}>▣ MAP SIZE {mapSizeOpen?'▴':'▾'}</button></div>
+          {mapSizeOpen&&<section id="map-size-panel" className="map-size-panel" aria-label="Map size and surrounding workspace">
+            <div className="map-size-heading"><strong>EDIT MAP SIZE</strong><span>Both map styles use the same dimensions</span></div>
+            <p>Set the surrounding <b>workspace</b> size separately from the property boundary. You can enlarge the map without stretching trees, paths or land measurements.</p>
+            <div className="map-size-fields">
+              <label>WIDTH (m)<input type="number" min="10" max="500" step="1" value={dims.width} onChange={e=>setDims(d=>({...d,width:e.target.value}))}/></label>
+              <label>HEIGHT (m)<input type="number" min="10" max="500" step="1" value={dims.height} onChange={e=>setDims(d=>({...d,height:e.target.value}))}/></label>
+            </div>
+            <fieldset className="map-size-modes"><legend>WHEN RESIZING</legend>
+              <label><input type="radio" name="map-resize-mode" checked={resizeMode==='preserve'} onChange={()=>setResizeMode('preserve')}/> Keep actual garden size and positions <small>Recommended: change only the surrounding workspace; unsafe shrinking is blocked.</small></label>
+              <label><input type="radio" name="map-resize-mode" checked={resizeMode==='scale'} onChange={()=>setResizeMode('scale')}/> Scale entire garden to fit <small>Changes distances, plant positions, boundaries and paths. Requires confirmation.</small></label>
+            </fieldset>
+            <div className="map-size-actions"><button className="btn btn-highlight" onClick={changeDimensions}>APPLY MAP SIZE</button><button className="btn btn-muted" onClick={()=>setDims({width:String(garden.width),height:String(garden.height)})}>RESET FIELDS</button></div>
+            <div className="map-margin-controls"><span>NEED MORE SURROUNDINGS?</span><button className="btn btn-muted" onClick={()=>expandAroundGarden(10)}>+10 m EACH SIDE</button><button className="btn btn-muted" onClick={()=>expandAroundGarden(25)}>+25 m EACH SIDE</button></div>
+            <p className="map-size-footnote">Property outline: {polygonArea(garden.layout.boundary).toFixed(1)} m². To alter the actual land border, use DRAW BORDER or EDIT BORDER. All changes can be undone.</p>
+          </section>}
           <div className="editor-history-bar" aria-label="Editing history">
               <button disabled={!past.length||Boolean(garden.linkMigration&&!garden.linkMigration.confirmed)} onClick={undo} title="Undo · Ctrl/Cmd+Z">↶ UNDO</button>
               <button disabled={!future.length||Boolean(garden.linkMigration&&!garden.linkMigration.confirmed)} onClick={redo} title="Redo · Ctrl/Cmd+Shift+Z">↷ REDO</button>
@@ -233,11 +261,9 @@ export default function App(){
           <div className="group-list">{garden.objects.filter(o=>o.groupId===selectedGroup.id).map(o=><button key={o.id} className="group-entry" onClick={()=>select(o.id)}><Icon kind={o.kind} size={25}/>{o.name}</button>)}</div>
           <button className="btn btn-danger" onClick={()=>{if(window.confirm('Delete group? All its objects will be kept.')){applyGarden(removeGroup(garden,selectedGroup.id));setSelectedGroupId(null);}}}>DELETE GROUP · KEEP ITEMS</button>
         </>:<p className="empty-inspector">Tap an item on the map to inspect its shared record. Drag directly to move it.</p>}
-        <div className="section-heading list-heading">WORKSPACE DIMENSIONS</div>
-        <p className="panel-hint">Actual scale dimensions. Changing dimensions proportionally rescales positions and outlines.</p>
-        <div className="dimension-row"><label>WIDTH (M)<input type="number" min="10" max="500" value={dims.width} onChange={e=>setDims(d=>({...d,width:e.target.value}))}/></label><label>HEIGHT (M)<input type="number" min="10" max="500" value={dims.height} onChange={e=>setDims(d=>({...d,height:e.target.value}))}/></label></div>
-        <button className="btn btn-muted" onClick={changeDimensions}>APPLY SIZE</button>
-        <p className="panel-hint">Plot area (Scale): {polygonArea(garden.layout.boundary).toFixed(1)} m². Not a geospatial survey.</p>
+        <div className="section-heading list-heading">MAP DIMENSIONS</div>
+        <p className="panel-hint">Workspace: {garden.width} × {garden.height} m · Property outline: {polygonArea(garden.layout.boundary).toFixed(1)} m² (approximate). Map dimensions can now be changed above the map without stretching the garden.</p>
+        <button className="btn btn-muted" onClick={()=>{setMapSizeOpen(true);window.scrollTo({top:0,behavior:'smooth'});}}>OPEN MAP SIZE SETTINGS ↑</button>
       </aside>
       <aside className={`panel project-panel ${selectedPanel==='projects'?'mobile-active':''}`}>
         <div className="section-heading">07 / MY GARDENS</div>
@@ -251,6 +277,6 @@ export default function App(){
       </aside>
     </main>
     <nav className="mobile-nav" aria-label="Editor panels"><button className={selectedPanel==='tools'?'active':''} onClick={()=>setSelectedPanel('tools')}>♣ OBJECTS</button><button className={selectedPanel==='inspector'?'active':''} onClick={()=>setSelectedPanel('inspector')}>✎ DETAILS</button><button className={selectedPanel==='projects'?'active':''} onClick={()=>setSelectedPanel('projects')}>▧ GARDENS</button></nav>
-    <footer className="footer">GARDEN ATLAS · P007 LINKED MAPS + HISTORY <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
+    <footer className="footer">GARDEN ATLAS · P008 MAP SIZE CONTROLS <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
   </div><GardenReport garden={garden}/></>;
 }
