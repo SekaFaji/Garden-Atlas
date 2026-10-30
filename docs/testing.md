@@ -27,3 +27,7 @@ The model tests run without a browser; they verify schema compatibility, editing
 8. With **disposable data only**, test recovery prompts and backups after a deliberately malformed stored record.
 
 Record actual device, browser, test result and any data risks in each PR. Never publish user-specific gardens or backups.
+
+## P026 UI regression checks
+
+`tests/mapObjectGeometry.test.mjs` verifies rectangular footprint dimensions, zero-measurement drawing and hit-target scaling without requiring a browser. The browser smoke suite also searches the object catalog, checks category results, and selects an existing garden object to open the Inspector. These tests are complementary: neither replaces testing touch gestures on an Android device.

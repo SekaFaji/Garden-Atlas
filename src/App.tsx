@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { MapView, type Tool } from './MapView';
 import { EDITOR_TOOLS, activeToolDescription } from './editorVisuals';
-import { Sprite } from './Sprite';
+import { ObjectIcon } from './components/ObjectIcon';
+import { ObjectCatalog } from './components/ObjectCatalog';
 import { PlantAtlasPanel } from './PlantAtlasPanel';
 import { ObjectDimensions } from './ObjectDimensions';
 import { NameDraftInput } from './NameDraftInput';
 import { MetricDraftInput } from './MetricDraftInput';
-import { PRESETS, findPresets, defaultPreset, getPreset } from './catalog';
+import { PRESETS, defaultPreset, getPreset } from './catalog';
 import { GardenReport } from './Report';
 import { EditorHeader, type SaveStatus } from './components/EditorHeader';
 import { GardenProjectsPanel } from './components/GardenProjectsPanel';
@@ -30,8 +31,6 @@ import { openBrowserLibrary, createBrowserWriter, approveBrowserRecovery, export
 type LayerKey='objects'|'regions'|'lines'|'boundary';
 type LayerState=Record<LayerKey,boolean>;
 type Visibility=LayerState;
-const ICONS=['✥','✿','♣','▤','⌂','◆','≈','▣'];
-function Icon({kind,size=38,presetId}:{kind:Kind;size?:number;presetId?:string}){return <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true" className="item-art"><Sprite kind={kind} presetId={presetId}/></svg>;}
 export default function App(){
   const [library,setLibrary]=useState<ProjectLibrary>(loadLibrary);
   const libraryRef=useRef(library);libraryRef.current=library;
@@ -41,8 +40,6 @@ export default function App(){
   const [tool,setTool]=useState<Tool>('select');
   const [ground,setGround]=useState<Ground>('soil');
   const [presetId,setPresetId]=useState('tree-oak');
-  const [presetSearch,setPresetSearch]=useState('');
-  const [presetFilter,setPresetFilter]=useState<Kind|'all'>('all');
   const [lineWidth,setLineWidth]=useState(1.5);
   const [selectedId,setSelectedId]=useState<string|null>('TREE-001');
   const [selectedGroupId,setSelectedGroupId]=useState<string|null>(null);
@@ -392,25 +389,9 @@ export default function App(){
 
     <main className="workspace">
       <aside ref={toolsPanelRef} className={`panel library-panel ${selectedPanel==='tools'?'mobile-active':''}`}>
-        <div className="section-heading">01 / OBJECT LIBRARY</div>
-        <p className="panel-hint">Choose an item, then tap repeatedly to place. Switch to SELECT to drag it.</p>
-        <div className="palette-grid">{KINDS.map((k,i)=><button key={k.kind} className={`palette-item ${tool===k.kind?'active':''}`} onClick={()=>activatePreset(defaultPreset(k.kind).id)}><Icon kind={k.kind} presetId={defaultPreset(k.kind).id}/><span>{k.label}</span><small>{ICONS[i]}</small></button>)}</div>
-        <div className="section-heading list-heading">PIXEL-ART PRESETS <span className="pill">{PRESETS.length}</span></div>
-        <div className="preset-filters">
-          <input aria-label="Search garden objects" type="search" placeholder="Search trees, ponds, furniture…" value={presetSearch} onChange={e=>setPresetSearch(e.target.value)}/>
-          <select aria-label="Filter object category" value={presetFilter} onChange={e=>setPresetFilter(e.target.value as Kind|'all')}>
-            <option value="all">ALL CATEGORIES</option>{KINDS.map(k=><option key={k.kind} value={k.kind}>{k.label}</option>)}
-          </select>
-        </div>
-        <div className="preset-grid" aria-label="Garden object presets">
-          {findPresets(presetSearch,presetFilter).map(p=><button key={p.id} className={`preset-button ${tool===p.kind&&presetId===p.id?'active':''}`} aria-pressed={tool===p.kind&&presetId===p.id}
-            disabled={locked.objects} onClick={()=>activatePreset(p.id)}>
-            <Icon kind={p.kind} presetId={p.id} size={34}/><span>{p.name}</span><small>{p.diameterM} m starting size</small>
-          </button>)}
-          {findPresets(presetSearch,presetFilter).length===0&&<p className="panel-hint">No presets match this search.</p>}
-        </div>
+        <ObjectCatalog activeTool={tool} activePresetId={presetId} locked={locked.objects} onActivatePreset={activatePreset}/>
         <div className="section-heading list-heading">02 / GARDEN ITEMS <span className="pill">{garden.objects.length}</span></div>
-        <div className="item-list">{garden.objects.map(o=><div key={o.id} className="object-row"><button className={`object-entry ${selectedId===o.id?'active':''}`} onClick={()=>{if(!setNewTool('select'))return;select(o.id);showDetails();}}><Icon kind={o.kind} presetId={o.presetId} size={28}/><span>{o.name}<small>{o.id} {o.position?'●':'○'}</small></span></button><label title={`Select ${o.name} for grouping`} className="batch-check"><input type="checkbox" aria-label={`Batch-select ${o.name}`} checked={checkedIds.includes(o.id)} onChange={e=>setCheckedIds(ids=>e.target.checked?[...ids,o.id]:ids.filter(x=>x!==o.id))}/></label></div>)}</div>
+        <div className="item-list">{garden.objects.map(o=><div key={o.id} className="object-row"><button className={`object-entry ${selectedId===o.id?'active':''}`} onClick={()=>{if(!setNewTool('select'))return;select(o.id);showDetails();}}><ObjectIcon kind={o.kind} presetId={o.presetId} size={28}/><span>{o.name}<small>{o.id} {o.position?'●':'○'}</small></span></button><label title={`Select ${o.name} for grouping`} className="batch-check"><input type="checkbox" aria-label={`Batch-select ${o.name}`} checked={checkedIds.includes(o.id)} onChange={e=>setCheckedIds(ids=>e.target.checked?[...ids,o.id]:ids.filter(x=>x!==o.id))}/></label></div>)}</div>
         <div className="batch-editor" aria-label="Multi-object editor">
           <button className={`btn ${multiSelect?'btn-highlight':'btn-muted'}`} aria-pressed={multiSelect} onClick={()=>{if(!setNewTool('select'))return;setMultiSelect(v=>!v);setSelectedGroupId(null);setSelectedId(null);}}>◩ {multiSelect?'MULTI SELECT ON':'MULTI SELECT'}</button>
           <button className="btn btn-muted" onClick={()=>{if(!setNewTool('select'))return;setCheckedIds(garden.objects.filter(o=>o.position).map(o=>o.id));setMultiSelect(true);setSelectedId(null);}}>SELECT ALL PLACED</button>
@@ -505,7 +486,7 @@ export default function App(){
             }}>− REMOVE SELECTED POINT</button>
             <button onClick={()=>{setSelectedFeature(null);setSelectedVertex(null);}}>CLEAR SELECTION</button>
           </div>}
-          <div className="quick-palette" aria-label="Quick add garden objects">{KINDS.map(k=><button key={k.kind} className={tool===k.kind?'active':''} onClick={()=>{if(setNewTool(k.kind))setPresetId(defaultPreset(k.kind).id);}} title={`Place ${k.label}`}><Icon kind={k.kind} presetId={defaultPreset(k.kind).id} size={29}/><span>{k.label}</span></button>)}<button className={tool==='select'?'active':''} onClick={()=>setNewTool('select')} title="Select and drag">↖<span>Move</span></button></div>
+          <div className="quick-palette" aria-label="Quick add garden objects">{KINDS.map(k=><button key={k.kind} className={tool===k.kind?'active':''} onClick={()=>{if(setNewTool(k.kind))setPresetId(defaultPreset(k.kind).id);}} title={`Place ${k.label}`}><ObjectIcon kind={k.kind} presetId={defaultPreset(k.kind).id} size={29}/><span>{k.label}</span></button>)}<button className={tool==='select'?'active':''} onClick={()=>setNewTool('select')} title="Select and drag">↖<span>Move</span></button></div>
           <MapView garden={garden} mode={mode} tool={tool} onDraftCountChange={setDraftCount} terrain={ground} lineWidth={lineWidth} selectedId={selectedId} selectedGroupId={selectedGroupId} hidden={visibility} showReference={showReference} snapEnabled={snapEnabled} selectedIds={checkedIds} multiSelect={multiSelect} locked={locked} selectedFeature={selectedFeature} onSelectFeature={feature=>{setSelectedFeature(feature);setSelectedVertex(null);}} onSelectVertex={setSelectedVertex} onEditFeature={editExistingFeature} onResizeObject={resizeSelected}
             onPick={select} onTogglePick={togglePick} onMoveSelection={moveMultiple} onPlace={place} onMove={move} onBoundary={outline} onTerrain={addArea} onLine={addMapLine} onNotice={setNotice}/>
           {tool==='select'&&!multiSelect&&selected&&<div className="map-selection-bar" aria-label="Selected garden item"><span><strong>SELECTED</strong> · {selected.name}</span><button type="button" className="btn btn-highlight" onClick={showDetails}>EDIT DETAILS ↓</button></div>}
@@ -519,7 +500,7 @@ export default function App(){
         <div className="section-heading">06 / INSPECTOR</div>
         {selected?<>
           <div className="inspector-compact-header">
-            <div className="inspector-compact-art"><Icon kind={selected.kind} presetId={selected.presetId} size={56}/></div>
+            <div className="inspector-compact-art"><ObjectIcon kind={selected.kind} presetId={selected.presetId} size={56}/></div>
             <div className="inspector-compact-title"><strong>{selected.name}</strong><span>{selected.id} · {info(selected.kind).label}</span></div>
             <button type="button" className="inspector-map-link" onClick={()=>navigateTo('map')} aria-label="Return to garden map">⌖ MAP</button>
           </div>
@@ -569,7 +550,7 @@ export default function App(){
           <label className="field">GROUP NAME<NameDraftInput key={selectedGroup.id} label="Group name" value={selectedGroup.name} maxLength={120} onCommit={name=>{const current=libraryRef.current.projects.find(p=>p.id===libraryRef.current.activeId)!.garden;applyGarden({...current,groups:current.groups.map(g=>g.id===selectedGroup.id?{...g,name}:g)});}} onNotice={setNotice}/></label>
           <label className="field">GROUP NOTES<textarea maxLength={3000} value={selectedGroup.notes} onChange={e=>applyGarden({...garden,groups:garden.groups.map(g=>g.id===selectedGroup.id?{...g,notes:e.target.value}:g)},true,'group-notes:'+selectedGroup.id)}/></label>
           <p className="panel-hint">Drag any member on the map to move the entire group. Both views remain linked.</p>
-          <div className="group-list">{garden.objects.filter(o=>o.groupId===selectedGroup.id).map(o=><button key={o.id} className="group-entry" onClick={()=>select(o.id)}><Icon kind={o.kind} presetId={o.presetId} size={25}/>{o.name}</button>)}</div>
+          <div className="group-list">{garden.objects.filter(o=>o.groupId===selectedGroup.id).map(o=><button key={o.id} className="group-entry" onClick={()=>select(o.id)}><ObjectIcon kind={o.kind} presetId={o.presetId} size={25}/>{o.name}</button>)}</div>
           <button disabled={locked.objects} className="btn btn-danger" onClick={()=>{if(!locked.objects&&window.confirm('Delete group? All its objects will be kept.')){applyGarden(removeGroup(garden,selectedGroup.id));setSelectedGroupId(null);}}}>DELETE GROUP · KEEP ITEMS</button>
         </>:<p className="empty-inspector">Tap an item on the map or select one from OBJECTS to edit its shared record.</p>}
         <div className="section-heading list-heading">MAP DIMENSIONS</div>

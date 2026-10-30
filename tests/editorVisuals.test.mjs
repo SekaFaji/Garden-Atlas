@@ -22,9 +22,11 @@ test('P022 only focused object receives a map name, not all group/multi members'
 test('P022 selection and map status use the presentation helpers',async()=>{
  const app=await readFile(new URL('../src/App.tsx',import.meta.url),'utf8');
  const map=await readFile(new URL('../src/MapView.tsx',import.meta.url),'utf8');
+ const object=await readFile(new URL('../src/components/MapObject.tsx',import.meta.url),'utf8');
  assert.match(app,/EDITOR_TOOLS\.map/);
  assert.match(app,/activeToolDescription\(tool,multiSelect\)/);
  assert.match(app,/checkedIds\.length>0&&<div className="map-selection-bar map-multi-selection-bar"/);
  assert.match(map,/selectionStyle\(item\.id,item\.groupId,selectedId,selectedIds,selectedGroupId,multiSelect\)/);
- assert.match(map,/showObjectMapLabel\(marker,tool\)/);
+ assert.match(map,/<MapObject key=\{item\.id\}/);
+ assert.match(object,/showObjectMapLabel\(marker, tool\)/);
 });

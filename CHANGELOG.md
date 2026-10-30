@@ -1,3 +1,11 @@
+## P026 — Editor architecture & map-object rendering (2026-10-30)
+
+- Extracted the object catalog and its search/filter state from `App.tsx` without changing the existing palette, presets or placement semantics.
+- Centralized object preview sprites and moved the selected/dragged object SVG to an isolated renderer. Moved visual size calculations into a tested, side-effect-free helper.
+- Expanded regression tests to cover zoom-dependent hit targets, zero dimensions and rectangular footprints; added a Chromium catalog-and-inspector smoke test.
+- Updated the committed-tree release workflow to generate P026 source archives against the P025 baseline.
+- Garden version 6, IndexedDB, photo data, import/export, touch gestures, and public UI behavior remain unchanged.
+
 ## P025 — Public repository and browser-test foundations (2026-10-30)
 
 - Replaced long patch-history README with a navigable project overview. Retained all earlier README text in `docs/history.md`.

@@ -1,3 +1,14 @@
+# Garden Atlas — P026 Editor Component Boundaries (2026-10-30)
+
+- Refactored the existing object catalog into `src/components/ObjectCatalog.tsx`. Search and category filters now belong to the catalog instead of the top-level editor; object placement decisions remain in `App.tsx`.
+- Added `src/components/ObjectIcon.tsx` for a shared, single sprite preview across the library and inspector.
+- Extracted one placed object's SVG markup to `src/components/MapObject.tsx`; gestures, selection decisions, camera management, and garden mutations remain in `MapView.tsx`.
+- Moved visual footprint and touch-target sizing into pure `src/mapObjectGeometry.ts` with regression tests covering zero measurements, rectangular objects and illustration scaling.
+- Added Chromium coverage for object catalog filtering and existing inspector selection, alongside the prior boot/save/reload tests.
+- No garden schema, dimensions, storage, geometry or artwork changes. Manual Android testing remains important; GitHub workflows are the production build gate.
+
+---
+
 # Garden Atlas — P025 Open-Source Readiness (2026-10-30)
 
 - Public documentation, contributor guidance, security/privacy policy and release verification guide added. Full historical README preserved in `docs/history.md`.
