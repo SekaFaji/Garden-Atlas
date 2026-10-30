@@ -1,3 +1,18 @@
+# P024 — Editor Component Boundaries & Quality Gates (2026-10-30)
+
+This maintenance patch keeps all garden tools, pixel art, version-6 data and storage algorithms unchanged. It begins splitting the main editor into smaller UI responsibilities:
+
+- `src/components/EditorHeader.tsx` owns the app title, save status and top-level file controls.
+- `src/components/GardenProjectsPanel.tsx` owns garden selection and backup/recovery controls, while receiving **all** mutations as callbacks from `App.tsx`.
+- `src/components/MobileNavigation.tsx` owns mobile navigation markup; scrolling logic stays in `App.tsx`.
+- `src/utils/backup.ts` centralizes existing JSON download naming and browser download behavior.
+- `.editorconfig`, `.nvmrc` and `scripts/checkQuality.mjs` standardize basic file hygiene and the supported Node runtime. `npm run check:quality` is added to the deploy workflow and a new PR validation workflow checks source, tests and build.
+- Three architecture regression tests supplement the existing suite; source-based tests were adjusted to follow components after extraction.
+
+**Limitations:** CI must confirm the React/TypeScript build. No new npm dependencies were introduced; the repository still lacks a checked-in dependency lockfile and a full ESLint/Prettier configuration. Large `App.tsx` and `MapView.tsx` are not yet fully decomposed. Manual mobile and real-browser test coverage remains future work.
+
+---
+
 # P023 — Data Integrity & Cross-Tab Save Safety (2026-10-30)
 
 This is a safety/maintenance-only patch; it adds no garden features or art and does not change the version-6 garden schema.

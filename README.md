@@ -1,3 +1,17 @@
+## Development and code quality (P024)
+
+Garden Atlas is a local-first React + TypeScript app. The garden schema is **version 6**; P024 changes only source organization and quality checks, not saved gardens.
+
+- Use **Node.js 22.16.0** (see `.nvmrc`) and npm 10.
+- From a fresh clone: `npm install`, then `npm run check:quality`, `npm test`, and `npm run build`.
+- `npm run dev` starts Vite locally. The production build and GitHub Pages deployment use the repository workflow.
+- `src/App.tsx` retains editor state, garden mutations and recovery decisions; `src/components/` owns presentational headers, garden-list controls and mobile navigation. `src/utils/backup.ts` handles local JSON downloads.
+- Pull requests run automated hygiene, test and build checks in `.github/workflows/quality.yml`; `main` deploys through `.github/workflows/deploy.yml`.
+
+**Known gaps:** There is not yet a committed npm lockfile or ESLint/Prettier setup. Accordingly dependency resolution is not fully reproducible from a fresh install. Browser integration tests, fuller component extraction and release verification remain on the cleanup roadmap. Please keep local JSON backups before using development builds with real data.
+
+---
+
 ## P023 safety update
 
 Garden Atlas blocks editing when it detects invalid IndexedDB records or a conflicting save from another tab. Download a JSON backup before approving any recovery operation. Raw damaged records are preserved locally when recovery is approved. Browser storage is device-specific: keep independent backups.

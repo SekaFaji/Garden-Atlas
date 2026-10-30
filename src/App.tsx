@@ -7,9 +7,12 @@ import { PlantAtlasPanel } from './PlantAtlasPanel';
 import { ObjectDimensions } from './ObjectDimensions';
 import { NameDraftInput } from './NameDraftInput';
 import { MetricDraftInput } from './MetricDraftInput';
-import { OfflineTools } from './OfflineTools';
 import { PRESETS, findPresets, defaultPreset, getPreset } from './catalog';
 import { GardenReport } from './Report';
+import { EditorHeader, type SaveStatus } from './components/EditorHeader';
+import { GardenProjectsPanel } from './components/GardenProjectsPanel';
+import { MobileNavigation, type EditorPanel } from './components/MobileNavigation';
+import { downloadJson, gardenSlug, backupDate } from './utils/backup';
 import { imageToReference } from './reference';
 import { isSameEditBurst, type EditBurst } from './history';
 import { editFeaturePoint, resizeObjectAxes, type FeatureSelection, type EditAction } from './featureEdit';
@@ -29,12 +32,6 @@ type LayerState=Record<LayerKey,boolean>;
 type Visibility=LayerState;
 const ICONS=['✥','✿','♣','▤','⌂','◆','≈','▣'];
 function Icon({kind,size=38,presetId}:{kind:Kind;size?:number;presetId?:string}){return <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true" className="item-art"><Sprite kind={kind} presetId={presetId}/></svg>;}
-function download(filename:string,data:string){
-  const url=URL.createObjectURL(new Blob([data],{type:'application/json'}));
-  const a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);
-}
-const slug=(name:string)=>name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,50)||'garden';
-const date=()=>new Date().toISOString().slice(0,10);
 export default function App(){
   const [library,setLibrary]=useState<ProjectLibrary>(loadLibrary);
   const libraryRef=useRef(library);libraryRef.current=library;
@@ -49,7 +46,7 @@ export default function App(){
   const [lineWidth,setLineWidth]=useState(1.5);
   const [selectedId,setSelectedId]=useState<string|null>('TREE-001');
   const [selectedGroupId,setSelectedGroupId]=useState<string|null>(null);
-  const [selectedPanel,setSelectedPanel]=useState<'map'|'tools'|'inspector'|'projects'>('map');
+  const [selectedPanel,setSelectedPanel]=useState<EditorPanel>('map');
   const [visibility,setVisibility]=useState<Visibility>({objects:false,regions:false,lines:false,boundary:false});
   const [locked,setLocked]=useState<LayerState>({objects:false,regions:false,lines:false,boundary:false});
   const [selectedFeature,setSelectedFeature]=useState<FeatureSelection|null>(null);
@@ -68,7 +65,7 @@ export default function App(){
   const mapFrameRef=useRef<HTMLDivElement>(null);
   const editorRef=useRef<HTMLElement>(null);
   /** Mobile tab navigation must scroll to the *visible* section after React renders it. */
-  const navigateTo=(section:'map'|'tools'|'inspector'|'projects')=>{
+  const navigateTo=(section:EditorPanel)=>{
     const mobile=window.matchMedia('(max-width:760px)').matches;
     if(mobile){
       const focused=document.activeElement;
@@ -86,7 +83,7 @@ export default function App(){
   const [mapSizeOpen,setMapSizeOpen]=useState(false);
   const [resizeMode,setResizeMode]=useState<'preserve'|'scale'>('preserve');
   const [notice,setNotice]=useState('Linked maps: edits to either view update both · pinch to zoom.');
-  const [saveStatus,setSaveStatus]=useState<'loading'|'saving'|'saved'|'failed'|'conflict'|'blocked'>('loading');
+  const [saveStatus,setSaveStatus]=useState<SaveStatus>('loading');
   const saved=saveStatus==='saved';
   const [hydrated,setHydrated]=useState(false);
   const [backend,setBackend]=useState<StorageBackend>('indexeddb');
@@ -161,7 +158,7 @@ export default function App(){
   };
   const downloadRawData=async()=>{
     const raw=await exportStoredRecords();
-    if(raw)download(`garden-atlas-stored-records-${date()}.json`,raw);
+    if(raw)downloadJson(`garden-atlas-stored-records-${backupDate()}.json`,raw);
     else setNotice('Could not read raw records. No stored records were altered.');
   };
   // A queued save may still be in flight when the browser is closed or reloaded.
@@ -375,7 +372,7 @@ export default function App(){
     <p role="alert">{storageLocked?'Stored garden data could not be validated. The editor is paused to protect the original record.':'Another open tab changed the saved garden library. This tab has stopped saving to prevent accidental overwrites.'}</p>
     <p>{storageLocked?'The garden shown in the backup may be a recovery snapshot or an older local copy. Download both backups before approving replacement.':'Your current unsaved edits remain in this tab. Export them before reloading to pick up the other tab’s changes.'}</p>
     <div style={{display:'flex',gap:'12px',flexWrap:'wrap'}}>
-      <button className="btn btn-highlight" onClick={()=>download(`garden-atlas-safety-backup-${date()}.json`,JSON.stringify(library,null,2))}>↓ DOWNLOAD VISIBLE GARDEN BACKUP</button>
+      <button className="btn btn-highlight" onClick={()=>downloadJson(`garden-atlas-safety-backup-${backupDate()}.json`,JSON.stringify(library,null,2))}>↓ DOWNLOAD VISIBLE GARDEN BACKUP</button>
       {storageLocked&&<button className="btn btn-muted" onClick={()=>{void downloadRawData();}}>↓ DOWNLOAD RAW STORED RECORDS</button>}
       {storageLocked&&<button className="btn btn-danger" onClick={()=>{void restoreDamagedData();}}>APPROVE RECOVERY / REPLACEMENT</button>}
       {saveStatus==='conflict'&&<button className="btn btn-muted" onClick={()=>window.location.reload()}>RELOAD LATEST SAVED GARDEN</button>}
@@ -384,15 +381,15 @@ export default function App(){
     <p>The editor has not automatically overwritten the data that triggered this warning.</p>
   </main>;
   return <><div className="app-shell">
-    <header className="topbar">
-      <div className="brand"><span className="brand-icon">✿</span><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL LANDSCAPE EDITOR · P021</div></div></div>
-      <div className="top-actions"><span role="status" aria-live="polite" className={`save-status ${saveStatus==='failed'?'danger':''}`}>● {saveStatus==='saved'?(backend==='indexeddb'?'INDEXEDDB SAVED':'LOCAL SAVE'):saveStatus==='saving'?'SAVING…':saveStatus==='failed'?'SAVE FAILED':'LOADING…'}</span>
-        <button className="btn btn-muted" onClick={()=>importFile.current?.click()}>IMPORT</button>
-        <button className="btn btn-highlight" onClick={()=>download(`garden-atlas-${slug(garden.name)}-${date()}.json`,JSON.stringify(garden,null,2))}>↓ BACKUP</button><button className="btn btn-muted" onClick={()=>window.print()} title="Open your browser print dialog to save the garden book as a PDF">☷ PDF / PRINT</button>
+    <EditorHeader status={saveStatus} backend={backend}
+      onImport={() => importFile.current?.click()}
+      onBackup={() => downloadJson(`garden-atlas-${gardenSlug(garden.name)}-${backupDate()}.json`, JSON.stringify(garden, null, 2))}
+      onPrint={() => window.print()}
+      fileInputs={<>
         <input hidden ref={importFile} type="file" accept=".json,application/json" onChange={e=>onImport(e,false)}/>
         <input hidden ref={importAllFile} type="file" accept=".json,application/json" onChange={e=>onImport(e,true)}/>
-      </div>
-    </header>
+      </>}/>
+
     <main className="workspace">
       <aside ref={toolsPanelRef} className={`panel library-panel ${selectedPanel==='tools'?'mobile-active':''}`}>
         <div className="section-heading">01 / OBJECT LIBRARY</div>
@@ -450,7 +447,7 @@ export default function App(){
           <p>Your previous Scale and Illustration maps may differ. Both originals have been archived inside this garden and will be included in your JSON backups. Choose which old layout should become the single editable layout.</p>
           <div className="migration-actions"><button className={garden.linkMigration.source==='scale'?'active':''} onClick={()=>applyGarden(previewLinkedSource(garden,'scale'),false)}>PREVIEW SCALE</button><button className={garden.linkMigration.source==='illustration'?'active':''} onClick={()=>applyGarden(previewLinkedSource(garden,'illustration'),false)}>PREVIEW ILLUSTRATION</button></div>
           <button className="btn btn-highlight" onClick={()=>{applyGarden(chooseLinkedSource(garden,garden.linkMigration!.source),false);setPast([]);setFuture([]);setNotice('Both maps are now linked. The original layouts remain in your JSON backups.');}}>USE {garden.linkMigration.source.toUpperCase()} AS SHARED MAP</button>
-          <button className="btn btn-muted" onClick={()=>download(`garden-atlas-pre-link-${slug(garden.name)}.json`,JSON.stringify(garden.linkMigration!.original,null,2))}>↓ DOWNLOAD ORIGINAL TWO-VIEW BACKUP</button>
+          <button className="btn btn-muted" onClick={()=>downloadJson(`garden-atlas-pre-link-${gardenSlug(garden.name)}.json`,JSON.stringify(garden.linkMigration!.original,null,2))}>↓ DOWNLOAD ORIGINAL TWO-VIEW BACKUP</button>
           <p className="migration-note">Choose a source before editing. Your original P006 browser storage remains recoverable using the previous local recovery snapshot or a backup.</p>
         </section>}
         <div ref={mapFrameRef} className={`map-frame ${garden.linkMigration&&!garden.linkMigration.confirmed?'migration-locked':''}`}><div className="map-toolbar"><span>● {mode==='scale'?'MEASURED MAP':'PIXEL MAP'} · {garden.width} × {garden.height} m</span><button type="button" className="map-size-toggle" aria-expanded={mapSizeOpen} aria-controls="map-size-panel" onClick={()=>setMapSizeOpen(o=>!o)}>▣ MAP SIZE {mapSizeOpen?'▴':'▾'}</button></div>
@@ -579,23 +576,17 @@ export default function App(){
         <p className="panel-hint">Workspace: {garden.width} × {garden.height} m · Property outline: {polygonArea(garden.layout.boundary).toFixed(1)} m² (approximate).</p>
         <button className="btn btn-muted inspector-map-size-link" onClick={()=>{setMapSizeOpen(true);navigateTo('map');window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>mapFrameRef.current?.scrollIntoView({behavior:'auto',block:'start'})));}}>OPEN MAP SIZE SETTINGS ↑</button>
       </aside>
-      <aside ref={projectsPanelRef} className={`panel project-panel ${selectedPanel==='projects'?'mobile-active':''}`}>
-        <div className="section-heading">07 / MY GARDENS</div>
-        <p className="panel-hint">Your projects are stored in this browser only. Download regular backups.</p>
-        <div className="project-list">{library.projects.map(p=><button key={p.id} className={`project-entry ${p.id===library.activeId?'active':''}`} onClick={()=>{replaceLibrary({...library,activeId:p.id});setNotice(`Opened ${p.garden.name}.`);}}><span>▧ {p.garden.name}</span><small>{p.garden.objects.length} items · {p.garden.width}×{p.garden.height} m</small></button>)}</div>
-        <div className="project-actions"><button className="btn btn-highlight" onClick={()=>newProject(false)}>+ EMPTY GARDEN</button><button className="btn btn-muted" onClick={()=>newProject(true)}>+ DEMO COPY</button><button className="btn btn-danger" onClick={removeProject}>DELETE CURRENT GARDEN</button></div>
-        <div className="section-heading list-heading">OFFLINE APP & INSTALLATION</div>
-        <OfflineTools saved={saved}/>
-        <div className="section-heading list-heading">BACKUP & RECOVERY</div>
-        {garden.linkMigration&&<button className="btn btn-muted" onClick={()=>download(`garden-atlas-original-two-views-${slug(garden.name)}.json`,JSON.stringify(garden.linkMigration!.original,null,2))}>↓ EXPORT ORIGINAL PRE-LINK MAPS</button>}
-        <div className="project-actions"><button className="btn btn-muted" onClick={()=>download(`garden-atlas-all-projects-${date()}.json`,JSON.stringify(library,null,2))}>↓ BACKUP ALL GARDENS</button><button className="btn btn-muted" onClick={()=>importAllFile.current?.click()}>↑ RESTORE ALL GARDENS</button><button className="btn btn-muted" onClick={recover}>↶ LOCAL RECOVERY COPY</button></div>
-        <p className="panel-hint">Primary storage: {backend==='indexeddb'?'IndexedDB (larger local storage)':'limited localStorage fallback'}. {storageInfo}. Clearing browser site data can still erase it; no cloud sync. JSON backups also include compressed photos.</p>
-        <button className="btn btn-muted" onClick={()=>{void requestPersistentStorage().then(ok=>setNotice(ok?'Browser granted persistent storage for this site. Keep external backups too.':'Persistent storage was unavailable or declined. JSON backups are recommended.'));}}>PROTECT LOCAL STORAGE</button>
-      </aside>
+      <GardenProjectsPanel panelRef={projectsPanelRef} active={selectedPanel==='projects'} library={library} garden={garden} saved={saved}
+        backend={backend} storageInfo={storageInfo}
+        onOpenProject={id=>{const project=library.projects.find(p=>p.id===id);if(!project)return;replaceLibrary({...library,activeId:id});setNotice(`Opened ${project.garden.name}.`);}}
+        onNewProject={newProject} onRemoveProject={removeProject}
+        onExportOriginal={()=>{if(garden.linkMigration)downloadJson(`garden-atlas-original-two-views-${gardenSlug(garden.name)}.json`,JSON.stringify(garden.linkMigration.original,null,2));}}
+        onBackupAll={()=>downloadJson(`garden-atlas-all-projects-${backupDate()}.json`,JSON.stringify(library,null,2))}
+        onRestoreAll={()=>importAllFile.current?.click()} onRecover={()=>{void recover();}}
+        onProtectStorage={()=>{void requestPersistentStorage().then(ok=>setNotice(ok?'Browser granted persistent storage for this site. Keep external backups too.':'Persistent storage was unavailable or declined. JSON backups are recommended.'));}}/>
+
     </main>
-    <nav className="mobile-nav" aria-label="Mobile garden navigation">
-      {([{id:'map',label:'⌖ MAP'},{id:'tools',label:'♣ OBJECTS'},{id:'inspector',label:'✎ DETAILS'},{id:'projects',label:'▧ GARDENS'}] as {id:'map'|'tools'|'inspector'|'projects';label:string}[]).map(item=><button key={item.id} type="button" className={selectedPanel===item.id?'active':''} aria-current={selectedPanel===item.id?'page':undefined} onClick={()=>navigateTo(item.id)}>{item.label}</button>)}
-    </nav>
-    <footer className="footer">GARDEN ATLAS · P021 EDITING & NAVIGATION POLISH <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
+    <MobileNavigation selected={selectedPanel} onNavigate={navigateTo}/>
+    <footer className="footer">GARDEN ATLAS · LOCAL-FIRST GARDEN EDITOR <span>OFFLINE LOCAL PROJECTS · NO ACCOUNTS</span></footer>
   </div><GardenReport garden={garden}/></>;
 }

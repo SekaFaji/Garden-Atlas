@@ -128,7 +128,9 @@ test('P015 editor uses IndexedDB hydration and its queued writes instead of lega
  assert.doesNotMatch(app,/setSaved\(saveLibrary\(library\)\)/);
  assert.match(app,/if\(!hydrated\)return/);
  assert.match(app,/SAVE FAILED/);
- assert.match(app,/OfflineTools saved=\{saved\}/);
+ const projects=await readFile(new URL('../src/components/GardenProjectsPanel.tsx',import.meta.url),'utf8');
+ assert.match(app,/<GardenProjectsPanel[\s\S]*saved=\{saved\}/);
+ assert.match(projects,/<OfflineTools saved=\{saved\}/);
 });
 
 
