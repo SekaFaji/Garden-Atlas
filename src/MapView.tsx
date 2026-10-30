@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react';
 import { Sprite } from './Sprite';
+import { selectionStyle, showObjectMapLabel } from './editorVisuals';
 import { closestEdge, formatArea } from './geometry';
 import { deliberateTap, intentionalDrag, type ScreenPoint } from './touchIntent';
 import { isDrawingTool, minimumDrawingPoints, drawingHint, drawingToolName } from './drawingUX';
@@ -308,7 +309,8 @@ export function MapView({garden,mode,tool,onDraftCountChange,selectedId,selected
       {!hidden.boundary&&<polygon points={shape(outline)} fill="none" stroke="#fff3c1" strokeWidth={Math.max(1.5,3/camera.z)} strokeDasharray={mode==='scale'?'10 6':undefined} pointerEvents="none" />}
       {!hidden.objects&&garden.objects.map(item=>{
         const original=item.position;if(!original)return null;
-        const active=selectedId===item.id||selectedIds.includes(item.id)||Boolean(selectedGroupId&&selectedGroupId===item.groupId);
+        const marker=selectionStyle(item.id,item.groupId,selectedId,selectedIds,selectedGroupId,multiSelect);
+        const active=marker!==null;
         const dragged=Boolean(preview&&(item.id===preview.id||groupIds.includes(item.id)));
         const offset=dragged?{x:dx,y:dy}:{x:0,y:0};
         const p={x:original.x+offset.x,y:original.y+offset.y};
@@ -319,14 +321,14 @@ export function MapView({garden,mode,tool,onDraftCountChange,selectedId,selected
         const hitWidth=Math.max(width,48/Math.max(.06,camera.z));
         const hitLength=Math.max(length,48/Math.max(.06,camera.z));
         return <g data-object={item.id} key={item.id} className="map-object" transform={`translate(${p.x*ppu} ${p.y*ppu})`}>
-          {active&&<rect x={-width/2-7} y={-length/2-7} width={width+14} height={length+14} fill="none" stroke="#fff3ac" strokeWidth="3" strokeDasharray="7 4" pointerEvents="none" />}
+          {active&&<rect data-selection={marker??undefined} x={-width/2-7} y={-length/2-7} width={width+14} height={length+14} fill="none" stroke={marker==='multiple'?'#8bd8f0':marker==='group'?'#dbefac':'#fff3ac'} strokeWidth={marker==='focused'?'3.5':'3'} strokeDasharray={marker==='group'?'5 5':marker==='multiple'?'3 3':'7 4'} pointerEvents="none" />}
           <svg x={-width/2} y={-length/2} width={width} height={length} viewBox="0 0 64 64" pointerEvents="none"><g transform={`rotate(${item.rotation??0} 32 32)`}><Sprite kind={item.kind} presetId={item.presetId}/></g></svg>
           <rect x={-hitWidth/2} y={-hitLength/2} width={hitWidth} height={hitLength} fill="transparent" />
           {tool==='select'&&!multiSelect&&selectedId===item.id&&!locked.objects&&<g>
             <line x1="0" y1="0" x2={width/2+12/camera.z} y2={length/2+12/camera.z} stroke="#fff3ac" strokeWidth={2/camera.z} pointerEvents="none"/>
             <rect data-resize={item.id} aria-label="Resize selected object width and length" x={width/2-10/camera.z} y={length/2-10/camera.z} width={Math.max(22,36/camera.z)} height={Math.max(22,36/camera.z)} fill="#f4df8e" stroke="#2a5442" strokeWidth={3/camera.z}/>
           </g>}
-          {active&&<g pointerEvents="none"><rect x={-55} y={length/2+6} width="110" height="20" fill="#1f382f" stroke="#f6dfa4" strokeWidth="1.5"/><text textAnchor="middle" x="0" y={length/2+20} fontSize="11" fontFamily="monospace" fill="#fff7d4">{item.name.slice(0,15)}</text></g>}
+          {showObjectMapLabel(marker,tool)&&<g pointerEvents="none"><rect x={-55} y={length/2+6} width="110" height="20" fill="#1f382f" stroke="#f6dfa4" strokeWidth="1.5"/><text textAnchor="middle" x="0" y={length/2+20} fontSize="11" fontFamily="monospace" fill="#fff7d4">{item.name.slice(0,15)}</text></g>}
         </g>;
       })}
       {tool==='outline-edit'&&outline.map((p,i)=>{

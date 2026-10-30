@@ -1,3 +1,12 @@
+## P022 — Selection visibility & active-tool clarity (2026-10-30)
+
+- Presentation-only polish: differentiate focused, multi-selected and group-highlighted objects with clearer outlines. Only the focused selected object shows its inline map name, preventing piles of overlapping labels in large groups.
+- Reuse the existing under-map hint row for a compact active-tool label and concise guidance; stronger pressed state and accessible descriptive labels for all nine original map tools.
+- In multi-select mode the existing selected-object strip shows a count and a shortcut back to the existing object list for bulk actions.
+- Refined active quick-palette and touch layouts without increasing toolbar button size or moving map gestures.
+- No model/schema, storage, PWA, paths, photos, selection semantics or imported-garden changes. Version-6 saved gardens and backups remain compatible.
+- Added regression tests for tool completeness, selection focus and map UI wiring. Phone visual and touch QA still required.
+
 ## P021 — Clearer drawing controls, safer tool switching
 
 When using **PATH**, **FENCE**, **BORDER** or **TERRAIN**, the map displays the active drawing mode and how many vertices are needed *before* the first tap. Tap the map to add points, then choose **FINISH**. **POINT** removes the most recent draft point; **CLEAR** discards the draft. Outside text fields, Backspace removes one draft point and Escape clears the drawing.

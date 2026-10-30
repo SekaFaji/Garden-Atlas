@@ -1,3 +1,12 @@
+## P022 — Selection visibility & active-tool clarity (2026-10-30)
+
+- Presentation-only polish: differentiate focused, multi-selected and group-highlighted objects with clearer outlines. Only the focused selected object shows its inline map name, preventing piles of overlapping labels in large groups.
+- Reuse the existing under-map hint row for a compact active-tool label and concise guidance; stronger pressed state and accessible descriptive labels for all nine original map tools.
+- In multi-select mode the existing selected-object strip shows a count and a shortcut back to the existing object list for bulk actions.
+- Refined active quick-palette and touch layouts without increasing toolbar button size or moving map gestures.
+- No model/schema, storage, PWA, paths, photos, selection semantics or imported-garden changes. Version-6 saved gardens and backups remain compatible.
+- Added regression tests for tool completeness, selection focus and map UI wiring. Phone visual and touch QA still required.
+
 # Garden Atlas — P021 Map Controls & Draft Safety (2026-10-29)
 
 - Latest patch: **P021**, focused on drawing mode clarity and avoiding accidental loss of in-progress vertices.
