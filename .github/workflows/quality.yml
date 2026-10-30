@@ -19,7 +19,7 @@ jobs:
         with:
           node-version-file: .nvmrc
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Check repository structure
         run: npm run check:quality
       - name: Lint TypeScript source

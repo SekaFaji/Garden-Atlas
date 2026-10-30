@@ -28,12 +28,7 @@ jobs:
         with:
           node-version-file: .nvmrc
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
-      - name: P025 lockfile bootstrap (remove after lock is committed)
-        run: |
-          echo GARDEN_ATLAS_LOCK_BEGIN
-          cat package-lock.json
-          echo GARDEN_ATLAS_LOCK_END
+        run: npm ci --no-audit --no-fund
       - name: Check repository structure
         run: npm run check:quality
       - name: Lint TypeScript source

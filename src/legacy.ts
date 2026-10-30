@@ -159,7 +159,7 @@ export function movePlaced(g:Garden,id:string,mode:Mode,requested:Point,together
   return {...g,objects:g.objects.map(o=>{if(!ids.has(o.id))return o;const p=o.placements[mode]!;return {...o,placements:{...o.placements,[mode]:{x:p.x+dx,y:p.y+dy}}};})};
 }
 export function nextGroupId(g:Garden):string {let n=1;const existing=new Set(g.groups.map(x=>x.id));while(existing.has('GROUP-'+String(n).padStart(3,'0')))n++;return 'GROUP-'+String(n).padStart(3,'0');}
-export function nextObjectId(g:Garden,kind:Kind):string {let n=1,prefix=kind.toUpperCase()+'-';const ids=new Set(g.objects.map(o=>o.id));while(ids.has(prefix+String(n).padStart(3,'0')))n++;return prefix+String(n).padStart(3,'0');}
+export function nextObjectId(g:Garden,kind:Kind):string {let n=1;const prefix=kind.toUpperCase()+'-';const ids=new Set(g.objects.map(o=>o.id));while(ids.has(prefix+String(n).padStart(3,'0')))n++;return prefix+String(n).padStart(3,'0');}
 export function nextLineId(g:Garden,mode:Mode):string {let n=1;const ids=new Set(g.layouts[mode].lines.map(o=>o.id));while(ids.has('LINE-'+String(n).padStart(3,'0')))n++;return 'LINE-'+String(n).padStart(3,'0');}
 export function addLine(g:Garden,mode:Mode,points:Point[],kind:LineKind,widthM:number):Garden|null {
   if(g.layouts[mode].lines.length>=200||points.length<2||points.length>100||!points.every(p=>isPoint(p,g))||!points.some((p,i)=>i&&Math.hypot(p.x-points[0].x,p.y-points[0].y)>.1)||!Number.isFinite(widthM)||widthM<.2||widthM>12)return null;
