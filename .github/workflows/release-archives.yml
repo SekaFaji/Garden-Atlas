@@ -1,0 +1,31 @@
+name: Verify release source archives
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout history for complete patch comparison
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Create release source ZIPs from committed trees
+        run: node scripts/createReleaseArchives.mjs 77f5bf65f38d59a3a69b894dd58c978249e9df7f P025 release
+      - name: Upload verified source archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: garden-atlas-p025-source
+          path: release/*.zip
+          if-no-files-found: error
+          retention-days: 30

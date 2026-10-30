@@ -16,3 +16,7 @@ Every release must reference a **specific Git commit** and must have passing aut
 - Keep lockfiles and CI configuration inside the source archives. Never include `node_modules/`, private backups, local environment secrets or built `dist/` unless specifically producing a separate runtime artifact.
 
 The static production build is a **separate artifact** uploaded and deployed by GitHub Actions. A source ZIP isn't the installed PWA.
+
+## Automated source archives
+
+`.github/workflows/release-archives.yml` packages both full and changed-file archives using `git archive` against committed trees. Update its `base` commit and `P###` label for each new patch; the archive generation fails if the comparison includes deleted files, rather than silently omitting deletions. GitHub Actions artifacts expire, so permanent downloads should link to immutable commit archives.
