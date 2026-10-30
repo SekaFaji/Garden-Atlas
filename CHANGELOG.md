@@ -1,3 +1,17 @@
+# P023 — Data Integrity & Cross-Tab Save Safety (2026-10-30)
+
+This is a safety/maintenance-only patch; it adds no garden features or art and does not change the version-6 garden schema.
+
+- IndexedDB now distinguishes missing saved data from malformed existing records. Damaged records block editing and cannot be replaced by automatic startup saves.
+- The blocked screen allows exporting the visible fallback/recovery library and raw saved records, and requires explicit confirmation to repair. Corrupt rows are preserved under unique `damaged-*` keys before replacement.
+- Each editor holds an IndexedDB revision. Every write checks the current revision inside the same read/write transaction. A competing tab causes a save conflict instead of a silent overwrite.
+- Conflicted tabs retain their in-memory library for JSON export and must reload to resume editing. The localStorage fallback has best-effort cross-tab checking, not an atomic guarantee.
+- First-run migration, legacy data and valid recovery snapshots remain supported, and old localStorage keys are not deleted.
+- Added regression tests for corrupted storage, explicit recovery, overlapping editors, stale revisions and recovery conflict refusal.
+- On-device recovery and multi-tab testing remains necessary; local automated Node tests are not a browser E2E substitute.
+
+---
+
 ## P022 — Selection visibility & active-tool clarity (2026-10-30)
 
 - Presentation-only polish: differentiate focused, multi-selected and group-highlighted objects with clearer outlines. Only the focused selected object shows its inline map name, preventing piles of overlapping labels in large groups.

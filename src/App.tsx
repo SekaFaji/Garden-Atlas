@@ -22,7 +22,7 @@ import {
   addProject, deleteProject, importGarden, importLibrary, loadLibrary,
   updateActiveGarden, type ProjectLibrary
 } from './storage';
-import { openBrowserLibrary, queueBrowserSave, recoverBrowserLibrary, estimateBrowserSpace, requestPersistentStorage, type StorageBackend } from './browserStorage';
+import { openBrowserLibrary, createBrowserWriter, approveBrowserRecovery, exportStoredRecords, recoverBrowserLibrary, estimateBrowserSpace, requestPersistentStorage, type StorageBackend } from './browserStorage';
 
 type LayerKey='objects'|'regions'|'lines'|'boundary';
 type LayerState=Record<LayerKey,boolean>;
@@ -86,10 +86,14 @@ export default function App(){
   const [mapSizeOpen,setMapSizeOpen]=useState(false);
   const [resizeMode,setResizeMode]=useState<'preserve'|'scale'>('preserve');
   const [notice,setNotice]=useState('Linked maps: edits to either view update both · pinch to zoom.');
-  const [saveStatus,setSaveStatus]=useState<'loading'|'saving'|'saved'|'failed'>('loading');
+  const [saveStatus,setSaveStatus]=useState<'loading'|'saving'|'saved'|'failed'|'conflict'|'blocked'>('loading');
   const saved=saveStatus==='saved';
   const [hydrated,setHydrated]=useState(false);
   const [backend,setBackend]=useState<StorageBackend>('indexeddb');
+  const [storageLocked,setStorageLocked]=useState(false);
+  const writerRef=useRef<ReturnType<typeof createBrowserWriter>|null>(null);
+  const skipFirstSave=useRef(true);
+  const migrationPending=useRef(false);
   const [storageInfo,setStorageInfo]=useState('Checking storage…');
   const [past,setPast]=useState<Garden[]>([]);
   const historyGroup=useRef<EditBurst|null>(null);
@@ -102,20 +106,38 @@ export default function App(){
     void openBrowserLibrary().then(result=>{
       if(cancelled)return;
       libraryRef.current=result.library;setLibrary(result.library);setBackend(result.backend);
-      setHydrated(true);setSaveStatus('saving');
+      writerRef.current=createBrowserWriter(result.backend,result.revision);
+      migrationPending.current=result.needsMigration;
+      skipFirstSave.current=true;
+      setStorageLocked(result.locked);
+      setHydrated(true);
+      setSaveStatus(result.locked?'blocked':result.needsMigration?'saving':'saved');
       if(result.warning)setNotice(result.warning);
       void estimateBrowserSpace().then(v=>{if(!cancelled)setStorageInfo(v);});
+    }).catch(()=>{
+      if(!cancelled){setSaveStatus('failed');setNotice('Cannot load local garden storage. No changes have been saved.');}
     });
     return ()=>{cancelled=true;};
   },[]);
   useEffect(()=>{
-    if(!hydrated)return;
+    if(!hydrated||storageLocked||saveStatus==='conflict')return;
+    if(skipFirstSave.current){
+      skipFirstSave.current=false;
+      if(!migrationPending.current){setSaveStatus('saved');return;}
+    }
+    migrationPending.current=false;
     let active=true;
     setSaveStatus('saving');
-    void queueBrowserSave(library,backend).then(ok=>{
+    void writerRef.current?.save(library).then(result=>{
       if(!active)return;
-      setSaveStatus(ok?'saved':'failed');
-      if(!ok)setNotice('SAVE FAILED: Your latest changes are not safely stored. Export a JSON backup now.');
+      if(result.status==='saved')setSaveStatus('saved');
+      else if(result.status==='conflict'){
+        setSaveStatus('conflict');
+        setNotice('ANOTHER TAB SAVED THIS LIBRARY: This tab has been paused to prevent overwriting newer changes. Export your work before reloading.');
+      }else{
+        setSaveStatus('failed');
+        setNotice('SAVE FAILED: Your latest changes are not safely stored. Export a JSON backup now.');
+      }
       void estimateBrowserSpace().then(v=>{if(active)setStorageInfo(v);});
     }).catch(()=>{
       if(!active)return;
@@ -123,7 +145,25 @@ export default function App(){
       setNotice('SAVE FAILED: Browser storage is unavailable. Export a JSON backup now.');
     });
     return ()=>{active=false;};
-  },[library,hydrated,backend]);
+  },[library,hydrated,backend,storageLocked]);
+  const restoreDamagedData=async()=>{
+    if(!window.confirm('Replace the damaged saved record with the displayed recovery or local fallback? The original damaged records will be preserved separately in IndexedDB. Download the raw record and a JSON backup first.'))return;
+    const result=await approveBrowserRecovery(libraryRef.current);
+    if(result.status!=='saved'){
+      setNotice(result.status==='conflict'?'Saved data changed in another tab. Reload before attempting recovery.':'Recovery could not be saved. Original data was not replaced.');return;
+    }
+    writerRef.current=createBrowserWriter('indexeddb',result.revision);
+    skipFirstSave.current=true;
+    migrationPending.current=false;
+    setStorageLocked(false);
+    setSaveStatus('saved');
+    setNotice('Recovery approved and saved. The previous damaged record is preserved in IndexedDB. Download a new JSON backup.');
+  };
+  const downloadRawData=async()=>{
+    const raw=await exportStoredRecords();
+    if(raw)download(`garden-atlas-stored-records-${date()}.json`,raw);
+    else setNotice('Could not read raw records. No stored records were altered.');
+  };
   // A queued save may still be in flight when the browser is closed or reloaded.
   useEffect(()=>{
     if(saveStatus==='saved'||saveStatus==='loading')return;
@@ -329,7 +369,20 @@ export default function App(){
       window.requestAnimationFrame(()=>mapFrameRef.current?.scrollIntoView({behavior:'auto',block:'start'}));
     }
   };
-  if(!hydrated)return <div className="app-shell"><div className="status-message" role="status">Loading saved gardens…</div></div>;
+  if(!hydrated)return <div className="app-shell"><div className="status-message" role="status">Loading saved gardens… {saveStatus==='failed'?'Storage is unavailable; reload or check browser permissions.':''}</div></div>;
+  if(storageLocked||saveStatus==='conflict')return <main className="app-shell" style={{padding:'24px',maxWidth:'700px',margin:'0 auto'}}>
+    <h1>Garden Atlas · Save protection</h1>
+    <p role="alert">{storageLocked?'Stored garden data could not be validated. The editor is paused to protect the original record.':'Another open tab changed the saved garden library. This tab has stopped saving to prevent accidental overwrites.'}</p>
+    <p>{storageLocked?'The garden shown in the backup may be a recovery snapshot or an older local copy. Download both backups before approving replacement.':'Your current unsaved edits remain in this tab. Export them before reloading to pick up the other tab’s changes.'}</p>
+    <div style={{display:'flex',gap:'12px',flexWrap:'wrap'}}>
+      <button className="btn btn-highlight" onClick={()=>download(`garden-atlas-safety-backup-${date()}.json`,JSON.stringify(library,null,2))}>↓ DOWNLOAD VISIBLE GARDEN BACKUP</button>
+      {storageLocked&&<button className="btn btn-muted" onClick={()=>{void downloadRawData();}}>↓ DOWNLOAD RAW STORED RECORDS</button>}
+      {storageLocked&&<button className="btn btn-danger" onClick={()=>{void restoreDamagedData();}}>APPROVE RECOVERY / REPLACEMENT</button>}
+      {saveStatus==='conflict'&&<button className="btn btn-muted" onClick={()=>window.location.reload()}>RELOAD LATEST SAVED GARDEN</button>}
+    </div>
+    <p role="status">{notice}</p>
+    <p>The editor has not automatically overwritten the data that triggered this warning.</p>
+  </main>;
   return <><div className="app-shell">
     <header className="topbar">
       <div className="brand"><span className="brand-icon">✿</span><div><div className="brand-name">GARDEN <span>ATLAS</span></div><div className="brand-caption">PIXEL LANDSCAPE EDITOR · P021</div></div></div>

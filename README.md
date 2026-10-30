@@ -1,3 +1,7 @@
+## P023 safety update
+
+Garden Atlas blocks editing when it detects invalid IndexedDB records or a conflicting save from another tab. Download a JSON backup before approving any recovery operation. Raw damaged records are preserved locally when recovery is approved. Browser storage is device-specific: keep independent backups.
+
 ## P022 — Selection visibility & active-tool clarity (2026-10-30)
 
 - Presentation-only polish: differentiate focused, multi-selected and group-highlighted objects with clearer outlines. Only the focused selected object shows its inline map name, preventing piles of overlapping labels in large groups.
