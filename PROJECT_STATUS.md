@@ -1,3 +1,12 @@
+# Garden Atlas — P025 Open-Source Readiness (2026-10-30)
+
+- Public documentation, contributor guidance, security/privacy policy and release verification guide added. Full historical README preserved in `docs/history.md`.
+- ESLint/Prettier configured; first Chromium smoke test exercises fresh load, editor canvas and IndexedDB save/reload.
+- Changes are tooling/docs/tests only; runtime garden v6, model, storage, drawing and UI are preserved.
+- See GitHub Actions for exact commit build/test/deployment status. Browser tests on Chromium do not substitute for manual Android gesture and storage QA.
+
+---
+
 # P024 — Editor Component Boundaries & Quality Gates (2026-10-30)
 
 This maintenance patch keeps all garden tools, pixel art, version-6 data and storage algorithms unchanged. It begins splitting the main editor into smaller UI responsibilities:

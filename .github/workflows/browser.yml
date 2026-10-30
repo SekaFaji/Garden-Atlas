@@ -1,0 +1,38 @@
+name: Browser smoke tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build production app
+        run: npm run build
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Test fresh browser storage and reload
+        run: npm run test:e2e
+      - name: Upload failed test traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chromium-failure-traces
+          path: test-results/
+          if-no-files-found: ignore

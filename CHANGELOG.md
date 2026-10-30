@@ -1,3 +1,10 @@
+## P025 — Public repository and browser-test foundations (2026-10-30)
+
+- Replaced long patch-history README with a navigable project overview. Retained all earlier README text in `docs/history.md`.
+- Added contributor, security/privacy, community, architecture, testing and release-packaging guidance.
+- Added ESLint/Prettier configuration, and a first real-Chromium Playwright smoke test covering app boot and IndexedDB save/reload.
+- No changes to garden schema v6, IndexedDB behavior, UI screens, sprites or editing tools.
+
 # P024 — Editor Component Boundaries & Quality Gates (2026-10-30)
 
 This maintenance patch keeps all garden tools, pixel art, version-6 data and storage algorithms unchanged. It begins splitting the main editor into smaller UI responsibilities:

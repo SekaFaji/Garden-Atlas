@@ -9,7 +9,11 @@
     "build": "npm run typecheck && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
-    "check:quality": "node scripts/checkQuality.mjs"
+    "check:quality": "node scripts/checkQuality.mjs",
+    "lint": "eslint src vite.config.ts playwright.config.ts",
+    "test:e2e": "playwright test",
+    "format": "prettier --write \".github/workflows/*.yml\" \"*.md\" \"docs/**/*.md\" \"playwright.config.ts\" \"e2e/**/*.ts\"",
+    "format:check": "prettier --check \"CONTRIBUTING.md\" \"SECURITY.md\" \"CODE_OF_CONDUCT.md\" \"docs/architecture.md\" \"docs/testing.md\" \"docs/releasing.md\""
   },
   "dependencies": {
     "react": "19.1.0",
@@ -20,7 +24,11 @@
     "@types/react-dom": "19.1.0",
     "@vitejs/plugin-react": "4.4.1",
     "typescript": "5.8.3",
-    "vite": "6.3.5"
+    "vite": "6.3.5",
+    "@playwright/test": "1.56.1",
+    "eslint": "9.38.0",
+    "typescript-eslint": "8.46.1",
+    "prettier": "3.6.2"
   },
   "engines": {
     "node": ">=22.16.0 <23",
