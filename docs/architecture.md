@@ -8,7 +8,7 @@ Garden Atlas is a client-only **React + TypeScript + Vite** web app deployed und
 - `src/storage.ts`: parsing and managing a library of gardens; fallback `localStorage` operations.
 - `src/browserStorage.ts`: async IndexedDB snapshots, recovery records, ordered writes and cross-tab revision checks. The editor must wait for hydration before editing. A damaged primary record blocks saving until a user approves recovery; backup exports are offered before destructive changes.
 - `src/App.tsx`: garden state, editor selection, undo history, tool transitions, storage decisions and callbacks. This is still a relatively large orchestration component and is **not yet fully separated**.
-- `src/components/*`: presentational header, project list, mobile navigation, object catalog, object icon and individual placed-object rendering. The catalog owns search/filter state, but App owns the placement callback.
+- `src/components/*`: presentational header, project list, mobile navigation, object catalog, garden Inspector, object icon and individual placed-object rendering. The catalog owns search/filter state; `src/components/GardenInspector.tsx` owns the existing object/group detail form markup. App owns placement, history, all Inspector mutations and persistence through explicit callbacks.
 - `src/MapView.tsx`: camera, pointer interactions and SVG map layers. `src/components/MapObject.tsx` renders one placed object (no state mutation); `src/mapObjectGeometry.ts` calculates visual-only footprints and hit targets. `Sprite.tsx` and `VariantSprites.tsx` provide locally authored SVG pixel sprites.
 - `src/PlantAtlasPanel.tsx` manages the UI for species and per-specimen records; `plantAtlas.ts` holds pure data transformations/validation.
 
@@ -25,7 +25,7 @@ Garden Atlas is a client-only **React + TypeScript + Vite** web app deployed und
 ## Tests and boundaries
 
 - `tests/*.test.mjs`: Node.js tests for the model, migrations, storage consistency, geometry and UI-related pure helpers.
-- `e2e/*.spec.ts`: real Chromium smoke tests for first load and save/reload, using a newly created browser context.
+- `e2e/*.spec.ts`: real Chromium smoke tests for first load and save/reload, using a newly created browser context, including a saved Inspector width/length round-trip.
 - `.github/workflows/quality.yml`: PR quality validation. `.github/workflows/deploy.yml`: main-branch build and GitHub Pages deployment.
 
 The old codebase intentionally has some large files (`App.tsx`, `MapView.tsx`, `styles.css`); contributors should avoid untested large-scale rewrites and extract behavior in focused steps.

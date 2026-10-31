@@ -1,3 +1,11 @@
+# Garden Atlas P029 — Inspector Refactor (2026-10-31)
+
+- Maintenance-only release based on P028 (`908fe91167739462e6a756cd51fcaf537d31215d`), whose Android installation was confirmed working by the user.
+- Object/group Inspector markup is now in `src/components/GardenInspector.tsx`; `App.tsx` retains all editing decisions, undo history, persistence and navigation callbacks.
+- Existing object measurements, notes, species, appearance, plant atlas and group controls remain accessible under the same CSS classes and keyboard behaviors. No garden format or save change.
+- Regression tests follow the actual component boundary; a Chromium test now exercises width/length editing and persistence after reload. CI verifies TypeScript/ESLint and browser tests.
+- Existing P028 installation assets and service worker preserved without modification.
+
 # P028 — Android Installability Cache Compatibility (2026-10-31)
 
 - The live production URL passed Chromium DevTools manifest checks with zero reported installability errors, but Brave and Chrome on the user's Android device still show installation disabled. Cause on that specific device remains unverified.

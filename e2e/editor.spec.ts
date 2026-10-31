@@ -60,3 +60,24 @@ test('Garden Atlas install icons decode in the browser and the manifest is scope
   expect(result.start).toBe('/Garden-Atlas/');
   expect(result.icons).toEqual([[192,192],[512,512]]);
 });
+
+test('Inspector still edits existing object dimensions and preserves them after reload', async ({ page }) => {
+  await page.goto('/Garden-Atlas/');
+  await expect(page.locator('.save-status')).toContainText(/INDEXEDDB SAVED|LOCAL SAVE/, { timeout: 15_000 });
+  await page.locator('.object-entry').first().click();
+  await expect(page.locator('.inspector-compact-header')).toBeVisible();
+  const width = page.getByRole('textbox', { name: 'Object width in metres' });
+  const length = page.getByRole('textbox', { name: 'Object length in metres' });
+  await width.fill('2.5');
+  await width.press('Enter');
+  await expect(width).toHaveValue('2.5');
+  await length.fill('4.5');
+  await length.press('Enter');
+  await expect(length).toHaveValue('4.5');
+  await expect(page.locator('.save-status')).toContainText(/INDEXEDDB SAVED|LOCAL SAVE/, { timeout: 15_000 });
+  await page.reload();
+  await expect(page.locator('.save-status')).toContainText(/INDEXEDDB SAVED|LOCAL SAVE/, { timeout: 15_000 });
+  await page.locator('.object-entry').first().click();
+  await expect(page.getByRole('textbox', { name: 'Object width in metres' })).toHaveValue('2.5');
+  await expect(page.getByRole('textbox', { name: 'Object length in metres' })).toHaveValue('4.5');
+});

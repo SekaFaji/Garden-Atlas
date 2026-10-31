@@ -1,3 +1,11 @@
+## P029 — Inspector component boundary & regression coverage (2026-10-31)
+
+- Extracted the existing object/group Inspector JSX into `src/components/GardenInspector.tsx` with typed props. It renders current fields, folds, plant history and group controls but **does not mutate garden state or storage itself**.
+- Retained all garden changes, save decisions, group edits, history and selection in `App.tsx` and passed handlers down explicitly. Preserved all existing classes, labels, tabs, permissions and map navigation behavior.
+- Rebased Inspector architecture tests onto the new component rather than checking its old inline location, added callback-boundary assertions, and extended Chromium tests with an object dimension edit/save/reload round-trip.
+- Updated the checked-in archive workflow to produce P029 archives against the exact P028 commit. The tested installed PWA manifest, icons, service worker and local IndexedDB schema are untouched.
+- No new garden features or art. Manual Android touch testing remains required.
+
 ## P028 — Android PWA cache refresh and network-first shell (2026-10-31)
 
 - Live GitHub Pages Chromium diagnostics showed HTTP 200 for the active manifest and icons, a controlling service worker, and zero installability errors. Android Chrome and Brave still reject installation on the user device.

@@ -4,13 +4,12 @@ import { MapView, type Tool } from './MapView';
 import { EDITOR_TOOLS, activeToolDescription } from './editorVisuals';
 import { ObjectIcon } from './components/ObjectIcon';
 import { ObjectCatalog } from './components/ObjectCatalog';
-import { PlantAtlasPanel } from './PlantAtlasPanel';
-import { ObjectDimensions } from './ObjectDimensions';
 import { NameDraftInput } from './NameDraftInput';
 import { MetricDraftInput } from './MetricDraftInput';
-import { PRESETS, defaultPreset, getPreset } from './catalog';
+import { defaultPreset, getPreset } from './catalog';
 import { GardenReport } from './Report';
 import { EditorHeader, type SaveStatus } from './components/EditorHeader';
+import { GardenInspector } from './components/GardenInspector';
 import { GardenProjectsPanel } from './components/GardenProjectsPanel';
 import { MobileNavigation, type EditorPanel } from './components/MobileNavigation';
 import { downloadJson, gardenSlug, backupDate } from './utils/backup';
@@ -18,7 +17,7 @@ import { imageToReference } from './reference';
 import { isSameEditBurst, type EditBurst } from './history';
 import { editFeaturePoint, resizeObjectAxes, type FeatureSelection, type EditAction } from './featureEdit';
 import {
-  GROUNDS, KINDS, createPresetObject, changeObjectPreset, addLine, addRegion, alignSelection, moveSelection, setReferenceWidth, clampPoint, demoGarden, emptyGarden, info, isGarden,
+  GROUNDS, KINDS, createPresetObject, changeObjectPreset, addLine, addRegion, alignSelection, moveSelection, setReferenceWidth, clampPoint, demoGarden, emptyGarden, isGarden,
   movePlaced, nextGroupId, nextObjectId, polygonArea, removeGroup, resizeGarden, resizeWorkspace, addSurroundings, setBoundary, previewLinkedSource, chooseLinkedSource,
   type Garden, type GardenObject, type Ground, type Kind, type Mode, type Point, type LineKind
 } from './model';
@@ -496,67 +495,20 @@ export default function App(){
         <div className="status-message" role="status">✦ {notice}</div>
         <div className="feature-strip"><span>■ P022 SELECTION POLISH</span><span>■ TOUCH-FIRST</span><span>■ LINKED SCALE + PIXEL VIEWS</span><span>■ LOCAL BACKUPS</span></div>
       </section>
-      <aside ref={inspectorRef} className={`panel details-panel ${selectedPanel==='inspector'?'mobile-active':''}`} aria-label="Garden item details">
-        <div className="section-heading">06 / INSPECTOR</div>
-        {selected?<>
-          <div className="inspector-compact-header">
-            <div className="inspector-compact-art"><ObjectIcon kind={selected.kind} presetId={selected.presetId} size={56}/></div>
-            <div className="inspector-compact-title"><strong>{selected.name}</strong><span>{selected.id} · {info(selected.kind).label}</span></div>
-            <button type="button" className="inspector-map-link" onClick={()=>navigateTo('map')} aria-label="Return to garden map">⌖ MAP</button>
-          </div>
-          <div className="inspector-core-fields">
-            <label className="field inspector-name-field">DISPLAY NAME<NameDraftInput key={selected.id} label="Object name" value={selected.name} maxLength={80} allowEmpty disabled={locked.objects} onCommit={name=>objectPatch(selected.id,{name})} onNotice={setNotice}/></label>
-            <label className="field">SPECIES / TYPE<input maxLength={140} value={selected.species} disabled={locked.objects} placeholder="Optional" onChange={e=>objectPatch(selected.id,{species:e.target.value},'species')}/></label>
-            <label className="field">GROUP<select value={selected.groupId??''} disabled={locked.objects} onChange={e=>objectPatch(selected.id,{groupId:e.target.value||null})}><option value="">— UNGROUPED —</option>{garden.groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
-          </div>
-          <div className="inspector-subheading">SIZE · METRES</div>
-          <ObjectDimensions key={selected.id} object={selected} disabled={locked.objects} onNotice={setNotice} onChange={axes=>{const updated=resizeObjectAxes(garden,selected.id,axes);if(updated)applyGarden(updated);else setNotice('Invalid dimension. Previous measurements preserved.');}}/>
-          <details key={`appearance-${selected.id}`} className="inspector-fold">
-            <summary>APPEARANCE & ROTATION</summary>
-            <div className="inspector-fold-body">
-              <label className="field">PIXEL-ART APPEARANCE
-                <select value={selected.presetId??defaultPreset(selected.kind).id} disabled={locked.objects}
-                  onChange={e=>{const updated=changeObjectPreset(garden,selected.id,e.target.value);if(updated)applyGarden(updated);}}>
-                  {PRESETS.filter(p=>p.kind===selected.kind).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-                <small>Changes the artwork, not the record or measurements.</small>
-              </label>
-              <label className="field">ROTATION (DEGREES)<MetricDraftInput key={selected.id} disabled={locked.objects} label="Rotation in degrees" min={0} max={359} decimals={0} value={selected.rotation??0} onCommit={n=>objectPatch(selected.id,{rotation:n})} onNotice={setNotice}/></label>
-            </div>
-          </details>
-          <details key={`notes-${selected.id}`} className="inspector-fold">
-            <summary>NOTES & MAP PLACEMENT</summary>
-            <div className="inspector-fold-body">
-              <label className="field">NOTES<textarea rows={4} maxLength={3000} disabled={locked.objects} value={selected.notes} onChange={e=>objectPatch(selected.id,{notes:e.target.value},'notes')}/></label>
-              <div className="placement-box">SHARED POSITION: {selected.position?`${selected.position.x.toFixed(1)} m × ${selected.position.y.toFixed(1)} m`:'Not placed'}
-                {!selected.position&&<button disabled={locked.objects} className="btn btn-highlight" onClick={()=>move(selected.id,{x:garden.width/2,y:garden.height/2},false)}>PLACE AT CENTER</button>}
-                {selected.position&&<button disabled={locked.objects} className="btn btn-muted" onClick={()=>objectPatch(selected.id,{position:undefined})}>REMOVE FROM BOTH MAPS</button>}
-              </div>
-            </div>
-          </details>
-          <div className="inspector-actions"><button disabled={locked.objects} className="btn btn-highlight" onClick={duplicate}>DUPLICATE</button><button disabled={locked.objects} className="btn btn-danger" onClick={removeObject}>DELETE</button></div>
-          {(selected.kind==='tree'||selected.kind==='shrub'||selected.kind==='flower')&&<details key={`atlas-${selected.id}`} className="inspector-fold inspector-atlas-fold">
-            <summary>PLANT ATLAS · PHOTOS & HISTORY</summary>
-            <div className="inspector-fold-body">
-              <PlantAtlasPanel garden={garden} objectId={selected.id} disabled={locked.objects||Boolean(garden.linkMigration&&!garden.linkMigration.confirmed)} onNotice={setNotice}
-                onChange={(edit,key)=>{if(locked.objects||libraryRef.current.activeId!==library.activeId)return;const current=libraryRef.current.projects.find(p=>p.id===libraryRef.current.activeId)!.garden;applyGarden(edit(current),true,key);}}/>
-            </div>
-          </details>}
-        </>:selectedGroup?<>
-          <div className="inspector-compact-header inspector-group-header"><div className="inspector-group-icon">▦</div>
-            <div className="inspector-compact-title"><strong>{selectedGroup.name}</strong><span>{selectedGroup.id} · {garden.objects.filter(x=>x.groupId===selectedGroup.id).length} members</span></div>
-            <button type="button" className="inspector-map-link" onClick={()=>navigateTo('map')}>⌖ MAP</button>
-          </div>
-          <label className="field">GROUP NAME<NameDraftInput key={selectedGroup.id} label="Group name" value={selectedGroup.name} maxLength={120} onCommit={name=>{const current=libraryRef.current.projects.find(p=>p.id===libraryRef.current.activeId)!.garden;applyGarden({...current,groups:current.groups.map(g=>g.id===selectedGroup.id?{...g,name}:g)});}} onNotice={setNotice}/></label>
-          <label className="field">GROUP NOTES<textarea maxLength={3000} value={selectedGroup.notes} onChange={e=>applyGarden({...garden,groups:garden.groups.map(g=>g.id===selectedGroup.id?{...g,notes:e.target.value}:g)},true,'group-notes:'+selectedGroup.id)}/></label>
-          <p className="panel-hint">Drag any member on the map to move the entire group. Both views remain linked.</p>
-          <div className="group-list">{garden.objects.filter(o=>o.groupId===selectedGroup.id).map(o=><button key={o.id} className="group-entry" onClick={()=>select(o.id)}><ObjectIcon kind={o.kind} presetId={o.presetId} size={25}/>{o.name}</button>)}</div>
-          <button disabled={locked.objects} className="btn btn-danger" onClick={()=>{if(!locked.objects&&window.confirm('Delete group? All its objects will be kept.')){applyGarden(removeGroup(garden,selectedGroup.id));setSelectedGroupId(null);}}}>DELETE GROUP · KEEP ITEMS</button>
-        </>:<p className="empty-inspector">Tap an item on the map or select one from OBJECTS to edit its shared record.</p>}
-        <div className="section-heading list-heading">MAP DIMENSIONS</div>
-        <p className="panel-hint">Workspace: {garden.width} × {garden.height} m · Property outline: {polygonArea(garden.layout.boundary).toFixed(1)} m² (approximate).</p>
-        <button className="btn btn-muted inspector-map-size-link" onClick={()=>{setMapSizeOpen(true);navigateTo('map');window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>mapFrameRef.current?.scrollIntoView({behavior:'auto',block:'start'})));}}>OPEN MAP SIZE SETTINGS ↑</button>
-      </aside>
+       <GardenInspector panelRef={inspectorRef} active={selectedPanel==='inspector'} garden={garden}
+         selected={selected} selectedGroup={selectedGroup} objectsLocked={locked.objects}
+         onMap={()=>navigateTo('map')}
+         onMapSettings={()=>{setMapSizeOpen(true);navigateTo('map');window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>mapFrameRef.current?.scrollIntoView({behavior:'auto',block:'start'})));}}
+         onNotice={setNotice} onUpdateObject={objectPatch}
+         onResizeObjectAxes={(id,axes)=>{const updated=resizeObjectAxes(garden,id,axes);if(updated)applyGarden(updated);else setNotice('Invalid dimension. Previous measurements preserved.');}}
+         onPresetChange={(id,preset)=>{const updated=changeObjectPreset(garden,id,preset);if(updated)applyGarden(updated);}}
+         onPlaceCenter={id=>move(id,{x:garden.width/2,y:garden.height/2},false)}
+         onDuplicate={duplicate} onDeleteObject={removeObject}
+         onAtlasChange={(edit,key)=>{if(locked.objects||libraryRef.current.activeId!==library.activeId)return;const current=libraryRef.current.projects.find(p=>p.id===libraryRef.current.activeId)!.garden;applyGarden(edit(current),true,key);}}
+         onRenameGroup={(id,name)=>{const current=libraryRef.current.projects.find(p=>p.id===libraryRef.current.activeId)!.garden;applyGarden({...current,groups:current.groups.map(g=>g.id===id?{...g,name}:g)});}}
+         onGroupNotes={(id,notes)=>applyGarden({...garden,groups:garden.groups.map(g=>g.id===id?{...g,notes}:g)},true,'group-notes:'+id)}
+         onSelectObject={select}
+         onDeleteGroup={id=>{if(!locked.objects&&window.confirm('Delete group? All its objects will be kept.')){applyGarden(removeGroup(garden,id));setSelectedGroupId(null);}}}/>
       <GardenProjectsPanel panelRef={projectsPanelRef} active={selectedPanel==='projects'} library={library} garden={garden} saved={saved}
         backend={backend} storageInfo={storageInfo}
         onOpenProject={id=>{const project=library.projects.find(p=>p.id===id);if(!project)return;replaceLibrary({...library,activeId:id});setNotice(`Opened ${project.garden.name}.`);}}

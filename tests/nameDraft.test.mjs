@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {parseNameDraft} from '../src/nameDraft.ts';
 const app=readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8');
 const ui=readFileSync(new URL('../src/NameDraftInput.tsx',import.meta.url),'utf8');
+const inspector=readFileSync(new URL('../src/components/GardenInspector.tsx',import.meta.url),'utf8');
 const css=readFileSync(new URL('../src/styles.css',import.meta.url),'utf8');
 
 test('P020 names accept intermediate blank typing but reject empty final garden/group names',()=>{
@@ -26,7 +27,8 @@ test('P020 editor commits names once on blur or Enter and Escape cancels',()=>{
  assert.match(ui,/e\.key==='Enter'/);
  assert.match(ui,/e\.key==='Escape'/);
  assert.match(ui,/if\(result!==value\)onCommit\(result\)/);
- for(const label of ['Garden name','Group name','Object name'])assert.ok(app.includes(`label="${label}"`));
+ assert.ok(app.includes('label="Garden name"'));
+ for(const label of ['Group name','Object name'])assert.ok(inspector.includes(`label="${label}"`));
 });
 test('P020 switching gardens/importing/repairing a project returns to the map',()=>{
  const swap=app.slice(app.indexOf('const replaceLibrary='),app.indexOf('const undo='));
