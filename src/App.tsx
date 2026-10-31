@@ -3,6 +3,8 @@ import type { ChangeEvent } from 'react';
 import { MapView, type Tool } from './MapView';
 import { EDITOR_TOOLS, activeToolDescription } from './editorVisuals';
 import { ObjectIcon } from './components/ObjectIcon';
+import { GardenObjectList } from './components/GardenObjectList';
+import { GardenLayersPanel, type LayerKey, type LayerState } from './components/GardenLayersPanel';
 import { ObjectCatalog } from './components/ObjectCatalog';
 import { NameDraftInput } from './NameDraftInput';
 import { MetricDraftInput } from './MetricDraftInput';
@@ -27,8 +29,6 @@ import {
 } from './storage';
 import { openBrowserLibrary, createBrowserWriter, approveBrowserRecovery, exportStoredRecords, recoverBrowserLibrary, estimateBrowserSpace, requestPersistentStorage, type StorageBackend } from './browserStorage';
 
-type LayerKey='objects'|'regions'|'lines'|'boundary';
-type LayerState=Record<LayerKey,boolean>;
 type Visibility=LayerState;
 export default function App(){
   const [library,setLibrary]=useState<ProjectLibrary>(loadLibrary);
@@ -389,34 +389,24 @@ export default function App(){
     <main className="workspace">
       <aside ref={toolsPanelRef} className={`panel library-panel ${selectedPanel==='tools'?'mobile-active':''}`}>
         <ObjectCatalog activeTool={tool} activePresetId={presetId} locked={locked.objects} onActivatePreset={activatePreset}/>
-        <div className="section-heading list-heading">02 / GARDEN ITEMS <span className="pill">{garden.objects.length}</span></div>
-        <div className="item-list">{garden.objects.map(o=><div key={o.id} className="object-row"><button className={`object-entry ${selectedId===o.id?'active':''}`} onClick={()=>{if(!setNewTool('select'))return;select(o.id);showDetails();}}><ObjectIcon kind={o.kind} presetId={o.presetId} size={28}/><span>{o.name}<small>{o.id} {o.position?'●':'○'}</small></span></button><label title={`Select ${o.name} for grouping`} className="batch-check"><input type="checkbox" aria-label={`Batch-select ${o.name}`} checked={checkedIds.includes(o.id)} onChange={e=>setCheckedIds(ids=>e.target.checked?[...ids,o.id]:ids.filter(x=>x!==o.id))}/></label></div>)}</div>
-        <div className="batch-editor" aria-label="Multi-object editor">
-          <button className={`btn ${multiSelect?'btn-highlight':'btn-muted'}`} aria-pressed={multiSelect} onClick={()=>{if(!setNewTool('select'))return;setMultiSelect(v=>!v);setSelectedGroupId(null);setSelectedId(null);}}>◩ {multiSelect?'MULTI SELECT ON':'MULTI SELECT'}</button>
-          <button className="btn btn-muted" onClick={()=>{if(!setNewTool('select'))return;setCheckedIds(garden.objects.filter(o=>o.position).map(o=>o.id));setMultiSelect(true);setSelectedId(null);}}>SELECT ALL PLACED</button>
-          <button className="btn btn-muted" onClick={()=>setCheckedIds([])} disabled={!checkedIds.length}>CLEAR</button>
-          {checkedIds.length>0&&<><span>{checkedIds.length} selected · drag any selected item to move the set</span>
-            <div className="alignment-grid">
-              {([{id:'left',name:'◧ LEFT'},{id:'right',name:'◨ RIGHT'},{id:'top',name:'▔ TOP'},{id:'bottom',name:'▁ BOTTOM'},{id:'horizontal',name:'↔ SPACE X'},{id:'vertical',name:'↕ SPACE Y'}] as const).map(a=><button key={a.id} className="btn btn-muted" onClick={()=>alignChecked(a.id)}>{a.name}</button>)}
-            </div>
-            <button className="btn btn-danger" onClick={deleteChecked}>DELETE SELECTED</button>
-          </>}
-        </div>
-        <div className="section-heading list-heading">03 / GROUPS <span className="pill">{garden.groups.length}</span></div>
-        <div className="group-create"><input aria-label="New group name" value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} maxLength={120} placeholder="Group name" onKeyDown={e=>{if(e.key==='Enter')createGroup();}}/><button className="btn btn-highlight" onClick={createGroup}>+</button></div>
-        {checkedIds.length>0&&<div className="batch-actions"><span>{checkedIds.length} selected</span><select aria-label="Assign selected items to group" defaultValue="choose" onChange={e=>{if(e.target.value!=='choose')assignChecked(e.target.value==='none'?null:e.target.value);}}><option value="choose">ASSIGN TO...</option><option value="none">UNGROUP</option>{garden.groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select><button className="btn btn-muted" onClick={()=>setCheckedIds([])}>CLEAR</button></div>}
-        <div className="group-list">{garden.groups.map(group=><button className={`group-entry ${selectedGroupId===group.id?'active':''}`} key={group.id} onClick={()=>selectGroup(group.id)}><span>▦</span><span>{group.name}<small>{garden.objects.filter(o=>o.groupId===group.id).length} members</small></span></button>)}</div>
-        <div className="section-heading list-heading">04 / LAYERS</div>
-        <div className="layer-list">{([{key:'objects',label:'Plants & structures'},{key:'regions',label:'Terrain regions'},{key:'lines',label:'Paths & fences'},{key:'boundary',label:'Property outline'}] as const).map(x=><div className="layer-control" key={x.key}>
-          <label><input type="checkbox" checked={!visibility[x.key]} onChange={e=>setVisibility(v=>({...v,[x.key]:!e.target.checked}))}/>{x.label}</label>
-          <button className={`layer-lock ${locked[x.key]?'locked':''}`} aria-pressed={locked[x.key]} aria-label={`${locked[x.key]?'Unlock':'Lock'} ${x.label}`} onClick={()=>{
-            if(!setNewTool('select'))return;setLocked(v=>({...v,[x.key]:!v[x.key]}));setSelectedFeature(null);setSelectedVertex(null);
-          }}>{locked[x.key]?'🔒 LOCKED':'🔓 EDIT'}</button>
-        </div>)}</div>
-        <p className="panel-hint">Layer locks prevent changes in this editing session; visibility affects display only. Both views share the same garden.</p>
-        <div className="section-heading list-heading">05 / TERRAIN AREAS & LINES</div>
-        <div className="terrain-list">{garden.layout.regions.map(r=><div className="terrain-entry" key={r.id}><button className="feature-pick" onClick={()=>{if(!setNewTool('feature-edit'))return;setSelectedFeature({kind:'region',id:r.id});setSelectedVertex(null);navigateTo('map');}}>{r.name} · {r.id} · EDIT POINTS</button><button disabled={locked.regions} title="Delete terrain region" onClick={()=>applyGarden({...garden,layout:{...garden.layout,regions:garden.layout.regions.filter(x=>x.id!==r.id)}})}>×</button></div>)}</div>
-        <div className="terrain-list">{garden.layout.lines.map(line=><div className="line-entry" key={line.id}><button className="feature-pick" onClick={()=>{if(!setNewTool('feature-edit'))return;setSelectedFeature({kind:'line',id:line.id});setSelectedVertex(null);navigateTo('map');}}>✎ EDIT POINTS</button><input disabled={locked.lines} aria-label={`Name of ${line.id}`} maxLength={120} value={line.name} onChange={e=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.map(x=>x.id===line.id?{...x,name:e.target.value}:x)}})}/><label>WIDTH M<MetricDraftInput key={line.id} disabled={locked.lines} label={`${line.name} width in metres`} min={0.2} max={12} value={line.widthM} onCommit={n=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.map(x=>x.id===line.id?{...x,widthM:n}:x)}})} onNotice={setNotice}/></label><button disabled={locked.lines} className="btn btn-danger" title="Delete path or fence" onClick={()=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.filter(x=>x.id!==line.id)}})}>×</button></div>)}</div>
+        <GardenObjectList garden={garden} selectedId={selectedId} selectedGroupId={selectedGroupId} checkedIds={checkedIds}
+          multiSelect={multiSelect} newGroupName={newGroupName}
+          onSelectObject={id=>{if(!setNewTool('select'))return;select(id);showDetails();}}
+          onCheckObject={(id,checked)=>setCheckedIds(ids=>checked?[...ids,id]:ids.filter(x=>x!==id))}
+          onToggleMultiSelect={()=>{if(!setNewTool('select'))return;setMultiSelect(v=>!v);setSelectedGroupId(null);setSelectedId(null);}}
+          onSelectAllPlaced={()=>{if(!setNewTool('select'))return;setCheckedIds(garden.objects.filter(o=>o.position).map(o=>o.id));setMultiSelect(true);setSelectedId(null);}}
+          onClearSelection={()=>setCheckedIds([])} onAlign={alignChecked} onDeleteSelected={deleteChecked}
+          onNewGroupName={setNewGroupName} onCreateGroup={createGroup} onAssignGroup={assignChecked} onSelectGroup={selectGroup}/>
+        <GardenLayersPanel garden={garden} visibility={visibility} locked={locked}
+          onVisibilityChange={(layer,visible)=>setVisibility(v=>({...v,[layer]:!visible}))}
+          onToggleLayerLock={layer=>{if(!setNewTool('select'))return;setLocked(v=>({...v,[layer]:!v[layer]}));setSelectedFeature(null);setSelectedVertex(null);}}
+          onEditFeature={feature=>{if(!setNewTool('feature-edit'))return;setSelectedFeature(feature);setSelectedVertex(null);navigateTo('map');}}
+          onDeleteRegion={id=>applyGarden({...garden,layout:{...garden.layout,regions:garden.layout.regions.filter(x=>x.id!==id)}})}
+          onRenameLine={(id,name)=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.map(x=>x.id===id?{...x,name}:x)}})}
+          onChangeLineWidth={(id,widthM)=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.map(x=>x.id===id?{...x,widthM}:x)}})}
+          onDeleteLine={id=>applyGarden({...garden,layout:{...garden.layout,lines:garden.layout.lines.filter(x=>x.id!==id)}})}
+          onNotice={setNotice}/>
+
       </aside>
       <section ref={editorRef} className="editor-column">
         <div className="editor-top"><div><div className="eyebrow">CURRENT GARDEN</div><NameDraftInput className="garden-name" label="Garden name" value={garden.name} maxLength={80} onCommit={name=>{const current=libraryRef.current.projects.find(p=>p.id===libraryRef.current.activeId)!.garden;applyGarden({...current,name});}} onNotice={setNotice}/></div>

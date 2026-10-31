@@ -5,6 +5,7 @@ import {parseNameDraft} from '../src/nameDraft.ts';
 const app=readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8');
 const ui=readFileSync(new URL('../src/NameDraftInput.tsx',import.meta.url),'utf8');
 const inspector=readFileSync(new URL('../src/components/GardenInspector.tsx',import.meta.url),'utf8');
+const layers=readFileSync(new URL('../src/components/GardenLayersPanel.tsx',import.meta.url),'utf8');
 const css=readFileSync(new URL('../src/styles.css',import.meta.url),'utf8');
 
 test('P020 names accept intermediate blank typing but reject empty final garden/group names',()=>{
@@ -36,7 +37,8 @@ test('P020 switching gardens/importing/repairing a project returns to the map',(
  assert.ok(app.includes('replaceLibrary(next);'));
 });
 test('P020 choosing existing terrain or path editing opens the map',()=>{
- assert.match(app,/kind:'region',id:r\.id\}[\s\S]{0,120}navigateTo\('map'\)/);
- assert.match(app,/kind:'line',id:line\.id\}[\s\S]{0,120}navigateTo\('map'\)/);
+ assert.match(layers,/onEditFeature\(\{kind:'region',id:region\.id\}\)/);
+ assert.match(layers,/onEditFeature\(\{kind:'line',id:line\.id\}\)/);
+ assert.match(app,/onEditFeature=\{feature=>\{if\(!setNewTool\('feature-edit'\)\)return;setSelectedFeature\(feature\);setSelectedVertex\(null\);navigateTo\('map'\);\}\}/);
  assert.match(css,/@media\(max-width:760px\)[\s\S]*\.line-entry\{flex-wrap:wrap/);
 });

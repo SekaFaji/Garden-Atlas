@@ -21,11 +21,11 @@ jobs:
         with:
           node-version-file: .nvmrc
       - name: Create release source ZIPs from committed trees
-        run: node scripts/createReleaseArchives.mjs 908fe91167739462e6a756cd51fcaf537d31215d P029 release
+        run: node scripts/createReleaseArchives.mjs 7a09db660f2c27b86d91b663d8a82719e151e8b3 P030 release
       - name: Upload verified source archives
         uses: actions/upload-artifact@v4
         with:
-          name: garden-atlas-p029-source
+          name: garden-atlas-p030-source
           path: release/*.zip
           if-no-files-found: error
           retention-days: 30

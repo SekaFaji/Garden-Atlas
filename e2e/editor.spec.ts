@@ -81,3 +81,24 @@ test('Inspector still edits existing object dimensions and preserves them after 
   await expect(page.getByRole('textbox', { name: 'Object width in metres' })).toHaveValue('2.5');
   await expect(page.getByRole('textbox', { name: 'Object length in metres' })).toHaveValue('4.5');
 });
+
+
+test('P030 object list, group controls and visibility preserve existing editing behavior', async ({ page }) => {
+  await page.goto('/Garden-Atlas/');
+  await expect(page.locator('.save-status')).toContainText(/INDEXEDDB SAVED|LOCAL SAVE/, { timeout: 15_000 });
+  const objects = page.locator('.map-surface [data-object]');
+  await expect(objects).not.toHaveCount(0);
+  const layer = page.locator('.layer-control').filter({ hasText: 'Plants & structures' });
+  await layer.locator('input[type="checkbox"]').uncheck();
+  await expect(objects).toHaveCount(0);
+  await layer.locator('input[type="checkbox"]').check();
+  await expect(objects).not.toHaveCount(0);
+
+  const selection = page.locator('.object-row').first().locator('input[type="checkbox"]');
+  await selection.check();
+  await expect(page.locator('.batch-editor')).toContainText('1 selected');
+  await page.getByRole('textbox', { name: 'New group name' }).fill('P030 Smoke Group');
+  await page.locator('.group-create button').click();
+  await expect(page.locator('.group-entry').filter({ hasText: 'P030 Smoke Group' })).toHaveCount(1);
+  await expect(page.locator('.save-status')).toContainText(/INDEXEDDB SAVED|LOCAL SAVE/, { timeout: 15_000 });
+});

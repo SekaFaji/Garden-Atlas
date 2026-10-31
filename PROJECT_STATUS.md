@@ -1,3 +1,11 @@
+## P030 — Sidebar architecture and regression coverage (2026-10-31)
+
+- Extracted the left sidebar object list, batch selection, alignment, group controls, layers and feature lists into `GardenObjectList.tsx` and `GardenLayersPanel.tsx`.
+- Kept all garden mutations, tool-lock safeguards, selections, history, navigation and storage state in `App.tsx`, passed through explicitly typed callbacks.
+- Preserved the P028 Android install manifest and offline worker unchanged, including its working standalone installation.
+- Updated historical UI tests to follow the new component boundary; added tests for delegated callbacks and a Chromium smoke test for visibility, object batch selection and group creation.
+- No garden format, artwork, storage, or user-facing feature changes.
+
 # Garden Atlas P029 — Inspector Refactor (2026-10-31)
 
 - Maintenance-only release based on P028 (`908fe91167739462e6a756cd51fcaf537d31215d`), whose Android installation was confirmed working by the user.
