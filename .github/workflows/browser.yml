@@ -29,6 +29,10 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Test fresh browser storage and reload
         run: npm run test:e2e
+      - name: Diagnose installed-app requirements on live GitHub Pages
+        env:
+          CHECK_LIVE_INSTALLABILITY: "1"
+        run: npx playwright test e2e/liveInstallability.spec.ts --reporter=line
       - name: Upload failed test traces
         if: failure()
         uses: actions/upload-artifact@v4
