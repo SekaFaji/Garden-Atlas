@@ -1,3 +1,11 @@
+## P027 — Android app installation reliability (2026-10-31)
+
+- Replaced invalid 192px and 512px PNGs used by the install manifest. The previous images had malformed IDAT streams despite plausible headers, preventing browsers from decoding app icons.
+- Preserved the existing Garden Atlas pixel-art emblem and the app name, scope, ID and garden data. No new garden features.
+- Added automated checks for PNG chunk CRCs, fully decompressed image pixels, manifest icon references, and a Chromium image-decoding smoke test.
+- The user may need to apply the new cached app version in GARDENS > UPDATE APP (when shown) before Brave sees the replacement icons. Do not clear site data: that can delete locally saved gardens.
+- Android Brave installation needs a real-device retest after GitHub Pages deploys. A browser shortcut is not a substitute for confirming standalone PWA installation.
+
 ## P026 — Editor architecture & map-object rendering (2026-10-30)
 
 - Extracted the object catalog and its search/filter state from `App.tsx` without changing the existing palette, presets or placement semantics.

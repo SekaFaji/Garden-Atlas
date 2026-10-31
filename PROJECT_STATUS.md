@@ -1,3 +1,10 @@
+# Garden Atlas — P027 Android Installability Repair (2026-10-31)
+
+- Confirmed P026's 192x192 and 512x512 install icon PNG files are corrupt (not just visually imperfect); PIL image decoding fails and PNG integrity checks fail. The browser displays "This app cannot be installed" rather than the expected app install flow.
+- Replaced the actual manifest icon assets with valid PNG files featuring the existing Garden Atlas emblem. Preserved manifest scope, ID, standalone display, offline worker and all garden records.
+- Added full payload decoding and integrity tests, plus browser-level `Image.decode()` checks. The previous PWA tests checked icon listings only and missed this regression.
+- The new deployment is expected to fix one confirmed app-side installability blocker; Brave/Android physical install still requires user verification. Do not recommend clearing site data because the app stores gardens locally.
+
 # Garden Atlas — P026 Editor Component Boundaries (2026-10-30)
 
 - Refactored the existing object catalog into `src/components/ObjectCatalog.tsx`. Search and category filters now belong to the catalog instead of the top-level editor; object placement decisions remain in `App.tsx`.
