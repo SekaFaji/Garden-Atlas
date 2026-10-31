@@ -1,3 +1,10 @@
+# P028 — Android Installability Cache Compatibility (2026-10-31)
+
+- The live production URL passed Chromium DevTools manifest checks with zero reported installability errors, but Brave and Chrome on the user's Android device still show installation disabled. Cause on that specific device remains unverified.
+- Added a fresh manifest path and icon filenames to avoid Android cache reusing prior corrupted icon assets; preserved manifest identity, garden files and IndexedDB storage.
+- Replaced service-worker navigation cache-first with network-first plus offline fallback, so subsequent HTML updates can appear without waiting on an old cached shell.
+- Verify Android installation after applying the update. Do not clear site storage to troubleshoot, as this could erase local gardens.
+
 # Garden Atlas — P027 Android Installability Repair (2026-10-31)
 
 - Confirmed P026's 192x192 and 512x512 install icon PNG files are corrupt (not just visually imperfect); PIL image decoding fails and PNG integrity checks fail. The browser displays "This app cannot be installed" rather than the expected app install flow.

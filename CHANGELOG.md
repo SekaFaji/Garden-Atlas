@@ -1,3 +1,10 @@
+## P028 — Android PWA cache refresh and network-first shell (2026-10-31)
+
+- Live GitHub Pages Chromium diagnostics showed HTTP 200 for the active manifest and icons, a controlling service worker, and zero installability errors. Android Chrome and Brave still reject installation on the user device.
+- Introduced a new manifest filename and 192/512 icon URLs so mobile browsers can fetch fresh install metadata instead of reusing cached broken-icon URLs from before P027. The web app manifest ID, scope and start URL are unchanged.
+- Changed service-worker navigation to network-first with an offline cached-shell fallback, preventing indefinite stale HTML after a deployment. Static hashed assets continue to use cache-first.
+- Added regression tests for versioned assets, app identity and online/offline navigation. This is a cache-compatibility improvement, not a verified fix for the Android-specific install failure; physical-device validation is still required. Never clear site data without exporting backups.
+
 ## P027 — Android app installation reliability (2026-10-31)
 
 - Replaced invalid 192px and 512px PNGs used by the install manifest. The previous images had malformed IDAT streams despite plausible headers, preventing browsers from decoding app icons.

@@ -38,3 +38,19 @@ test('P014 manifest has project-scoped standalone installation and two sized ico
  assert.equal(m.display,'standalone');
  assert.ok(m.icons.some(i=>i.sizes==='192x192')&&m.icons.some(i=>i.sizes==='512x512'));
 });
+
+
+test('P028 navigation is network-first so updated install metadata is not trapped behind the offline shell',async()=>{
+ const handlers={},cached={'/Garden-Atlas/index.html':{source:'outdated shell'}};
+ const caches={open:async()=>({match:async path=>cached[path],addAll:async()=>{}})};
+ let online=true;
+ const env={URL,self:{location:{origin:'https://test.example'},addEventListener(n,fn){handlers[n]=fn;}},caches,fetch:async()=>{if(!online)throw Error('offline');return {source:'fresh shell'};}};
+ vm.runInNewContext(makeWorker(['index.html','manifest.webmanifest','manifest-v2.webmanifest'],'test'),env);
+ const request={method:'GET',mode:'navigate',url:'https://test.example/Garden-Atlas/'};
+ let p;handlers.fetch({request,respondWith(result){p=result;}});
+ assert.equal((await p).source,'fresh shell');
+ online=false;handlers.fetch({request,respondWith(result){p=result;}});
+ assert.equal((await p).source,'outdated shell');
+ let intercepted=false;handlers.fetch({request:{method:'GET',mode:'cors',url:'https://test.example/Garden-Atlas/icons/atlas-192-v2.png'},respondWith(){intercepted=true;}});
+ assert.equal(intercepted,false,'a prior worker does not capture new icon URLs');
+});

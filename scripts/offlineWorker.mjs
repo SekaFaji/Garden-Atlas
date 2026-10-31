@@ -24,7 +24,7 @@ self.addEventListener('fetch',e=>{
  if(e.request.method!=='GET')return;
  const u=new URL(e.request.url);
  if(u.origin!==self.location.origin||!u.pathname.startsWith(BASE))return;
- if(e.request.mode==='navigate'){e.respondWith(caches.open(CACHE).then(c=>c.match(BASE+'index.html')).then(hit=>hit||fetch(e.request)));return;}
+ if(e.request.mode==='navigate'){e.respondWith(fetch(e.request).catch(()=>caches.open(CACHE).then(c=>c.match(BASE+'index.html'))));return;}
  if(!ASSETS.includes(u.pathname))return;
  e.respondWith(caches.open(CACHE).then(c=>c.match(u.pathname)).then(hit=>hit||fetch(e.request)));
 });`;

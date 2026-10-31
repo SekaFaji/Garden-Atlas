@@ -62,3 +62,19 @@ test('P027 manifest references fully decodable install icons in both required si
     validatePng(data,size);
   }
 });
+
+
+test('P028 installation manifest and icons use fresh URLs without changing app identity',async()=>{
+  const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
+  assert.match(html,/rel="manifest" href="%BASE_URL%manifest-v2\.webmanifest"/);
+  const previous=JSON.parse(await readFile(new URL('../public/manifest.webmanifest',import.meta.url)));
+  const active=JSON.parse(await readFile(new URL('../public/manifest-v2.webmanifest',import.meta.url)));
+  for(const field of ['id','scope','start_url','display'])assert.equal(active[field],previous[field]);
+  for(const size of [192,512]){
+    const icon=active.icons.find(icon=>icon.sizes===`${size}x${size}`);
+    assert.ok(icon);
+    assert.equal(icon.src,`icons/atlas-${size}-v2.png`);
+    assert.ok(!previous.icons.some(old=>old.src===icon.src),'new icon URL avoids stale cached image');
+    validatePng(await readFile(new URL(`../public/${icon.src}`,import.meta.url)),size);
+  }
+});
