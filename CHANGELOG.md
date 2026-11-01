@@ -1,3 +1,10 @@
+## P033 - Extract map settings and tracing panels (2026-11-01)
+
+- Moved the existing map size UI into `MapSizePanel` with typed controlled dimensions and resize callbacks; all resizing rules and confirmations remain in App.
+- Moved reference-image import, visibility, opacity, width, offsets and removal controls into `ReferenceImagePanel`; image processing and garden data mutations remain in App.
+- Added component-boundary regression tests and Chromium smoke coverage for map size persistence and tracing disclosure.
+- No garden schema, stored records, sprite, gesture, PWA icons, service worker or new feature changes.
+
 ## P032 - Editor selection state and object actions (2026-11-01)
 
 - Extracted transient selected object/group/feature, batch IDs and multi-select state into `src/hooks/useEditorSelection.ts`; project changes clear all selection through one action.

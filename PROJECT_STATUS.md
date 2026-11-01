@@ -1,3 +1,10 @@
+# Garden Atlas P033 - Map Settings and Tracing Panels (2026-11-01)
+
+- Extracted existing map workspace sizing controls to `src/components/MapSizePanel.tsx` without changing dimensions, resize rules, confirmation or edit history.
+- Extracted tracing-image controls to `src/components/ReferenceImagePanel.tsx`; App retains image import, storage, validation, history, visibility state and removal confirmation.
+- Added boundary tests and a real Chromium regression path for workspace resizing/reload and tracing controls.
+- Garden format v6, reference image data, both maps, PWA installation icons and offline service worker are unchanged. Run CI and Android smoke tests before release claims.
+
 # Garden Atlas P032 - Editor Selection and Object Actions (2026-11-01)
 
 - Separated transient editor selection into `src/hooks/useEditorSelection.ts`; App controls navigation and owns all saved garden data.

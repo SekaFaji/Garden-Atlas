@@ -3,6 +3,8 @@ import { useEditorSelection } from './hooks/useEditorSelection';
 import { patchGardenObject, withoutGardenObjects, assignGardenObjects, duplicateGardenObject, addGardenGroup } from './editorObjectActions';
 import type { ChangeEvent } from 'react';
 import { MapView, type Tool } from './MapView';
+import { MapSizePanel } from './components/MapSizePanel';
+import { ReferenceImagePanel } from './components/ReferenceImagePanel';
 import { EDITOR_TOOLS, activeToolDescription } from './editorVisuals';
 import { ObjectIcon } from './components/ObjectIcon';
 import { GardenObjectList } from './components/GardenObjectList';
@@ -22,7 +24,7 @@ import { isSameEditBurst, type EditBurst } from './history';
 import { editFeaturePoint, resizeObjectAxes, type FeatureSelection, type EditAction } from './featureEdit';
 import {
   GROUNDS, KINDS, createPresetObject, changeObjectPreset, addLine, addRegion, alignSelection, moveSelection, setReferenceWidth, demoGarden, emptyGarden, isGarden,
-  movePlaced, polygonArea, removeGroup, resizeGarden, resizeWorkspace, addSurroundings, setBoundary, previewLinkedSource, chooseLinkedSource,
+  movePlaced, removeGroup, resizeGarden, resizeWorkspace, addSurroundings, setBoundary, previewLinkedSource, chooseLinkedSource,
   type Garden, type GardenObject, type Ground, type Kind, type Mode, type Point, type LineKind
 } from './model';
 import {
@@ -416,21 +418,11 @@ export default function App(){
           <p className="migration-note">Choose a source before editing. Your original P006 browser storage remains recoverable using the previous local recovery snapshot or a backup.</p>
         </section>}
         <div ref={mapFrameRef} className={`map-frame ${garden.linkMigration&&!garden.linkMigration.confirmed?'migration-locked':''}`}><div className="map-toolbar"><span>● {mode==='scale'?'MEASURED MAP':'PIXEL MAP'} · {garden.width} × {garden.height} m</span><button type="button" className="map-size-toggle" aria-expanded={mapSizeOpen} aria-controls="map-size-panel" onClick={()=>setMapSizeOpen(o=>!o)}>▣ MAP SIZE {mapSizeOpen?'▴':'▾'}</button></div>
-          {mapSizeOpen&&<section id="map-size-panel" className="map-size-panel" aria-label="Map size and surrounding workspace">
-            <div className="map-size-heading"><strong>EDIT MAP SIZE</strong><span>Both map styles use the same dimensions</span></div>
-            <p>Set the surrounding <b>workspace</b> size separately from the property boundary. You can enlarge the map without stretching trees, paths or land measurements.</p>
-            <div className="map-size-fields">
-              <label>WIDTH (m)<input type="number" min="10" max="500" step="1" value={dims.width} onChange={e=>setDims(d=>({...d,width:e.target.value}))}/></label>
-              <label>HEIGHT (m)<input type="number" min="10" max="500" step="1" value={dims.height} onChange={e=>setDims(d=>({...d,height:e.target.value}))}/></label>
-            </div>
-            <fieldset className="map-size-modes"><legend>WHEN RESIZING</legend>
-              <label><input type="radio" name="map-resize-mode" checked={resizeMode==='preserve'} onChange={()=>setResizeMode('preserve')}/> Keep actual garden size and positions <small>Recommended: change only the surrounding workspace; unsafe shrinking is blocked.</small></label>
-              <label><input type="radio" name="map-resize-mode" checked={resizeMode==='scale'} onChange={()=>setResizeMode('scale')}/> Scale entire garden to fit <small>Changes distances, plant positions, boundaries and paths. Requires confirmation.</small></label>
-            </fieldset>
-            <div className="map-size-actions"><button className="btn btn-highlight" onClick={changeDimensions}>APPLY MAP SIZE</button><button className="btn btn-muted" onClick={()=>setDims({width:String(garden.width),height:String(garden.height)})}>RESET FIELDS</button></div>
-            <div className="map-margin-controls"><span>NEED MORE SURROUNDINGS?</span><button className="btn btn-muted" onClick={()=>expandAroundGarden(10)}>+10 m EACH SIDE</button><button className="btn btn-muted" onClick={()=>expandAroundGarden(25)}>+25 m EACH SIDE</button></div>
-            <p className="map-size-footnote">Property outline: {polygonArea(garden.layout.boundary).toFixed(1)} m². To alter the actual land border, use DRAW BORDER or EDIT BORDER. All changes can be undone.</p>
-          </section>}
+          {mapSizeOpen&&<MapSizePanel garden={garden} dimensions={dims} resizeMode={resizeMode}
+            onDimensionChange={(axis,value)=>setDims(previous=>({...previous,[axis]:value}))}
+            onResizeModeChange={setResizeMode} onApply={changeDimensions}
+            onReset={()=>setDims({width:String(garden.width),height:String(garden.height)})}
+            onExpand={expandAroundGarden}/>}
           <div className="editor-history-bar" aria-label="Editing history">
               <button className={multiSelect?'active-history':''} aria-pressed={multiSelect} onClick={()=>{if(!setNewTool('select'))return;setMultiSelect(v=>!v);setSelectedGroupId(null);setSelectedId(null);}} title="Tap objects to select multiple">◩ MULTI</button>
               <button className={snapEnabled?'active-history':''} aria-pressed={snapEnabled} onClick={()=>setSnapEnabled(v=>!v)} title="Snap moves and placements to a 0.5 metre grid">⌗ SNAP {snapEnabled?'ON':'OFF'}</button>
@@ -443,26 +435,13 @@ export default function App(){
           </div>
           {(tool==='path'||tool==='fence')&&<div className="terrain-chooser"><span>{tool.toUpperCase()} WIDTH (M)</span><MetricDraftInput label="New path or fence width in metres" min={0.2} max={12} value={lineWidth} onCommit={setLineWidth} onNotice={setNotice}/></div>}
           {tool==='terrain'&&<div className="terrain-chooser"><span>NEW REGION</span><select aria-label="Terrain brush" value={ground} onChange={e=>setGround(e.target.value as Ground)}>{GROUNDS.map(g=><option key={g.value} value={g.value}>{g.label}</option>)}</select></div>}
-          <div className="reference-toolbar">
-            <button className="btn btn-muted" onClick={()=>setReferenceOpen(o=>!o)} aria-expanded={referenceOpen} aria-controls="reference-panel">▧ TRACE IMAGE {referenceOpen?'▴':'▾'} {garden.reference?'●':''}</button>
-            {garden.reference&&<label><input type="checkbox" checked={showReference} onChange={e=>setShowReference(e.target.checked)}/> SHOW ON MAP</label>}
-          </div>
-          {referenceOpen&&<section id="reference-panel" className="reference-panel" aria-label="Local reference image controls">
-            <p>Import a JPG, PNG or WebP aerial photo or plan. The image stays on this device, and is included in JSON backups. No automatic geolocation or measurement accuracy is assumed.</p>
-            <input ref={referenceFile} hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={referenceChange}/>
-            <button className="btn btn-highlight" disabled={importingReference} onClick={()=>referenceFile.current?.click()}>{importingReference?'PROCESSING IMAGE…':garden.reference?'REPLACE REFERENCE IMAGE':'IMPORT REFERENCE IMAGE'}</button>
-            {garden.reference&&<>
-              <small>{garden.reference.name} · shown in BOTH map styles</small>
-              <label>OPACITY {Math.round(garden.reference.opacity*100)}%<input type="range" min="5" max="100" step="5" value={garden.reference.opacity*100} onChange={e=>updateReference({opacity:Number(e.target.value)/100})}/></label>
-              <label>IMAGE WIDTH (metres)<MetricDraftInput label="Tracing image width in metres" min={0.5} max={garden.width} value={garden.reference.widthM} onCommit={referenceWidth} onNotice={setNotice}/></label>
-              <div className="reference-coordinates">
-                <label>LEFT X (m)<MetricDraftInput label="Tracing image X offset in metres" min={0} max={Math.max(0,garden.width-garden.reference.widthM)} value={garden.reference.x} onCommit={x=>updateReference({x})} onNotice={setNotice}/></label>
-                <label>TOP Y (m)<MetricDraftInput label="Tracing image Y offset in metres" min={0} max={Math.max(0,garden.height-garden.reference.heightM)} value={garden.reference.y} onCommit={y=>updateReference({y})} onNotice={setNotice}/></label>
-              </div>
-              <button className="btn btn-danger" onClick={()=>{if(window.confirm('Remove this tracing image from your garden? Undo can restore it.')){const {reference:_reference,...rest}=garden;void _reference;applyGarden(rest);}}}>REMOVE REFERENCE</button>
-              <p>Align the image using width and X/Y offsets. For accurate tracing, calibrate from a known real-world distance. This is a visual reference, not a legal survey.</p>
-            </>}
-          </section>}
+          <ReferenceImagePanel garden={garden} open={referenceOpen} importing={importingReference}
+            visible={showReference} fileInputRef={referenceFile} onToggle={()=>setReferenceOpen(o=>!o)}
+            onVisibleChange={setShowReference} onImport={referenceChange}
+            onOpacityChange={opacity=>updateReference({opacity})} onWidthChange={referenceWidth}
+            onPositionChange={updateReference}
+            onRemove={()=>{if(window.confirm('Remove this tracing image from your garden? Undo can restore it.')){const {reference:_reference,...rest}=garden;void _reference;applyGarden(rest);}}}
+            onNotice={setNotice}/>
           {tool==='feature-edit'&&<div className="feature-edit-controls" role="group" aria-label="Edit selected path or terrain">
             <span>{selectedFeature?`EDIT ${selectedFeature.kind.toUpperCase()} · ${selectedFeature.id}`:'SELECT A PATH, FENCE OR TERRAIN REGION'}</span>
             <button disabled={!selectedFeature||selectedVertex===null} onClick={()=>{
