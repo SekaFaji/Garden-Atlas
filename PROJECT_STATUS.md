@@ -1,3 +1,10 @@
+# Garden Atlas P034 - Map Toolbar and Tool Transition Rules (2026-11-01)
+
+- Extracted toolbar/history/path/terrain UI into `src/components/MapEditingToolbar.tsx` with typed callbacks.
+- Extracted existing tool lock and draft-confirmation rules into `src/toolAccess.ts`, including the unlocked-regions feature-edit exception.
+- App still owns prompts, tool state, save recovery, undo/redo and all garden mutations.
+- Schema v6, PWA icons/manifest, offline worker, map sprites and gesture behavior remain unchanged.
+
 # Garden Atlas P033 - Map Settings and Tracing Panels (2026-11-01)
 
 - Extracted existing map workspace sizing controls to `src/components/MapSizePanel.tsx` without changing dimensions, resize rules, confirmation or edit history.

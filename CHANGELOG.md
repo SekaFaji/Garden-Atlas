@@ -1,3 +1,9 @@
+## P034 - Map toolbar and tool-transition rules (2026-11-01)
+
+- Extracted the existing editing history bar, main tool buttons, path/fence width and terrain selector into typed `MapEditingToolbar`, preserving layout and control labels.
+- Separated original locked-layer rules and unfinished-draft confirmation conditions into tested `toolAccess.ts`. Dialogs, selection state, undo/redo and saved garden edits remain in App.
+- Added regression tests and Chromium toolbar smoke coverage; no garden schema, installation assets, artwork, gestures, IndexedDB or offline changes.
+
 ## P033 - Extract map settings and tracing panels (2026-11-01)
 
 - Moved the existing map size UI into `MapSizePanel` with typed controlled dimensions and resize callbacks; all resizing rules and confirmations remain in App.

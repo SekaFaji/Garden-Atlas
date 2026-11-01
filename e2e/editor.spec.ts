@@ -162,3 +162,22 @@ test('P033 map resizing persists across reload and tracing panel remains accessi
   await page.locator('.reference-toolbar button').click();
   await expect(page.locator('#reference-panel')).toHaveCount(0);
 });
+
+test('P034 map toolbar retains tool selection, snap and multi-select', async ({ page }) => {
+  await page.goto('/Garden-Atlas/');
+  await expect(page.locator('.save-status')).toContainText(/INDEXEDDB SAVED|LOCAL SAVE/, { timeout: 15_000 });
+  const toolbar=page.locator('.primary-tools');
+  await toolbar.getByRole('button', { name: /^PATH:/ }).click();
+  await expect(page.locator('.terrain-chooser')).toContainText('PATH WIDTH');
+  await expect(toolbar.getByRole('button', { name: /^PATH:/ })).toHaveAttribute('aria-pressed','true');
+  await toolbar.getByRole('button', { name: /^TERRAIN:/ }).click();
+  await expect(page.getByRole('combobox', { name: 'Terrain brush' })).toBeVisible();
+  await toolbar.getByRole('button', { name: /^SELECT:/ }).click();
+  await expect(page.locator('.terrain-chooser')).toHaveCount(0);
+  const history=page.locator('.editor-history-bar');
+  await history.getByRole('button', { name: /SNAP OFF/ }).click();
+  await expect(history.getByRole('button', { name: /SNAP ON/ })).toHaveAttribute('aria-pressed','true');
+  await history.getByRole('button', { name: /MULTI/ }).click();
+  await expect(history.getByRole('button', { name: /MULTI/ })).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('.map-tool-pill')).toContainText('MULTI SELECT');
+});
