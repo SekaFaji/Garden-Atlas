@@ -4,14 +4,15 @@ import { patchGardenObject, withoutGardenObjects, assignGardenObjects, duplicate
 import type { ChangeEvent } from 'react';
 import { MapView, type Tool } from './MapView';
 import { MapSizePanel } from './components/MapSizePanel';
+import { MapEditingToolbar } from './components/MapEditingToolbar';
+import { toolLockMessage, needsDraftExitConfirmation, draftExitMessage } from './toolAccess';
 import { ReferenceImagePanel } from './components/ReferenceImagePanel';
-import { EDITOR_TOOLS, activeToolDescription } from './editorVisuals';
+import { activeToolDescription } from './editorVisuals';
 import { ObjectIcon } from './components/ObjectIcon';
 import { GardenObjectList } from './components/GardenObjectList';
-import { GardenLayersPanel, type LayerKey, type LayerState } from './components/GardenLayersPanel';
+import { GardenLayersPanel, type LayerState } from './components/GardenLayersPanel';
 import { ObjectCatalog } from './components/ObjectCatalog';
 import { NameDraftInput } from './NameDraftInput';
-import { MetricDraftInput } from './MetricDraftInput';
 import { defaultPreset, getPreset } from './catalog';
 import { GardenReport } from './Report';
 import { EditorHeader, type SaveStatus } from './components/EditorHeader';
@@ -23,7 +24,7 @@ import { imageToReference } from './reference';
 import { isSameEditBurst, type EditBurst } from './history';
 import { editFeaturePoint, resizeObjectAxes, type FeatureSelection, type EditAction } from './featureEdit';
 import {
-  GROUNDS, KINDS, createPresetObject, changeObjectPreset, addLine, addRegion, alignSelection, moveSelection, setReferenceWidth, demoGarden, emptyGarden, isGarden,
+  KINDS, createPresetObject, changeObjectPreset, addLine, addRegion, alignSelection, moveSelection, setReferenceWidth, demoGarden, emptyGarden, isGarden,
   movePlaced, removeGroup, resizeGarden, resizeWorkspace, addSurroundings, setBoundary, previewLinkedSource, chooseLinkedSource,
   type Garden, type GardenObject, type Ground, type Kind, type Mode, type Point, type LineKind
 } from './model';
@@ -333,14 +334,14 @@ export default function App(){
     }).catch(()=>setNotice('Could not read the file.'));
   };
   const confirmDraftExit=(nextTool:Tool,nextMode:Mode=mode)=>{
-    if(draftCount>0&&(nextTool!==tool||nextMode!==mode)){
-      return window.confirm(`Discard ${draftCount} unfinished drawing point${draftCount===1?'':'s'}? Finish or clear the shape first to keep working on it.`);
+    if(needsDraftExitConfirmation(draftCount,tool,nextTool,mode,nextMode)){
+      return window.confirm(draftExitMessage(draftCount));
     }
     return true;
   };
   const setNewTool=(value:Tool):boolean=>{
-    const layer:LayerKey|null=value==='outline-edit'||value==='outline-draw'||value==='freehand'?'boundary':value==='terrain'?'regions':value==='path'||value==='fence'||value==='feature-edit'?'lines':KINDS.some(k=>k.kind===value)?'objects':null;
-    if(layer&&locked[layer]&&!(value==='feature-edit'&&!locked.regions)){setNotice(`Unlock ${layer} to use this tool.`);return false;}
+    const lockMessage=toolLockMessage(value,locked);
+    if(lockMessage){setNotice(lockMessage);return false;}
     if(!confirmDraftExit(value))return false;
     setTool(value);if(value!=='select')setMultiSelect(false);if(value==='select'||value==='pan')setNotice(value==='select'?'Drag an object to move it, or drag empty ground to pan.':'Pan around the map; pinch with two fingers to zoom.');
     return true;
@@ -423,18 +424,14 @@ export default function App(){
             onResizeModeChange={setResizeMode} onApply={changeDimensions}
             onReset={()=>setDims({width:String(garden.width),height:String(garden.height)})}
             onExpand={expandAroundGarden}/>}
-          <div className="editor-history-bar" aria-label="Editing history">
-              <button className={multiSelect?'active-history':''} aria-pressed={multiSelect} onClick={()=>{if(!setNewTool('select'))return;setMultiSelect(v=>!v);setSelectedGroupId(null);setSelectedId(null);}} title="Tap objects to select multiple">◩ MULTI</button>
-              <button className={snapEnabled?'active-history':''} aria-pressed={snapEnabled} onClick={()=>setSnapEnabled(v=>!v)} title="Snap moves and placements to a 0.5 metre grid">⌗ SNAP {snapEnabled?'ON':'OFF'}</button>
-              <button disabled={!past.length||Boolean(garden.linkMigration&&!garden.linkMigration.confirmed)} onClick={undo} title="Undo · Ctrl/Cmd+Z">↶ UNDO</button>
-              <button disabled={!future.length||Boolean(garden.linkMigration&&!garden.linkMigration.confirmed)} onClick={redo} title="Redo · Ctrl/Cmd+Shift+Z">↷ REDO</button>
-              <span>{garden.linkMigration&&!garden.linkMigration.confirmed?'CHOOSE MAP SOURCE FIRST':'BOTH MAPS LINKED'}</span>
-            </div>
-            <div className="primary-tools" role="toolbar" aria-label="Editor interaction tools">
-            {EDITOR_TOOLS.map(x=><button type="button" key={x.id} className={tool===x.id?'active':''} aria-pressed={tool===x.id} aria-label={`${x.name}: ${x.hint}`} title={x.hint} onClick={()=>setNewTool(x.id)}>{x.label}</button>)}
-          </div>
-          {(tool==='path'||tool==='fence')&&<div className="terrain-chooser"><span>{tool.toUpperCase()} WIDTH (M)</span><MetricDraftInput label="New path or fence width in metres" min={0.2} max={12} value={lineWidth} onCommit={setLineWidth} onNotice={setNotice}/></div>}
-          {tool==='terrain'&&<div className="terrain-chooser"><span>NEW REGION</span><select aria-label="Terrain brush" value={ground} onChange={e=>setGround(e.target.value as Ground)}>{GROUNDS.map(g=><option key={g.value} value={g.value}>{g.label}</option>)}</select></div>}
+          <MapEditingToolbar tool={tool} multiSelect={multiSelect} snapEnabled={snapEnabled}
+            canUndo={past.length>0} canRedo={future.length>0}
+            migrationBlocked={Boolean(garden.linkMigration&&!garden.linkMigration.confirmed)}
+            lineWidth={lineWidth} ground={ground}
+            onToggleMultiSelect={()=>{if(!setNewTool('select'))return;setMultiSelect(v=>!v);setSelectedGroupId(null);setSelectedId(null);}}
+            onToggleSnap={()=>setSnapEnabled(v=>!v)}
+            onUndo={undo} onRedo={redo} onSelectTool={setNewTool}
+            onLineWidthChange={setLineWidth} onGroundChange={setGround} onNotice={setNotice}/>
           <ReferenceImagePanel garden={garden} open={referenceOpen} importing={importingReference}
             visible={showReference} fileInputRef={referenceFile} onToggle={()=>setReferenceOpen(o=>!o)}
             onVisibleChange={setShowReference} onImport={referenceChange}
