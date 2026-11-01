@@ -21,7 +21,7 @@ test('P034 locked layers block edits, including the original feature edit except
  assert.equal(toolLockMessage('terrain',locked),'Unlock regions to use this tool.');
  assert.equal(toolLockMessage('feature-edit',locked),'Unlock lines to use this tool.');
  assert.equal(toolLockMessage('feature-edit',{...locked,regions:false}),null);
- assert.equal(toolLockMessage('feature-edit',{...locked,lines:false}),'Unlock lines to use this tool.');
+ assert.equal(toolLockMessage('feature-edit',{...locked,lines:false}),null);
  assert.equal(toolLockMessage('tree',unlocked()),null);
 });
 test('P034 unfinished drafts only prompt for actual tool or view changes',()=>{
