@@ -1,3 +1,10 @@
+## P035 - Isolate undo/redo history and edit bursts (2026-11-01)
+
+- Extracted transient undo/redo stacks into a dedicated `useGardenHistory` hook and pure history transitions in `history.ts`.
+- Preserved existing 40-snapshot limit, 1.2-second grouping window, undo/redo buttons, keyboard shortcuts and redo invalidation after a new edit.
+- Project switching and legacy-map linking clear history; garden validation, storage conflict protection and save ownership remain in App.
+- Added regression tests and a browser smoke test for undo/redo and save/reload. No changes to the version-6 garden format, PWA/Android assets, art or map gestures.
+
 ## P034 - Map toolbar and tool-transition rules (2026-11-01)
 
 - Extracted the existing editing history bar, main tool buttons, path/fence width and terrain selector into typed `MapEditingToolbar`, preserving layout and control labels.

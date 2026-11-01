@@ -181,3 +181,22 @@ test('P034 map toolbar retains tool selection, snap and multi-select', async ({ 
   await expect(history.getByRole('button', { name: /MULTI/ })).toHaveAttribute('aria-pressed','true');
   await expect(page.locator('.map-tool-pill')).toContainText('MULTI SELECT');
 });
+
+
+test('P035 garden name undo/redo survives a save without altering linked layouts', async ({ page }) => {
+  await page.goto('/Garden-Atlas/');
+  await expect(page.locator('.save-status')).toContainText(/INDEXEDDB SAVED|LOCAL SAVE/, {timeout:15_000});
+  const name=page.getByRole('textbox',{name:'Garden name'});
+  const initial=await name.inputValue();
+  await name.fill('P035 Undo Redo Regression');
+  await name.press('Enter');
+  await expect(name).toHaveValue('P035 Undo Redo Regression');
+  const history=page.locator('.editor-history-bar');
+  await history.getByRole('button',{name:/UNDO/}).click();
+  await expect(name).toHaveValue(initial);
+  await history.getByRole('button',{name:/REDO/}).click();
+  await expect(name).toHaveValue('P035 Undo Redo Regression');
+  await expect(page.locator('.save-status')).toContainText(/INDEXEDDB SAVED|LOCAL SAVE/, {timeout:15_000});
+  await page.reload();
+  await expect(page.getByRole('textbox',{name:'Garden name'})).toHaveValue('P035 Undo Redo Regression');
+});

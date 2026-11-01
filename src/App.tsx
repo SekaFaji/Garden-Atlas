@@ -21,7 +21,7 @@ import { GardenProjectsPanel } from './components/GardenProjectsPanel';
 import { MobileNavigation, type EditorPanel } from './components/MobileNavigation';
 import { downloadJson, gardenSlug, backupDate } from './utils/backup';
 import { imageToReference } from './reference';
-import { isSameEditBurst, type EditBurst } from './history';
+import { useGardenHistory } from './hooks/useGardenHistory';
 import { editFeaturePoint, resizeObjectAxes, type FeatureSelection, type EditAction } from './featureEdit';
 import {
   KINDS, createPresetObject, changeObjectPreset, addLine, addRegion, alignSelection, moveSelection, setReferenceWidth, demoGarden, emptyGarden, isGarden,
@@ -89,9 +89,7 @@ export default function App(){
   const skipFirstSave=useRef(true);
   const migrationPending=useRef(false);
   const [storageInfo,setStorageInfo]=useState('Checking storage…');
-  const [past,setPast]=useState<Garden[]>([]);
-  const historyGroup=useRef<EditBurst|null>(null);
-  const [future,setFuture]=useState<Garden[]>([]);
+  const {past,future,recordEdit,clearHistory,takeUndo,takeRedo}=useGardenHistory();
   const importFile=useRef<HTMLInputElement>(null),importAllFile=useRef<HTMLInputElement>(null);
   const selected=garden.objects.find(o=>o.id===selectedId)??null;
   const selectedGroup=garden.groups.find(g=>g.id===selectedGroupId)??null;
@@ -171,21 +169,16 @@ export default function App(){
     const previous=libraryRef.current.projects.find(p=>p.id===libraryRef.current.activeId)!.garden;
     if(JSON.stringify(previous)===JSON.stringify(next))return;
     if(withHistory&&previous.linkMigration&&!previous.linkMigration.confirmed){setNotice('Choose and confirm your old map source first. Both original maps are preserved.');return;}
-    if(withHistory){
-      const now=Date.now(),grouped=isSameEditBurst(historyGroup.current,historyKey,now);
-      if(!grouped)setPast(list=>[...list.slice(-39),previous]);
-      historyGroup.current=historyKey?{key:historyKey,time:now}:null;
-      setFuture([]);
-    }
+    if(withHistory)recordEdit(previous,historyKey);
     const updated=updateActiveGarden(libraryRef.current,next);libraryRef.current=updated;setLibrary(updated);
   };
   const replaceLibrary=(next:ProjectLibrary)=>{
-    libraryRef.current=next;setLibrary(next);setPast([]);setFuture([]);historyGroup.current=null;resetSelection();setTool('select');
+    libraryRef.current=next;setLibrary(next);clearHistory();resetSelection();setTool('select');
     // Projects, restores and imports must return to the new garden, not leave the user below a hidden panel.
     navigateTo('map');
   };
-  const undo=()=>{historyGroup.current=null;if(garden.linkMigration&&!garden.linkMigration.confirmed)return;if(!past.length)return;const prev=past[past.length-1];setPast(p=>p.slice(0,-1));setFuture(f=>[...f,garden]);applyGarden(prev,false);setNotice('Undid last edit.');};
-  const redo=()=>{historyGroup.current=null;if(garden.linkMigration&&!garden.linkMigration.confirmed)return;if(!future.length)return;const next=future[future.length-1];setFuture(f=>f.slice(0,-1));setPast(p=>[...p,garden]);applyGarden(next,false);setNotice('Redid edit.');};
+  const undo=()=>{if(garden.linkMigration&&!garden.linkMigration.confirmed)return;const previous=takeUndo(garden);if(!previous)return;applyGarden(previous,false);setNotice('Undid last edit.');};
+  const redo=()=>{if(garden.linkMigration&&!garden.linkMigration.confirmed)return;const next=takeRedo(garden);if(!next)return;applyGarden(next,false);setNotice('Redid edit.');};
   useEffect(()=>{
     const listener=(event:KeyboardEvent)=>{
       const target=event.target as HTMLElement|null;
@@ -414,7 +407,7 @@ export default function App(){
           <strong>LINK YOUR EXISTING GARDEN</strong>
           <p>Your previous Scale and Illustration maps may differ. Both originals have been archived inside this garden and will be included in your JSON backups. Choose which old layout should become the single editable layout.</p>
           <div className="migration-actions"><button className={garden.linkMigration.source==='scale'?'active':''} onClick={()=>applyGarden(previewLinkedSource(garden,'scale'),false)}>PREVIEW SCALE</button><button className={garden.linkMigration.source==='illustration'?'active':''} onClick={()=>applyGarden(previewLinkedSource(garden,'illustration'),false)}>PREVIEW ILLUSTRATION</button></div>
-          <button className="btn btn-highlight" onClick={()=>{applyGarden(chooseLinkedSource(garden,garden.linkMigration!.source),false);setPast([]);setFuture([]);setNotice('Both maps are now linked. The original layouts remain in your JSON backups.');}}>USE {garden.linkMigration.source.toUpperCase()} AS SHARED MAP</button>
+          <button className="btn btn-highlight" onClick={()=>{applyGarden(chooseLinkedSource(garden,garden.linkMigration!.source),false);clearHistory();setNotice('Both maps are now linked. The original layouts remain in your JSON backups.');}}>USE {garden.linkMigration.source.toUpperCase()} AS SHARED MAP</button>
           <button className="btn btn-muted" onClick={()=>downloadJson(`garden-atlas-pre-link-${gardenSlug(garden.name)}.json`,JSON.stringify(garden.linkMigration!.original,null,2))}>↓ DOWNLOAD ORIGINAL TWO-VIEW BACKUP</button>
           <p className="migration-note">Choose a source before editing. Your original P006 browser storage remains recoverable using the previous local recovery snapshot or a backup.</p>
         </section>}
