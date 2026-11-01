@@ -1,3 +1,11 @@
+# Garden Atlas P032 - Editor Selection and Object Actions (2026-11-01)
+
+- Separated transient editor selection into `src/hooks/useEditorSelection.ts`; App controls navigation and owns all saved garden data.
+- Moved object edits, group assignment, group creation, deletion, duplicate and checkbox selection transformations to pure testable helpers in `src/editorObjectActions.ts`.
+- Lock checks, confirmation prompts, redo/undo, validation, save conflict handling and indexed database writes remain unchanged in App.
+- Added pure helper and architecture regression coverage; no schema, artwork, service worker, icons or installation changes.
+- This is one focused architecture step, not a complete App rewrite; verify CI and continue small steps before artwork.
+
 # Garden Atlas P031 - Map Renderer Separation (2026-11-01)
 
 - Extracted all original SVG map layers into `src/components/MapScene.tsx`; `MapView.tsx` retains gesture state, draft state, camera logic, event handlers and all feature edits.
