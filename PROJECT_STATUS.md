@@ -1,3 +1,10 @@
+# Garden Atlas P035 - Editor History Isolation (2026-11-01)
+
+- Pure history transitions in `src/history.ts`; ephemeral state and edit-burst ordering in `src/hooks/useGardenHistory.ts`.
+- Existing 40-step undo cap, grouping window, keyboard shortcuts, redo clearing and project/map-migration resets preserved.
+- App retains actual garden updates, validation, IndexedDB hydration/write/conflict safety and undo/redo messages.
+- Added history regression tests and Chromium undo/redo persistence coverage; schema v6, reference images, PWA manifest/worker and sprites untouched.
+
 # Garden Atlas P034 - Map Toolbar and Tool Transition Rules (2026-11-01)
 
 - Extracted toolbar/history/path/terrain UI into `src/components/MapEditingToolbar.tsx` with typed callbacks.
