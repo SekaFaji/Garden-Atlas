@@ -137,3 +137,28 @@ test('P031 Android-sized touch controls preserve zoom and deliberate path draft 
     await context.close();
   }
 });
+
+
+test('P033 map resizing persists across reload and tracing panel remains accessible', async ({ page }) => {
+  await page.goto('/Garden-Atlas/');
+  await expect(page.locator('.save-status')).toContainText(/INDEXEDDB SAVED|LOCAL SAVE/, { timeout: 15_000 });
+  const openMapSize = page.locator('.map-size-toggle');
+  await openMapSize.click();
+  const panel = page.locator('#map-size-panel');
+  await expect(panel).toBeVisible();
+  const width = panel.locator('input[type="number"]').first();
+  await width.fill('50');
+  await panel.getByRole('button', { name: 'APPLY MAP SIZE' }).click();
+  await expect(page.locator('.map-toolbar')).toContainText('50 × 26 m');
+  await expect(page.locator('.save-status')).toContainText(/INDEXEDDB SAVED|LOCAL SAVE/, { timeout: 15_000 });
+  await page.reload();
+  await expect(page.locator('.save-status')).toContainText(/INDEXEDDB SAVED|LOCAL SAVE/, { timeout: 15_000 });
+  await expect(page.locator('.map-toolbar')).toContainText('50 × 26 m');
+  await page.locator('.map-size-toggle').click();
+  await expect(page.locator('#map-size-panel input[type="number"]').first()).toHaveValue('50');
+  await page.locator('.reference-toolbar button').click();
+  await expect(page.locator('#reference-panel')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'IMPORT REFERENCE IMAGE' })).toBeVisible();
+  await page.locator('.reference-toolbar button').click();
+  await expect(page.locator('#reference-panel')).toHaveCount(0);
+});
