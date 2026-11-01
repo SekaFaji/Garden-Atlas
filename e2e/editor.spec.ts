@@ -102,3 +102,38 @@ test('P030 object list, group controls and visibility preserve existing editing 
   await expect(page.locator('.group-entry').filter({ hasText: 'P030 Smoke Group' })).toHaveCount(1);
   await expect(page.locator('.save-status')).toContainText(/INDEXEDDB SAVED|LOCAL SAVE/, { timeout: 15_000 });
 });
+
+test('P031 Android-sized touch controls preserve zoom and deliberate path draft interactions', async ({ browser }) => {
+  const context = await browser.newContext({
+    viewport: { width: 393, height: 852 },
+    isMobile: true,
+    hasTouch: true,
+    deviceScaleFactor: 2,
+  });
+  try {
+    const page = await context.newPage();
+    await page.goto('/Garden-Atlas/');
+    await expect(page.locator('.save-status')).toContainText(/INDEXEDDB SAVED|LOCAL SAVE/, { timeout: 15_000 });
+    await expect(page.locator('.map-surface [data-object]')).not.toHaveCount(0);
+
+    const status = page.locator('.viewport-status');
+    const before = await status.innerText();
+    await page.getByRole('button', {name: 'Zoom in'}).tap();
+    await expect(status).not.toHaveText(before);
+
+    await page.locator('.primary-tools button[aria-label^="PATH:"]').tap();
+    const progress = page.locator('.drawing-controls .drawing-progress');
+    await expect(progress).toContainText('0 / 2');
+    const map = page.locator('.map-surface');
+    await map.scrollIntoViewIfNeeded();
+    const rect = await map.boundingBox();
+    expect(rect).not.toBeNull();
+    await page.touchscreen.tap(rect!.x + rect!.width/2, rect!.y + rect!.height/2);
+    await expect(progress).toContainText('1 / 2');
+    await page.locator('.drawing-controls button[title="Discard draft points"]').tap();
+    await expect(progress).toContainText('0 / 2');
+    await expect(page.locator('.map-surface [data-object]')).not.toHaveCount(0);
+  } finally {
+    await context.close();
+  }
+});

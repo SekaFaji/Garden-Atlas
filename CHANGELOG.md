@@ -1,3 +1,10 @@
+## P031 - Map scene architecture and mobile gesture regression coverage (2026-11-01)
+
+- Extracted the existing garden SVG layers and feature hit targets from `MapView.tsx` into typed `src/components/MapScene.tsx`. MapView continues to own all pointer handling, camera interactions, draft controls and callbacks.
+- Moved object/group drag preview offsets into pure `src/mapPreview.ts` with unit tests covering individual drag, group previews, multi-select offsets and safe absent anchors.
+- Added renderer-boundary regression tests and an Android-sized Chromium touch smoke test for zooming and starting/clearing a path draft.
+- Kept the version-6 garden schema, object artwork, dimensions, IndexedDB saves and working P028 standalone installation files unchanged. No new garden features.
+
 ## P030 — Sidebar architecture and regression coverage (2026-10-31)
 
 - Extracted the left sidebar object list, batch selection, alignment, group controls, layers and feature lists into `GardenObjectList.tsx` and `GardenLayersPanel.tsx`.

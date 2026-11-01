@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react';
-import { MapObject } from './components/MapObject';
-import { selectionStyle } from './editorVisuals';
+import { MapScene } from './components/MapScene';
 import { closestEdge, formatArea } from './geometry';
 import { deliberateTap, intentionalDrag, type ScreenPoint } from './touchIntent';
 import { isDrawingTool, minimumDrawingPoints, drawingHint, drawingToolName } from './drawingUX';
@@ -40,10 +39,7 @@ type Activity =
   | {kind:'feature-node';feature:FeatureSelection;index:number;point:Point;screenStart:ScreenPoint;pointerType:string;moved:boolean}
   | {kind:'resize';id:string;origin:Point;widthM:number;lengthM:number;screenStart:ScreenPoint;pointerType:string;moved:boolean};
 const ppu=WORLD.pixelsPerUnit;
-const color: Record<Ground,string>={grass:'#8ebc77',soil:'#a57c53',gravel:'#a8aca0',stone:'#bdb8a9',water:'#64a6bc'};
 const snap=(p:Point,mode:Mode,force=false):Point=>force?{x:Math.round(p.x*2)/2,y:Math.round(p.y*2)/2}:mode==='scale'?{x:Math.round(p.x*10)/10,y:Math.round(p.y*10)/10}:p;
-const px=(p:Point)=>`${p.x*ppu},${p.y*ppu}`;
-const polygon=(pts:Point[])=>pts.map(px).join(' ');
 const midpoint=(a:PointerInfo,b:PointerInfo)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
 const distance=(a:PointerInfo,b:PointerInfo)=>Math.hypot(a.x-b.x,a.y-b.y);
 export function MapView({garden,mode,tool,onDraftCountChange,selectedId,selectedGroupId,selectedIds,multiSelect,snapEnabled,showReference,terrain,lineWidth,hidden,locked,selectedFeature,onSelectFeature,onSelectVertex,onEditFeature,onResizeObject,onPick,onTogglePick,onMoveSelection,onPlace,onMove,onBoundary,onTerrain,onLine,onNotice}:Props){
@@ -271,85 +267,17 @@ export function MapView({garden,mode,tool,onDraftCountChange,selectedId,selected
   const wheel=(event:ReactWheelEvent<SVGSVGElement>)=>{
     event.preventDefault();const r=event.currentTarget.getBoundingClientRect();zoomAt(Math.exp(-event.deltaY*.0012),event.clientX-r.left,event.clientY-r.top);
   };
-  const layout=garden.layout,place=garden.objects.find(o=>o.id===preview?.id)?.position;
-  const groupIds=preview?.many??(preview?.together?garden.objects.filter(o=>o.groupId&&o.groupId===garden.objects.find(x=>x.id===preview.id)?.groupId).map(o=>o.id):[]);
-  const dx=preview&&place?preview.point.x-place.x:0,dy=preview&&place?preview.point.y-place.y:0;
   const vw=size.width/camera.z,vh=size.height/camera.z;
-  const shape=(pts:Point[])=>polygon(pts);
-  const outline=layout.boundary.map((p,i)=>cornerPreview?.index===i?cornerPreview.point:p);
-  const previewPoints=(feature:FeatureSelection,points:Point[])=>points.map((p,i)=>featurePreview&&featurePreview.kind===feature.kind&&featurePreview.id===feature.id&&featurePreview.index===i?featurePreview.point:p);
   return <div className="atlas-viewport">
     <svg ref={svgRef} className="map-surface" role="application" aria-label={`Interactive ${mode} garden map; drag objects with one finger, pan on empty land, pinch to zoom.`}
       viewBox={`${camera.cx*ppu-vw/2} ${camera.cy*ppu-vh/2} ${vw} ${vh}`} preserveAspectRatio="none"
       onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={cancelPointer}
       onWheel={wheel}>
-      <defs>
-        <pattern id="ground-grid" width="20" height="20" patternUnits="userSpaceOnUse"><rect width="20" height="20" fill="#aebca3"/><path d="M0 0h20v20" stroke="#91a98d" fill="none" strokeWidth=".5"/></pattern>
-        <pattern id="map-grass" width="40" height="40" patternUnits="userSpaceOnUse"><rect width="40" height="40" fill={color[layout.ground]}/><rect x="4" y="8" width="6" height="4" fill="#ecf5ba" opacity=".17"/><rect x="27" y="24" width="4" height="6" fill="#2b5a45" opacity=".14"/></pattern>
-        <clipPath id="property-clip"><polygon points={shape(outline)}/></clipPath>
-      </defs>
-      <rect x={-garden.width*ppu} y={-garden.height*ppu} width={garden.width*ppu*3} height={garden.height*ppu*3} fill="url(#ground-grid)" />
-      <rect width={garden.width*ppu} height={garden.height*ppu} fill="#c0ccb3" stroke="#78947d" strokeWidth="3"/>
-      <polygon points={shape(outline)} fill="url(#map-grass)" />
-      {mode==='scale'&&<g clipPath="url(#property-clip)" pointerEvents="none">
-        {Array.from({length:Math.floor(garden.width)+1},(_,i)=><line key={'x'+i} x1={i*ppu} x2={i*ppu} y1="0" y2={garden.height*ppu} stroke="#3f6950" strokeWidth={i%5===0?1.6:.7} opacity={i%5===0?.55:.3}/>)}
-        {Array.from({length:Math.floor(garden.height)+1},(_,i)=><line key={'y'+i} x1="0" x2={garden.width*ppu} y1={i*ppu} y2={i*ppu} stroke="#3f6950" strokeWidth={i%5===0?1.6:.7} opacity={i%5===0?.55:.3}/>)}
-      </g>}
-      {!hidden.regions&&layout.regions.map(reg=><polygon key={reg.id} points={shape(previewPoints({kind:'region',id:reg.id},reg.points))} fill={color[reg.ground]} stroke="#3d634b" strokeWidth="2" opacity=".96"/>)}
-      {garden.reference&&showReference&&<image
-        href={garden.reference.dataUrl}
-        x={garden.reference.x*ppu} y={garden.reference.y*ppu}
-        width={garden.reference.widthM*ppu} height={garden.reference.heightM*ppu}
-        opacity={garden.reference.opacity} preserveAspectRatio="none"
-        pointerEvents="none" aria-label="Imported tracing reference" />}
-      {!hidden.lines&&layout.lines.map(line=><g key={line.id} pointerEvents="none">
-        <polyline points={shape(previewPoints({kind:'line',id:line.id},line.points))} stroke={line.kind==='fence'?'#4f3e31':'#6c614d'} strokeWidth={line.widthM*ppu+4} fill="none" strokeLinecap="square" strokeLinejoin="bevel" />
-        <polyline points={shape(previewPoints({kind:'line',id:line.id},line.points))} stroke={line.kind==='fence'?'#bc9564':'#c9c0a8'} strokeWidth={line.widthM*ppu} strokeDasharray={line.kind==='fence'?'9 10':undefined} fill="none" strokeLinecap="square" strokeLinejoin="bevel" />
-      </g>)}
-      {!hidden.boundary&&<polygon points={shape(outline)} fill="none" stroke="#fff3c1" strokeWidth={Math.max(1.5,3/camera.z)} strokeDasharray={mode==='scale'?'10 6':undefined} pointerEvents="none" />}
-      {!hidden.objects&&garden.objects.map(item=>{
-        const original=item.position;if(!original)return null;
-        const marker=selectionStyle(item.id,item.groupId,selectedId,selectedIds,selectedGroupId,multiSelect);
-        const dragged=Boolean(preview&&(item.id===preview.id||groupIds.includes(item.id)));
-        const offset=dragged?{x:dx,y:dy}:{x:0,y:0};
-        const p={x:original.x+offset.x,y:original.y+offset.y};
-        const axes=resizePreview?.id===item.id?resizePreview:objectDimensions(item);
-        return <MapObject key={item.id} item={item} point={p} dimensions={axes} marker={marker}
-          mode={mode} tool={tool} selectedId={selectedId} multiSelect={multiSelect}
-          objectsLocked={locked.objects} zoom={camera.z}/>;
-      })}
-      {tool==='outline-edit'&&outline.map((p,i)=>{
-        const next=outline[(i+1)%outline.length];const mid={x:(p.x+next.x)/2,y:(p.y+next.y)/2};
-        const handle=Math.max(12,30/camera.z);return <g key={i}>
-          <line data-edge={i} x1={p.x*ppu} y1={p.y*ppu} x2={next.x*ppu} y2={next.y*ppu} stroke="transparent" strokeWidth={Math.max(20,36/camera.z)} pointerEvents="stroke" />
-          <circle data-edge={i} cx={mid.x*ppu} cy={mid.y*ppu} r={handle*.55} fill="#b9efc8" stroke="#265f48" strokeWidth="2" opacity=".82" />
-          <rect data-corner={i} x={p.x*ppu-handle/2} y={p.y*ppu-handle/2} width={handle} height={handle} fill="#f9e5a7" stroke="#345a47" strokeWidth="3" />
-        </g>;
-      })}
-      {tool==='feature-edit'&&<g className="feature-overlay">
-        {!hidden.regions&&!locked.regions&&layout.regions.map(reg=><g key={reg.id} data-feature-kind="region" data-feature-id={reg.id}>
-          <polygon points={shape(previewPoints({kind:'region',id:reg.id},reg.points))} fill="transparent" stroke={selectedFeature?.id===reg.id?'#ffef92':'transparent'} strokeWidth={3/camera.z} />
-          {selectedFeature?.kind==='region'&&selectedFeature.id===reg.id&&<>
-            {reg.points.map((pt,i)=>{const next=reg.points[(i+1)%reg.points.length],p=featurePreview?.id===reg.id&&featurePreview.index===i?featurePreview.point:pt;
-              return <g key={i}><line data-feature-edge={i} x1={p.x*ppu} y1={p.y*ppu} x2={next.x*ppu} y2={next.y*ppu} stroke="transparent" strokeWidth={Math.max(16,28/camera.z)} />
-                <rect data-feature-node={i} x={p.x*ppu-13/camera.z} y={p.y*ppu-13/camera.z} width={26/camera.z} height={26/camera.z} fill="#f6e7a8" stroke="#315644" strokeWidth={2/camera.z}/></g>;
-            })}
-          </>}
-        </g>)}
-        {!hidden.lines&&!locked.lines&&layout.lines.map(line=><g key={line.id} data-feature-kind="line" data-feature-id={line.id}>
-          <polyline points={shape(previewPoints({kind:'line',id:line.id},line.points))} fill="none" stroke="transparent" strokeWidth={Math.max(20,Math.max(line.widthM*ppu,30/camera.z))} />
-          {selectedFeature?.kind==='line'&&selectedFeature.id===line.id&&<>
-            {line.points.map((pt,i)=>{const p=featurePreview?.id===line.id&&featurePreview.index===i?featurePreview.point:pt;
-              return <g key={i}>
-                {i<line.points.length-1&&<line data-feature-edge={i} x1={p.x*ppu} y1={p.y*ppu} x2={line.points[i+1].x*ppu} y2={line.points[i+1].y*ppu} stroke="transparent" strokeWidth={Math.max(22,32/camera.z)}/>}
-                <circle data-feature-node={i} cx={p.x*ppu} cy={p.y*ppu} r={Math.max(8,14/camera.z)} fill="#f6e7a8" stroke="#315644" strokeWidth={3/camera.z}/>
-              </g>;
-            })}
-          </>}
-        </g>)}
-      </g>}
-      {draft.length>0&&<g pointerEvents="none"><polyline points={shape(draft)} fill="none" stroke="#fff1a0" strokeWidth="3" strokeDasharray="6 3"/>{draft.map((p,i)=><circle key={i} cx={p.x*ppu} cy={p.y*ppu} r="5" fill="#fff1a0"/>)}</g>}
-      <text x={10} y={garden.height*ppu+20} fontSize="12" fill="#41644c" pointerEvents="none">Surrounding workspace · {garden.width} × {garden.height} m</text>
+      <MapScene garden={garden} mode={mode} tool={tool} zoom={camera.z}
+        hidden={hidden} locked={locked} selectedId={selectedId} selectedGroupId={selectedGroupId}
+        selectedIds={selectedIds} multiSelect={multiSelect} showReference={showReference}
+        selectedFeature={selectedFeature} preview={preview} cornerPreview={cornerPreview}
+        featurePreview={featurePreview} resizePreview={resizePreview} draft={draft}/>
     </svg>
     <div className="viewport-tools" aria-label="Map camera">
       <button aria-label="Zoom in" title="Zoom in" onClick={()=>zoomAt(1.35,size.width/2,size.height/2)}>+</button>
@@ -357,7 +285,7 @@ export function MapView({garden,mode,tool,onDraftCountChange,selectedId,selected
       <button onClick={()=>fit(false)} title="Fit garden boundary">FIT</button>
       <button onClick={()=>fit(true)} title="Show surrounding workspace">AREA</button>
     </div>
-    <div className="viewport-status"><span>{mode==='scale'?formatArea(polygonArea(layout.boundary)):'ILLUSTRATION'}</span><span>ZOOM {Math.round(camera.z*100)}%</span></div>
+    <div className="viewport-status"><span>{mode==='scale'?formatArea(polygonArea(garden.layout.boundary)):'ILLUSTRATION'}</span><span>ZOOM {Math.round(camera.z*100)}%</span></div>
     {isDrawingTool(tool)&&<div className="drawing-controls" aria-label={`${drawingToolName(tool)} drawing controls`}>
       <span className="drawing-progress" role="status" aria-live="polite"><b>{drawingToolName(tool)}</b> · {draft.length} / {minimumDrawingPoints(tool)} minimum</span>
       <span className="drawing-instruction">{drawingHint(tool,draft.length)}</span>

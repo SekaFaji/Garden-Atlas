@@ -1,3 +1,10 @@
+# Garden Atlas P031 - Map Renderer Separation (2026-11-01)
+
+- Extracted all original SVG map layers into `src/components/MapScene.tsx`; `MapView.tsx` retains gesture state, draft state, camera logic, event handlers and all feature edits.
+- `src/mapPreview.ts` now computes drag preview offsets with pure tested functions. Data remains untouched until editor callbacks commit edits.
+- Added static structure tests plus mobile-sized Chromium touch coverage for camera zoom and a path draft. The current test suite and CI remain release gates.
+- Garden version 6, save/recovery logic, original art and the P028 Android installation manifest/icons/service worker remain unchanged.
+
 ## P030 — Sidebar architecture and regression coverage (2026-10-31)
 
 - Extracted the left sidebar object list, batch selection, alignment, group controls, layers and feature lists into `GardenObjectList.tsx` and `GardenLayersPanel.tsx`.
