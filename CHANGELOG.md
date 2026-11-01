@@ -1,3 +1,10 @@
+## P032 - Editor selection state and object actions (2026-11-01)
+
+- Extracted transient selected object/group/feature, batch IDs and multi-select state into `src/hooks/useEditorSelection.ts`; project changes clear all selection through one action.
+- Extracted pure immutable object editing, duplication, grouping and batch transformations to `src/editorObjectActions.ts`. App retains locks, dialogs, saved-garden validation, undo/redo and all persistence.
+- Added regression tests for immutable updates, batch scope, duplicate plant records, edge clamping, selection toggles and the state/actions boundary.
+- Preserved garden schema v6, offline/PWA installation assets, drawing gestures, existing art, imports and recovery behavior.
+
 ## P031 - Map scene architecture and mobile gesture regression coverage (2026-11-01)
 
 - Extracted the existing garden SVG layers and feature hit targets from `MapView.tsx` into typed `src/components/MapScene.tsx`. MapView continues to own all pointer handling, camera interactions, draft controls and callbacks.

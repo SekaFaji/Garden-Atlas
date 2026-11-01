@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { useEditorSelection } from './hooks/useEditorSelection';
+import { patchGardenObject, withoutGardenObjects, assignGardenObjects, duplicateGardenObject, addGardenGroup } from './editorObjectActions';
 import type { ChangeEvent } from 'react';
 import { MapView, type Tool } from './MapView';
 import { EDITOR_TOOLS, activeToolDescription } from './editorVisuals';
@@ -19,8 +21,8 @@ import { imageToReference } from './reference';
 import { isSameEditBurst, type EditBurst } from './history';
 import { editFeaturePoint, resizeObjectAxes, type FeatureSelection, type EditAction } from './featureEdit';
 import {
-  GROUNDS, KINDS, createPresetObject, changeObjectPreset, addLine, addRegion, alignSelection, moveSelection, setReferenceWidth, clampPoint, demoGarden, emptyGarden, isGarden,
-  movePlaced, nextGroupId, nextObjectId, polygonArea, removeGroup, resizeGarden, resizeWorkspace, addSurroundings, setBoundary, previewLinkedSource, chooseLinkedSource,
+  GROUNDS, KINDS, createPresetObject, changeObjectPreset, addLine, addRegion, alignSelection, moveSelection, setReferenceWidth, demoGarden, emptyGarden, isGarden,
+  movePlaced, polygonArea, removeGroup, resizeGarden, resizeWorkspace, addSurroundings, setBoundary, previewLinkedSource, chooseLinkedSource,
   type Garden, type GardenObject, type Ground, type Kind, type Mode, type Point, type LineKind
 } from './model';
 import {
@@ -40,16 +42,12 @@ export default function App(){
   const [ground,setGround]=useState<Ground>('soil');
   const [presetId,setPresetId]=useState('tree-oak');
   const [lineWidth,setLineWidth]=useState(1.5);
-  const [selectedId,setSelectedId]=useState<string|null>('TREE-001');
-  const [selectedGroupId,setSelectedGroupId]=useState<string|null>(null);
+  const {selectedId,setSelectedId,selectedGroupId,setSelectedGroupId,selectedFeature,setSelectedFeature,selectedVertex,setSelectedVertex,
+    checkedIds,setCheckedIds,multiSelect,setMultiSelect,selectObject,toggleChecked,resetSelection}=useEditorSelection();
   const [selectedPanel,setSelectedPanel]=useState<EditorPanel>('map');
   const [visibility,setVisibility]=useState<Visibility>({objects:false,regions:false,lines:false,boundary:false});
   const [locked,setLocked]=useState<LayerState>({objects:false,regions:false,lines:false,boundary:false});
-  const [selectedFeature,setSelectedFeature]=useState<FeatureSelection|null>(null);
-  const [selectedVertex,setSelectedVertex]=useState<number|null>(null);
   const [newGroupName,setNewGroupName]=useState('');
-  const [checkedIds,setCheckedIds]=useState<string[]>([]);
-  const [multiSelect,setMultiSelect]=useState(false);
   const [snapEnabled,setSnapEnabled]=useState(false);
   const [referenceOpen,setReferenceOpen]=useState(false);
   const [showReference,setShowReference]=useState(true);
@@ -179,7 +177,7 @@ export default function App(){
     const updated=updateActiveGarden(libraryRef.current,next);libraryRef.current=updated;setLibrary(updated);
   };
   const replaceLibrary=(next:ProjectLibrary)=>{
-    libraryRef.current=next;setLibrary(next);setPast([]);setFuture([]);historyGroup.current=null;setSelectedId(null);setSelectedGroupId(null);setTool('select');setCheckedIds([]);setMultiSelect(false);setSelectedFeature(null);setSelectedVertex(null);
+    libraryRef.current=next;setLibrary(next);setPast([]);setFuture([]);historyGroup.current=null;resetSelection();setTool('select');
     // Projects, restores and imports must return to the new garden, not leave the user below a hidden panel.
     navigateTo('map');
   };
@@ -197,10 +195,10 @@ export default function App(){
     window.addEventListener('keydown',listener);return ()=>window.removeEventListener('keydown',listener);
   });
   // Selecting on the map must not yank mobile focus away from the map. Details opens explicitly.
-  const select=(id:string|null)=>{setSelectedId(id);setSelectedGroupId(null);};
-  const togglePick=(id:string)=>setCheckedIds(ids=>ids.includes(id)?ids.filter(x=>x!==id):[...ids,id]);
+  const select=selectObject;
+  const togglePick=toggleChecked;
   const selectGroup=(id:string)=>{if(!setNewTool('select'))return;setSelectedGroupId(id);setSelectedId(null);showDetails();};
-  const objectPatch=(id:string,patch:Partial<GardenObject>,key?:string)=>{if(locked.objects){setNotice('Unlock Plants & structures to edit this item.');return;}applyGarden({...garden,objects:garden.objects.map(o=>o.id===id?{...o,...patch}:o)},true,key?`object:${id}:${key}`:undefined);};
+  const objectPatch=(id:string,patch:Partial<GardenObject>,key?:string)=>{if(locked.objects){setNotice('Unlock Plants & structures to edit this item.');return;}applyGarden(patchGardenObject(garden,id,patch),true,key?`object:${id}:${key}`:undefined);};
   const resizeSelected=(id:string,widthM:number,lengthM:number)=>{
     if(locked.objects){setNotice('Unlock Plants & structures before resizing.');return;}
     const updated=resizeObjectAxes(garden,id,{widthM,lengthM});
@@ -231,8 +229,7 @@ export default function App(){
   };
   const deleteChecked=()=>{
     if(locked.objects||!checkedIds.length||!window.confirm(`Delete ${checkedIds.length} selected objects from your garden? Undo can restore them.`))return;
-    const ids=new Set(checkedIds);
-    applyGarden({...garden,objects:garden.objects.filter(o=>!ids.has(o.id))});setCheckedIds([]);setSelectedId(null);
+    applyGarden(withoutGardenObjects(garden,checkedIds));setCheckedIds([]);setSelectedId(null);
   };
   const referenceChange=async(event:ChangeEvent<HTMLInputElement>)=>{
     const file=event.target.files?.[0];event.target.value='';if(!file)return;
@@ -267,26 +264,24 @@ export default function App(){
   const addArea=(points:Point[],type:Ground)=>{if(locked.regions){setNotice('Unlock terrain regions before adding areas.');return;}const next=addRegion(garden,mode,points,type);if(next)applyGarden(next);else setNotice('Could not add this region.');};
   const assignChecked=(groupId:string|null)=>{if(locked.objects){setNotice('Unlock the object layer first.');return;}
     if(!checkedIds.length){setNotice('Select some items in the object list first.');return;}
-    const ids=new Set(checkedIds);
-    applyGarden({...garden,objects:garden.objects.map(o=>ids.has(o.id)?{...o,groupId}:o)});
-    setCheckedIds([]);setNotice(`Assigned ${ids.size} selected item(s) to the group.`);
+    applyGarden(assignGardenObjects(garden,checkedIds,groupId));
+    setCheckedIds([]);setNotice(`Assigned ${checkedIds.length} selected item(s) to the group.`);
   };
   const createGroup=()=>{
     const name=newGroupName.trim();if(!name)return;
     if(garden.groups.some(g=>g.name.toLowerCase()===name.toLowerCase())){setNotice('That group already exists.');return;}
-    const id=nextGroupId(garden);
-    applyGarden({...garden,groups:[...garden.groups,{id,name,notes:''}]});setNewGroupName('');selectGroup(id);
+    const {garden:updated,id}=addGardenGroup(garden,name);
+    applyGarden(updated);setNewGroupName('');selectGroup(id);
   };
   const duplicate=()=>{if(locked.objects){setNotice('Unlock the object layer first.');return;}
     if(!selected||garden.objects.length>=3000)return;
-    const id=nextObjectId(garden,selected.kind);
-    const position=selected.position?clampPoint({x:selected.position.x+1.2,y:selected.position.y+1.2},garden):undefined;
-    applyGarden({...garden,objects:[...garden.objects,{...selected,id,name:selected.name+' copy',position,plant:selected.plant?{...selected.plant,plantedOn:'',identification:'unidentified',observations:[],maintenance:[],photos:[]}:undefined}]});select(id);
+    const {garden:updated,id}=duplicateGardenObject(garden,selected);
+    applyGarden(updated);select(id);
     setNotice('Object duplicated 1.2 m away; drag it into place.');
   };
   const removeObject=()=>{if(locked.objects){setNotice('Unlock the object layer first.');return;}
     if(!selected||!window.confirm(`Delete ${selected.name} from both map layouts and its record?`))return;
-    applyGarden({...garden,objects:garden.objects.filter(x=>x.id!==selected.id)});select(null);
+    applyGarden(withoutGardenObjects(garden,[selected.id]));select(null);
   };
   const changeDimensions=()=>{
     const width=Number(dims.width),height=Number(dims.height);
