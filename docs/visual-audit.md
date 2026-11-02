@@ -35,3 +35,10 @@ The app has two synchronized presentations: Scale for measurements and Illustrat
 ## Validation
 
 P036 adds source checks for complete ground-type coverage, reusable world-space patterns and unchanged garden records, plus a browser check that the same ground art appears in both views after reload. Passing CI is necessary but does not replace visual review and physical Android touch/install verification.
+
+## P037 - First plant sprites and narrow-line editing
+
+- Added hand-placed pixel highlights/shadows to the default broadleaf tree, rounded shrub and wildflower visuals, plus the eight existing tree/shrub/flower variant sprites. Preset identifiers, measured footprints and botanical record fields are unchanged.
+- Sub-metre paths and fences now support widths down to 0.05 m, including the existing-line editor. The toolbar exposes practical presets (0.1/0.25/0.5/1/2 m); comma decimals continue to work in text inputs.
+- Open paths and fences keep their short endpoints; a close-to-start simplification remains for closed terrain/boundary outlines only.
+- Thin-line decorative outline now scales with width while transparent gesture targets remain unchanged. Future art patches can refine fence posts and path details.

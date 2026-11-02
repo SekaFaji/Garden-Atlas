@@ -1,3 +1,10 @@
+# Garden Atlas P037 - Sub-metre lines and first plant sprites (2026-11-02)
+
+- New and existing path/fence widths can be as low as 0.05 m. Toolbar offers fractional quick widths, and the decimal text input remains editable in both Scale and Illustration.
+- Open paths and fences may be shorter than 1 m without the draft-endpoint trimming bug; transparent editing hit targets stay large enough for fingers.
+- Broader pixel shading/detail for 11 existing plant art choices, preserving preset IDs and saved object dimensions.
+- Runtime artwork and editing validation only; IndexedDB, backups, schema v6, service worker, manifest and PWA icons unchanged.
+
 # Garden Atlas P036 - Visual Audit and Terrain Texture Pass (2026-11-02)
 
 - Completed evidence-based visual audit of the actual SVG object sprites, terrain drawing and map rendering; see `docs/visual-audit.md`.

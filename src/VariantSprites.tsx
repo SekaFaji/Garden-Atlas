@@ -83,9 +83,39 @@ const ART: Record<string,Layer[]> = {
   ['#356b44',[[16,14,32,18],[25,7,16,20]]],
   ['#7dbf6d',[[19,13,23,15],[28,7,10,11]]]],
 };
+/** Deliberately positioned shadow and highlight pixels for recognizable plant forms. */
+const PLANT_DETAILS: Record<string, Layer[]> = {
+  'tree-pine': [
+    ['#183e39',[[13,42,7,4],[22,31,5,5],[30,15,5,4],[44,43,6,4]]],
+    ['#a6cc91',[[29,9,4,4],[26,20,4,4],[21,32,5,4],[16,42,6,3],[36,32,4,3]]]],
+  'tree-apple': [
+    ['#245139',[[12,36,5,5],[40,25,4,5],[23,14,4,4]]],
+    ['#b7ce83',[[25,15,5,4],[13,28,5,4],[36,33,4,4]]],
+    ['#f2c887',[[20,22,3,3],[40,16,3,3],[33,36,3,3]]]],
+  'tree-cherry': [
+    ['#b46c87',[[13,34,5,4],[25,19,4,4],[39,40,4,5]]],
+    ['#ffe0d8',[[22,29,4,4],[35,20,4,3],[17,36,4,4],[42,31,4,3]]]],
+  'shrub-hedge': [
+    ['#285a3c',[[8,40,6,5],[30,43,5,4],[48,37,5,4]]],
+    ['#b5d792',[[15,26,4,4],[34,29,5,3],[48,32,4,3]]]],
+  'shrub-lavender': [
+    ['#4b8d64',[[11,44,5,4],[26,45,5,5],[40,43,5,4]]],
+    ['#ded0f5',[[18,25,3,4],[32,18,4,4],[45,23,3,4],[28,32,3,3]]]],
+  'shrub-rose': [
+    ['#2d714a',[[20,42,5,4],[41,39,5,4]]],
+    ['#ffd7be',[[19,32,4,3],[42,25,4,3],[32,40,4,3]]],
+    ['#863b54',[[15,35,4,3],[39,31,5,4],[29,44,4,3]]]],
+  'flower-tulip': [
+    ['#2f6843',[[15,40,4,5],[31,35,4,4],[46,44,4,5]]],
+    ['#fff0c2',[[18,16,4,4],[36,15,4,4],[48,23,3,4]]]],
+  'flower-sunflower': [
+    ['#fff0aa',[[13,14,4,4],[26,20,4,4],[36,12,4,4],[51,18,4,4]]],
+    ['#543c2f',[[21,19,4,4],[40,15,4,4]]],
+    ['#a7c879',[[15,40,4,3],[38,43,4,4]]]],
+};
 export function VariantSprite({presetId}:{presetId?:string}) {
   const layers=presetId?ART[presetId]:undefined;
   if(!layers)return null;
-  return <g shapeRendering="crispEdges">{layers.map(([color,rects],i)=><g key={i} fill={color}>{rects.map(([x,y,w,h],j)=><rect key={j} x={x} y={y} width={w} height={h}/>)}</g>)}</g>;
+  return <g shapeRendering="crispEdges">{[...layers,...(PLANT_DETAILS[presetId!]??[])].map(([color,rects],i)=><g key={i} fill={color}>{rects.map(([x,y,w,h],j)=><rect key={j} x={x} y={y} width={w} height={h}/>)}</g>)}</g>;
 }
 export function hasVariantArt(id?:string):boolean{return !!id&&Object.prototype.hasOwnProperty.call(ART,id);}

@@ -217,3 +217,25 @@ test('P036 pixel-textured garden surfaces persist across Scale and Illustration 
   await page.reload();
   await expect(map.locator('polygon[fill="url(#map-grass)"]').first()).toBeVisible();
 });
+
+test('P037 fractional path/fence widths are selectable on desktop and mobile-sized layouts', async ({ page }) => {
+  await page.goto('/Garden-Atlas/');
+  await expect(page.locator('.save-status')).toContainText(/INDEXEDDB SAVED|LOCAL SAVE/, {timeout:15_000});
+  const tools=page.locator('.primary-tools');
+  await tools.getByRole('button',{name:/^PATH:/}).click();
+  const field=page.getByRole('textbox',{name:'New path or fence width in metres'});
+  await field.fill('0.05');
+  await field.press('Enter');
+  await expect(field).toHaveValue('0.05');
+  await page.getByRole('button',{name:'0.25 m line width'}).click();
+  await expect(field).toHaveValue('0.25');
+  await tools.getByRole('button',{name:/^FENCE:/}).click();
+  await expect(field).toHaveValue('0.25');
+  await field.fill('0,15');
+  await field.press('Enter');
+  await expect(field).toHaveValue('0.15');
+  await page.setViewportSize({width:393,height:852});
+  await expect(page.getByRole('button',{name:'0.1 m line width'})).toBeVisible();
+  await page.getByRole('button',{name:'0.1 m line width'}).click();
+  await expect(field).toHaveValue('0.1');
+});

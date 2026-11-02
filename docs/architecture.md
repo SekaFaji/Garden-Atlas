@@ -34,3 +34,7 @@ Garden Atlas is a client-only **React + TypeScript + Vite** web app deployed und
 - `.github/workflows/quality.yml`: PR quality validation. `.github/workflows/deploy.yml`: main-branch build and GitHub Pages deployment.
 
 The old codebase intentionally has some large files (`App.tsx`, `MapView.tsx`, `styles.css`); contributors should avoid untested large-scale rewrites and extract behavior in focused steps.
+
+## Sub-metre garden lines (P037)
+
+The shared `lineDimensions.ts` defines path/fence limits, width presets and visual outline sizing. Both new lines and existing line edits use the same 0.05 m minimum; open line segments may also be shorter than 1 m. The garden still uses schema v6 and stores exact width values in metres. `MapView` retains close endpoints for open paths and fences, while closed polygon simplification is unchanged. Touch/feature edit targets remain visually generous even for very thin strokes.

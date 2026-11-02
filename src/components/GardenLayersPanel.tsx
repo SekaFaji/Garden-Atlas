@@ -1,6 +1,7 @@
 import type { Garden } from '../model';
 import type { FeatureSelection } from '../featureEdit';
 import { MetricDraftInput } from '../MetricDraftInput';
+import { MIN_LINE_WIDTH_M, MAX_LINE_WIDTH_M } from '../lineDimensions';
 
 export type LayerKey = 'objects' | 'regions' | 'lines' | 'boundary';
 export type LayerState = Record<LayerKey, boolean>;
@@ -46,7 +47,7 @@ export function GardenLayersPanel({ garden, visibility, locked, onVisibilityChan
     <div className="terrain-list">{garden.layout.lines.map(line => <div className="line-entry" key={line.id}>
       <button className="feature-pick" onClick={() => onEditFeature({kind:'line',id:line.id})}>✎ EDIT POINTS</button>
       <input disabled={locked.lines} aria-label={`Name of ${line.id}`} maxLength={120} value={line.name} onChange={e => onRenameLine(line.id, e.target.value)}/>
-      <label>WIDTH M<MetricDraftInput key={line.id} disabled={locked.lines} label={`${line.name} width in metres`} min={0.2} max={12} value={line.widthM} onCommit={widthM => onChangeLineWidth(line.id, widthM)} onNotice={onNotice}/></label>
+      <label>WIDTH M<MetricDraftInput key={line.id} disabled={locked.lines} label={`${line.name} width in metres`} min={MIN_LINE_WIDTH_M} max={MAX_LINE_WIDTH_M} value={line.widthM} onCommit={widthM => onChangeLineWidth(line.id, widthM)} onNotice={onNotice}/></label>
       <button disabled={locked.lines} className="btn btn-danger" title="Delete path or fence" onClick={() => onDeleteLine(line.id)}>×</button>
     </div>)}</div>
   </>;
