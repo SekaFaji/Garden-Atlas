@@ -1,6 +1,7 @@
 import { MapObject } from './MapObject';
 import { MapSurfacePatterns } from './MapSurfacePatterns';
 import { surfacePatternFill } from '../mapSurfacePalette';
+import { lineRenderWidths } from '../lineDimensions';
 import { objectPreviewTranslation, type ObjectDragPreview } from '../mapPreview';
 import { selectionStyle } from '../editorVisuals';
 import { objectDimensions, WORLD, type Garden, type Mode, type Point } from '../model';
@@ -58,8 +59,8 @@ export function MapScene({garden,mode,tool,zoom,hidden,locked,selectedId,selecte
         opacity={garden.reference.opacity} preserveAspectRatio="none"
         pointerEvents="none" aria-label="Imported tracing reference" />}
       {!hidden.lines&&layout.lines.map(line=><g key={line.id} pointerEvents="none">
-        <polyline points={shape(previewPoints({kind:'line',id:line.id},line.points))} stroke={line.kind==='fence'?'#4f3e31':'#6c614d'} strokeWidth={line.widthM*ppu+4} fill="none" strokeLinecap="square" strokeLinejoin="bevel" />
-        <polyline points={shape(previewPoints({kind:'line',id:line.id},line.points))} stroke={line.kind==='fence'?'#bc9564':'#c9c0a8'} strokeWidth={line.widthM*ppu} strokeDasharray={line.kind==='fence'?'9 10':undefined} fill="none" strokeLinecap="square" strokeLinejoin="bevel" />
+        <polyline points={shape(previewPoints({kind:'line',id:line.id},line.points))} stroke={line.kind==='fence'?'#4f3e31':'#6c614d'} strokeWidth={lineRenderWidths(line.widthM,ppu).outline} fill="none" strokeLinecap="square" strokeLinejoin="bevel" />
+        <polyline points={shape(previewPoints({kind:'line',id:line.id},line.points))} stroke={line.kind==='fence'?'#bc9564':'#c9c0a8'} strokeWidth={lineRenderWidths(line.widthM,ppu).interior} strokeDasharray={line.kind==='fence'?'9 10':undefined} fill="none" strokeLinecap="square" strokeLinejoin="bevel" />
       </g>)}
       {!hidden.boundary&&<polygon points={shape(outline)} fill="none" stroke="#fff3c1" strokeWidth={Math.max(1.5,3/zoom)} strokeDasharray={mode==='scale'?'10 6':undefined} pointerEvents="none" />}
       {!hidden.objects&&garden.objects.map(item=>{

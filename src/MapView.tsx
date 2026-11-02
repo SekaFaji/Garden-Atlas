@@ -98,7 +98,8 @@ export function MapView({garden,mode,tool,onDraftCountChange,selectedId,selected
   };
   const inside=(p:Point)=>p.x>=0&&p.y>=0&&p.x<=garden.width&&p.y<=garden.height;
   const finishDraft=()=>{
-    const clean=draft.length>1&&distance(draft[0],draft[draft.length-1])<.15?draft.slice(0,-1):draft;
+    // Open paths and fences must retain close endpoints; only closed polygons drop a repeated final vertex.
+    const clean=(tool==='path'||tool==='fence')?draft:draft.length>1&&distance(draft[0],draft[draft.length-1])<.15?draft.slice(0,-1):draft;
     if(tool==='path'||tool==='fence'){
       if(clean.length<2){onNotice('Tap at least two points for a path or fence.');return;}
       onLine(clean,tool,lineWidth);setDraft([]);return;

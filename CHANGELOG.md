@@ -1,3 +1,11 @@
+## P037 - Small paths/fences and plant sprite polish (2026-11-02)
+
+- Path and fence widths accept 0.05 to 12 m with fractional quick-select options and matching existing-line controls.
+- Reduced the shortest supported open line segment to 0.05 m and preserved nearby endpoints when completing paths/fences.
+- Kept thin strokes visually proportional rather than giving 5 cm paths an oversized border; touch selection hit areas remain unchanged.
+- Added authored shadow/highlight pixel details to default tree, shrub, wildflower and eight plant variants, retaining all preset IDs and coordinates.
+- No change to garden schema v6, IndexedDB, browser recovery, artwork file loading, Android PWA metadata or offline worker.
+
 ## P036 - Visual audit and first map-surface polish (2026-11-02)
 
 - Audited the actual SVG sprites, surfaces and map-object renderers, with a prioritized art plan in `docs/visual-audit.md`.

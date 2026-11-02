@@ -1,5 +1,6 @@
 /** Garden Atlas P007. One source of truth for geometry; Scale/Illustration are render styles. */
 import { getPreset, defaultPreset } from './catalog.ts';
+import { MIN_LINE_WIDTH_M, MAX_LINE_WIDTH_M, MIN_LINE_LENGTH_M } from './lineDimensions.ts';
 import { validPlantAtlas } from './plantAtlas.ts';
 import type { PlantSpecies, SpecimenProfile } from './plantAtlas.ts';
 import {
@@ -113,7 +114,7 @@ export function isGarden(value:unknown):value is Garden {
  const ids=new Set<string>();
  for(const r of l.regions){if(!isObj(r)||!isText(r.id,80)||!r.id||ids.has(r.id)||!isText(r.name,120)||!GROUNDS.some(z=>z.value===r.ground)||!validPolygon(r.points,g))return false;ids.add(r.id);}
  for(const line of l.lines){
-  if(!isObj(line)||!isText(line.id,80)||!line.id||ids.has(line.id)||!isText(line.name,120)||!(line.kind==='path'||line.kind==='fence')||!Number.isFinite(line.widthM)||line.widthM<.2||line.widthM>12||!Array.isArray(line.points)||line.points.length<2||line.points.length>100||!line.points.every(p=>isPoint(p,g))||!line.points.some((p,i)=>i&&Math.hypot(p.x-line.points[0].x,p.y-line.points[0].y)>.1))return false;
+  if(!isObj(line)||!isText(line.id,80)||!line.id||ids.has(line.id)||!isText(line.name,120)||!(line.kind==='path'||line.kind==='fence')||!Number.isFinite(line.widthM)||line.widthM<MIN_LINE_WIDTH_M||line.widthM>MAX_LINE_WIDTH_M||!Array.isArray(line.points)||line.points.length<2||line.points.length>100||!line.points.every(p=>isPoint(p,g))||!line.points.some((p,i)=>i&&Math.hypot(p.x-line.points[0].x,p.y-line.points[0].y)>MIN_LINE_LENGTH_M))return false;
   ids.add(line.id);
  }
  if(g.linkMigration!==undefined){const m=g.linkMigration;if(!isObj(m)||!isLegacyGarden(m.original)||!(m.source==='scale'||m.source==='illustration')||typeof m.confirmed!=='boolean')return false;}
@@ -220,7 +221,7 @@ export function nextGroupId(g:Garden):string {let n=1;const ids=new Set(g.groups
 export function nextObjectId(g:Garden,kind:Kind):string {let n=1;const ids=new Set(g.objects.map(x=>x.id)),prefix=kind.toUpperCase()+'-';while(ids.has(prefix+String(n).padStart(3,'0')))n++;return prefix+String(n).padStart(3,'0');}
 export function nextLineId(g:Garden,_mode:Mode):string {let n=1;const ids=new Set(g.layout.lines.map(x=>x.id));while(ids.has('LINE-'+String(n).padStart(3,'0')))n++;return 'LINE-'+String(n).padStart(3,'0');}
 export function addLine(g:Garden,mode:Mode,points:Point[],kind:LineKind,widthM:number):Garden|null {
- if(g.layout.lines.length>=200||points.length<2||points.length>100||!points.every(p=>isPoint(p,g))||!points.some((p,i)=>i&&Math.hypot(p.x-points[0].x,p.y-points[0].y)>.1)||!Number.isFinite(widthM)||widthM<.2||widthM>12)return null;
+ if(g.layout.lines.length>=200||points.length<2||points.length>100||!points.every(p=>isPoint(p,g))||!points.some((p,i)=>i&&Math.hypot(p.x-points[0].x,p.y-points[0].y)>MIN_LINE_LENGTH_M)||!Number.isFinite(widthM)||widthM<MIN_LINE_WIDTH_M||widthM>MAX_LINE_WIDTH_M)return null;
  const line:LineFeature={id:nextLineId(g,mode),kind,name:kind==='path'?'Garden path':'Fence',points,widthM};
  return {...g,layout:{...g.layout,lines:[...g.layout.lines,line]}};
 }

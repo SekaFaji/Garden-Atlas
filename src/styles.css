@@ -302,3 +302,12 @@
  .map-tool-pill{font-size:9px;padding:4px 5px}
  .map-multi-selection-bar button{min-width:99px}
 }
+
+/* P037: discoverable sub-metre paths and fences without reducing touch targets. */
+.line-width-chooser{flex-wrap:wrap;align-items:flex-start}
+.line-width-controls{display:flex;flex:1 1 210px;align-items:center;flex-wrap:wrap;gap:6px}
+.line-width-controls>.metric-draft-input{width:96px;min-width:80px;flex:none}
+.line-width-presets{display:flex;gap:4px;flex-wrap:wrap}
+.line-width-presets button{padding:8px 9px;min-height:40px;color:#e6efd8;background:#315641;border:1px solid #749773;font:800 11px monospace}
+.line-width-presets button.active{background:#c5e2a0;color:#243c2c;border-color:#e6f2b7}
+.line-width-controls small{flex-basis:100%;color:#bed5b5;font:10px/1.4 monospace}
