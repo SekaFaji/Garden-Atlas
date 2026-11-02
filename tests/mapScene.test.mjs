@@ -17,9 +17,12 @@ test('P031 SVG rendering remains inside the original event-catching map surface'
 
 test('P031 renderer keeps the same scale/illustration layers without mutating state',async()=>{
   const scene=await read('../src/components/MapScene.tsx');
-  for(const marker of ['ground-grid','map-grass','property-clip','layout.regions.map','layout.lines.map','garden.reference','hidden.objects','hidden.boundary']){
+  const patterns=await read('../src/components/MapSurfacePatterns.tsx');
+  for(const marker of ['property-clip','layout.regions.map','layout.lines.map','garden.reference','hidden.objects','hidden.boundary']){
     assert.ok(scene.includes(marker),`retain rendering layer ${marker}`);
   }
+  assert.match(scene,/<MapSurfacePatterns\/>/);
+  for(const marker of ['ground-grid','map-grass','map-soil','map-gravel','map-stone','map-water']) assert.ok(patterns.includes(marker),`retain SVG pattern ${marker}`);
   assert.doesNotMatch(scene,/useState\(|useEffect\(|onPointerDown=|onPointerUp=/);
   assert.match(scene,/objectPreviewTranslation\(garden,preview\)/);
 });

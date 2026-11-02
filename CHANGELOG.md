@@ -1,3 +1,10 @@
+## P036 - Visual audit and first map-surface polish (2026-11-02)
+
+- Audited the actual SVG sprites, surfaces and map-object renderers, with a prioritized art plan in `docs/visual-audit.md`.
+- Added five carefully authored, repeating pixel-style surfaces for grass, soil, gravel, stone and water; the previous grass-only texture no longer appears on other ground types.
+- Both the default property ground and drawn terrain regions use the same world-space surface patterns in Scale and Illustration views.
+- Retained map interaction targets, measured object footprints, data schema v6, saves, reference images and Android PWA installation files. Added unit and Chromium surface consistency checks.
+
 ## P035 - Isolate undo/redo history and edit bursts (2026-11-01)
 
 - Extracted transient undo/redo stacks into a dedicated `useGardenHistory` hook and pure history transitions in `history.ts`.

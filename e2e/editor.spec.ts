@@ -200,3 +200,20 @@ test('P035 garden name undo/redo survives a save without altering linked layouts
   await page.reload();
   await expect(page.getByRole('textbox',{name:'Garden name'})).toHaveValue('P035 Undo Redo Regression');
 });
+
+test('P036 pixel-textured garden surfaces persist across Scale and Illustration modes', async ({ page }) => {
+  await page.goto('/Garden-Atlas/');
+  await expect(page.locator('.save-status')).toContainText(/INDEXEDDB SAVED|LOCAL SAVE/, {timeout: 15_000});
+  const map = page.locator('.map-surface');
+  for(const ground of ['grass','soil','gravel','stone','water']) {
+    await expect(map.locator(`pattern[id="map-${ground}"]`)).toHaveCount(1);
+  }
+  const garden = map.locator('polygon[fill="url(#map-grass)"]').first();
+  await expect(garden).toBeVisible();
+  await page.locator('.mode-switch button').filter({hasText:'SCALE'}).click();
+  await expect(map.locator('polygon[fill="url(#map-grass)"]').first()).toBeVisible();
+  await page.locator('.mode-switch button').filter({hasText:'ILLUSTRATION'}).click();
+  await expect(map.locator('polygon[fill="url(#map-grass)"]').first()).toBeVisible();
+  await page.reload();
+  await expect(map.locator('polygon[fill="url(#map-grass)"]').first()).toBeVisible();
+});

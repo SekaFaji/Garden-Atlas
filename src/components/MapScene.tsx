@@ -1,4 +1,6 @@
 import { MapObject } from './MapObject';
+import { MapSurfacePatterns } from './MapSurfacePatterns';
+import { surfacePatternFill } from '../mapSurfacePalette';
 import { objectPreviewTranslation, type ObjectDragPreview } from '../mapPreview';
 import { selectionStyle } from '../editorVisuals';
 import { objectDimensions, WORLD, type Garden, type Mode, type Point } from '../model';
@@ -26,7 +28,6 @@ export interface MapSceneProps {
 }
 
 const ppu = WORLD.pixelsPerUnit;
-const color = {grass:'#8ebc77',soil:'#a57c53',gravel:'#a8aca0',stone:'#bdb8a9',water:'#64a6bc'};
 const polygon = (points: Point[]) => points.map(p => `${p.x * ppu},${p.y * ppu}`).join(' ');
 
 /** SVG only: preserves data-object, data-feature-node, edge and corner targets
@@ -39,18 +40,17 @@ export function MapScene({garden,mode,tool,zoom,hidden,locked,selectedId,selecte
   const previewPoints=(feature:FeatureSelection,points:Point[])=>points.map((p,i)=>featurePreview&&featurePreview.kind===feature.kind&&featurePreview.id===feature.id&&featurePreview.index===i?featurePreview.point:p);
   return <>
       <defs>
-        <pattern id="ground-grid" width="20" height="20" patternUnits="userSpaceOnUse"><rect width="20" height="20" fill="#aebca3"/><path d="M0 0h20v20" stroke="#91a98d" fill="none" strokeWidth=".5"/></pattern>
-        <pattern id="map-grass" width="40" height="40" patternUnits="userSpaceOnUse"><rect width="40" height="40" fill={color[layout.ground]}/><rect x="4" y="8" width="6" height="4" fill="#ecf5ba" opacity=".17"/><rect x="27" y="24" width="4" height="6" fill="#2b5a45" opacity=".14"/></pattern>
+        <MapSurfacePatterns/>
         <clipPath id="property-clip"><polygon points={shape(outline)}/></clipPath>
       </defs>
       <rect x={-garden.width*ppu} y={-garden.height*ppu} width={garden.width*ppu*3} height={garden.height*ppu*3} fill="url(#ground-grid)" />
       <rect width={garden.width*ppu} height={garden.height*ppu} fill="#c0ccb3" stroke="#78947d" strokeWidth="3"/>
-      <polygon points={shape(outline)} fill="url(#map-grass)" />
+      <polygon points={shape(outline)} fill={surfacePatternFill(layout.ground)} />
       {mode==='scale'&&<g clipPath="url(#property-clip)" pointerEvents="none">
         {Array.from({length:Math.floor(garden.width)+1},(_,i)=><line key={'x'+i} x1={i*ppu} x2={i*ppu} y1="0" y2={garden.height*ppu} stroke="#3f6950" strokeWidth={i%5===0?1.6:.7} opacity={i%5===0?.55:.3}/>)}
         {Array.from({length:Math.floor(garden.height)+1},(_,i)=><line key={'y'+i} x1="0" x2={garden.width*ppu} y1={i*ppu} y2={i*ppu} stroke="#3f6950" strokeWidth={i%5===0?1.6:.7} opacity={i%5===0?.55:.3}/>)}
       </g>}
-      {!hidden.regions&&layout.regions.map(reg=><polygon key={reg.id} points={shape(previewPoints({kind:'region',id:reg.id},reg.points))} fill={color[reg.ground]} stroke="#3d634b" strokeWidth="2" opacity=".96"/>)}
+      {!hidden.regions&&layout.regions.map(reg=><polygon key={reg.id} points={shape(previewPoints({kind:'region',id:reg.id},reg.points))} fill={surfacePatternFill(reg.ground)} stroke="#597460" strokeWidth="2" opacity=".96"/>)}
       {garden.reference&&showReference&&<image
         href={garden.reference.dataUrl}
         x={garden.reference.x*ppu} y={garden.reference.y*ppu}
