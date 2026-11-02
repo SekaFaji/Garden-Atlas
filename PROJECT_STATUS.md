@@ -1,3 +1,10 @@
+# Garden Atlas P036 - Visual Audit and Terrain Texture Pass (2026-11-02)
+
+- Completed evidence-based visual audit of the actual SVG object sprites, terrain drawing and map rendering; see `docs/visual-audit.md`.
+- First art improvement: dedicated, consistent 64 px world-aligned pixel textures for five terrain types in both Scale and Illustration, including previously flat regions.
+- Remaining priorities: silhouette detail for the 24 object presets, path/fence decoration, then mobile and dense-garden readability.
+- No saved garden, geometry, touch hit target, IndexedDB, PWA icon/manifest/worker or navigation changes. Full suite and Android physical-device checks still apply.
+
 # Garden Atlas P035 - Editor History Isolation (2026-11-01)
 
 - Pure history transitions in `src/history.ts`; ephemeral state and edit-burst ordering in `src/hooks/useGardenHistory.ts`.
