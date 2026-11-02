@@ -39,7 +39,7 @@ export function MapEditingToolbar({tool,multiSelect,snapEnabled,canUndo,canRedo,
             {EDITOR_TOOLS.map(x=><button type="button" key={x.id} className={tool===x.id?'active':''} aria-pressed={tool===x.id} aria-label={`${x.name}: ${x.hint}`} title={x.hint} onClick={()=>onSelectTool(x.id)}>{x.label}</button>)}
           </div>
           {(tool==='path'||tool==='fence')&&<div className="terrain-chooser line-width-chooser">
-            <label htmlFor="new-line-width">{tool.toUpperCase()} WIDTH (M)</label>
+            <span>{tool.toUpperCase()} WIDTH (M)</span>
             <div className="line-width-controls" id="new-line-width">
               <MetricDraftInput label="New path or fence width in metres" min={MIN_LINE_WIDTH_M} max={MAX_LINE_WIDTH_M} value={lineWidth} onCommit={onLineWidthChange} onNotice={onNotice}/>
               <div className="line-width-presets" aria-label="Quick path and fence widths">
@@ -48,7 +48,7 @@ export function MapEditingToolbar({tool,multiSelect,snapEnabled,canUndo,canRedo,
               </div>
               <small>Widths from 0.05 m (5 cm). Decimals accepted, e.g. 0.15 m.</small>
             </div>
-          </div>
+          </div>}
           {tool==='terrain'&&<div className="terrain-chooser"><span>NEW REGION</span><select aria-label="Terrain brush" value={ground} onChange={e=>onGroundChange(e.target.value as Ground)}>{GROUNDS.map(g=><option key={g.value} value={g.value}>{g.label}</option>)}</select></div>}
   </>;
 }
