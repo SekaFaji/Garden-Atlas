@@ -1,3 +1,10 @@
+## P038 - Paths, fences and garden-object pixel art (2026-11-03)
+
+- Render wider paths with restrained paving highlights, leaving narrow 5 cm widths readable and proportional.
+- Add wood rails and capped decorative posts to fences without editing vertices or reducing hit areas.
+- Improve hand-authored pixel detail on beds, buildings, rocks, ponds and garden furniture, preserving all original preset IDs.
+- Add geometry and browser regression tests. Garden v6 storage, offline PWA assets, and all measurements are unchanged.
+
 ## P037 - Small paths/fences and plant sprite polish (2026-11-02)
 
 - Path and fence widths accept 0.05 to 12 m with fractional quick-select options and matching existing-line controls.

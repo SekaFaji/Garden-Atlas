@@ -1,3 +1,10 @@
+# Garden Atlas P038 - Path, Fence and Remaining Sprite Polish (2026-11-03)
+
+- Path and fence art now has its own presentation-only renderer with pure, capped fence-post geometry.
+- Sub-metre widths stay correct, and selection/feature-edit hit areas remain untouched.
+- Existing beds, structures, rocks, ponds and furniture receive additional handcrafted detail.
+- Garden v6, IndexedDB, import/export, saved dimensions, PWA and offline files remain unchanged. CI and Android QA remain required.
+
 # Garden Atlas P037 - Sub-metre lines and first plant sprites (2026-11-02)
 
 - New and existing path/fence widths can be as low as 0.05 m. Toolbar offers fractional quick widths, and the decimal text input remains editable in both Scale and Illustration.

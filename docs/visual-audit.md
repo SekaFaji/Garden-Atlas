@@ -42,3 +42,10 @@ P036 adds source checks for complete ground-type coverage, reusable world-space 
 - Sub-metre paths and fences now support widths down to 0.05 m, including the existing-line editor. The toolbar exposes practical presets (0.1/0.25/0.5/1/2 m); comma decimals continue to work in text inputs.
 - Open paths and fences keep their short endpoints; a close-to-start simplification remains for closed terrain/boundary outlines only.
 - Thin-line decorative outline now scales with width while transparent gesture targets remain unchanged. Future art patches can refine fence posts and path details.
+
+## P038 - Paths, fences and remaining garden object art
+
+- Paths receive restrained paving highlights when wide enough; narrow paths keep proportional strokes and precise measured widths.
+- Fences use rails and up to 32 small decorative posts sampled along each actual polyline. Wire-thin fences stay dashed. Decorations do not alter any vertex or touch hit target.
+- Beds, sheds, greenhouses, stones, ponds and furniture now have extra authored pixel shading and highlights. The 24 preset IDs and 64px source sprite sizes stay unchanged.
+- No runtime randomness or animation; performance and physical-phone readability should be checked with dense gardens.

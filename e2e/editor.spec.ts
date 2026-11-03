@@ -239,3 +239,28 @@ test('P037 fractional path/fence widths are selectable on desktop and mobile-siz
   await page.getByRole('button',{name:'0.1 m line width'}).click();
   await expect(field).toHaveValue('0.1');
 });
+
+test('P038 narrow paths render with exact widths after creation and reload',async ({page})=>{
+  await page.goto('/Garden-Atlas/');
+  await expect(page.locator('.save-status')).toContainText(/INDEXEDDB SAVED|LOCAL SAVE/,{timeout:15_000});
+  await page.locator('.primary-tools').getByRole('button',{name:/^PATH:/}).click();
+  const width=page.getByRole('textbox',{name:'New path or fence width in metres'});
+  await width.fill('0.05');
+  await width.press('Enter');
+  await expect(width).toHaveValue('0.05');
+  const surface=page.locator('.map-surface');
+  await surface.scrollIntoViewIfNeeded();
+  const rect=await surface.boundingBox();
+  expect(rect).not.toBeNull();
+  await page.mouse.click(rect!.x+rect!.width*.41,rect!.y+rect!.height*.62);
+  await page.mouse.click(rect!.x+rect!.width*.57,rect!.y+rect!.height*.62);
+  await expect(page.locator('.drawing-controls .drawing-progress')).toContainText('2 / 2');
+  await page.locator('.drawing-controls .drawing-finish').click();
+  await expect(surface.locator('.map-line-art[data-line-art-kind="path"]')).toHaveCount(1);
+  const strokes=surface.locator('.map-line-art[data-line-art-kind="path"] polyline');
+  await expect(strokes).toHaveCount(2);
+  await expect(strokes.last()).toHaveAttribute('stroke-width','1');
+  await expect(page.locator('.save-status')).toContainText(/INDEXEDDB SAVED|LOCAL SAVE/,{timeout:15_000});
+  await page.reload();
+  await expect(surface.locator('.map-line-art[data-line-art-kind="path"]')).toHaveCount(1);
+});
