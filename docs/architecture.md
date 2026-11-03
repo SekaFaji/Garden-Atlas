@@ -38,3 +38,7 @@ The old codebase intentionally has some large files (`App.tsx`, `MapView.tsx`, `
 ## Sub-metre garden lines (P037)
 
 The shared `lineDimensions.ts` defines path/fence limits, width presets and visual outline sizing. Both new lines and existing line edits use the same 0.05 m minimum; open line segments may also be shorter than 1 m. The garden still uses schema v6 and stores exact width values in metres. `MapView` retains close endpoints for open paths and fences, while closed polygon simplification is unchanged. Touch/feature edit targets remain visually generous even for very thin strokes.
+
+## Map line art (P038)
+
+`src/components/MapLineArt.tsx` paints path/fence SVGs and `src/mapLineArt.ts` computes decorative fence post points from readonly geometry. Both maps use identical physical widths, and `MapScene.tsx` retains the existing transparent hit areas and edit handles. No persisted schema or coordinate changes.

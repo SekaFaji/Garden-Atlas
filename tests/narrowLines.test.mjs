@@ -37,16 +37,17 @@ test('P037 thin line artwork is proportional, normal line artwork unchanged',()=
 });
 
 test('P037 both width controls and renderer use shared limits',async()=>{
-  const [model,toolbar,layers,map,scene]=await Promise.all([
+  const [model,toolbar,layers,map,scene,lineArt]=await Promise.all([
     read('../src/model.ts'),read('../src/components/MapEditingToolbar.tsx'),
     read('../src/components/GardenLayersPanel.tsx'),read('../src/MapView.tsx'),
-    read('../src/components/MapScene.tsx')
+    read('../src/components/MapScene.tsx'),read('../src/components/MapLineArt.tsx')
   ]);
   assert.match(model,/widthM<MIN_LINE_WIDTH_M/);
   assert.match(toolbar,/min=\{MIN_LINE_WIDTH_M\}/);
   assert.match(layers,/min=\{MIN_LINE_WIDTH_M\}/);
   assert.match(toolbar,/LINE_WIDTH_PRESETS_M\.map/);
-  assert.match(scene,/lineRenderWidths\(line.widthM,ppu\)\.interior/);
+  assert.match(scene,/<MapLineArt key=\{line.id\}/);
+  assert.match(lineArt,/lineRenderWidths\(line.widthM, pixelsPerMetre\)/);
   assert.match(map,/const clean=\(tool==='path'\|\|tool==='fence'\)\?draft/);
   assert.match(scene,/Math\.max\(20,Math\.max\(line.widthM\*ppu,30\/zoom\)\)/);
 });
