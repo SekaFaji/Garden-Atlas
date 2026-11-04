@@ -42,3 +42,7 @@ The shared `lineDimensions.ts` defines path/fence limits, width presets and visu
 ## Map line art (P038)
 
 `src/components/MapLineArt.tsx` paints path/fence SVGs and `src/mapLineArt.ts` computes decorative fence post points from readonly geometry. Both maps use identical physical widths, and `MapScene.tsx` retains the existing transparent hit areas and edit handles. No persisted schema or coordinate changes.
+
+## Zoom-dependent visual feedback (P039)
+
+`src/mapZoomVisuals.ts` provides two pure presentation helpers: stable screen-readable selection borders/labels and a dashed visibility indicator for sub-pixel paths/fences. `MapObject.tsx` and `MapLineArt.tsx` consume current camera zoom without modifying object dimensions, line widths, SVG interaction targets or stored records. Gesture handling remains in `MapView.tsx`. Small-phone CSS modifies only visual spacing and minimum button sizes.

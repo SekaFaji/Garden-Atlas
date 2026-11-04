@@ -1,3 +1,10 @@
+# Garden Atlas P039 - Zoom and Mobile Visual Readability (2026-11-04)
+
+- Fixed visual selection outline/dash scaling and focused-object label readability across map camera zooms using pure functions.
+- Extremely narrow paths/fences gain a noninteractive dashed guide at overview zoom only; their stored widths remain exact (from 0.05 m) and editing hit areas are unchanged.
+- Camera controls and line width presets are 44px or larger on narrow phones, with browser checks at 320px and 393px.
+- Preserved garden version 6, asset catalog, IndexedDB/backups, geometry, PWA install files and touch gesture code. Real Android physical-device QA is still recommended.
+
 # Garden Atlas P038 - Path, Fence and Remaining Sprite Polish (2026-11-03)
 
 - Path and fence art now has its own presentation-only renderer with pure, capped fence-post geometry.

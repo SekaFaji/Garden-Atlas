@@ -264,3 +264,35 @@ test('P038 narrow paths render with exact widths after creation and reload',asyn
   await page.reload();
   await expect(surface.locator('.map-line-art[data-line-art-kind="path"]')).toHaveCount(1);
 });
+
+test('P039 zoom-aware selection stays readable and mobile controls stay in viewport',async ({page})=>{
+  await page.goto('/Garden-Atlas/');
+  await expect(page.locator('.save-status')).toContainText(/INDEXEDDB SAVED|LOCAL SAVE/,{timeout:15_000});
+  await page.locator('.object-entry').first().click();
+  const focus=page.locator('.map-surface [data-selection="focused"]').first();
+  await expect(focus).toHaveCount(1);
+  const before=Number(await focus.getAttribute('stroke-width'));
+  await page.getByRole('button',{name:'Zoom in'}).click();
+  await expect.poll(async()=>Number(await focus.getAttribute('stroke-width'))).toBeLessThan(before);
+  await expect(focus).toHaveAttribute('pointer-events','none');
+  for(const width of [393,320]){
+    await page.setViewportSize({width,height:760});
+    const tools=page.locator('.viewport-tools button');
+    for(let i=0;i<4;i++){
+      const bounds=await tools.nth(i).boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(bounds!.width).toBeGreaterThanOrEqual(44);
+      expect(bounds!.height).toBeGreaterThanOrEqual(44);
+    }
+    const map=page.locator('.map-frame');
+    const rect=await map.boundingBox();
+    expect(rect).not.toBeNull();
+    expect(rect!.width).toBeLessThanOrEqual(width);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
+  }
+  await page.locator('.primary-tools').getByRole('button',{name:/^PATH:/}).click();
+  const quick=page.getByRole('button',{name:'0.1 m line width'});
+  const box=await quick.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.height).toBeGreaterThanOrEqual(44);
+});
