@@ -49,3 +49,10 @@ P036 adds source checks for complete ground-type coverage, reusable world-space 
 - Fences use rails and up to 32 small decorative posts sampled along each actual polyline. Wire-thin fences stay dashed. Decorations do not alter any vertex or touch hit target.
 - Beds, sheds, greenhouses, stones, ponds and furniture now have extra authored pixel shading and highlights. The 24 preset IDs and 64px source sprite sizes stay unchanged.
 - No runtime randomness or animation; performance and physical-phone readability should be checked with dense gardens.
+
+## P039 - Zoom readability and mobile visual consistency
+
+- Selection outlines, dash cadence and focused-object labels now compensate for camera zoom so they remain legible at normal phone and desktop zoom. Labels are suppressed only at very distant overview zoom where they would otherwise be unreadable; the existing selection UI is retained.
+- Very narrow paths and fences retain their exact measured SVG interior strokes. When a real stroke would project under 1.25 screen pixels, a faint dashed centreline guide can appear as a *visual indicator*, not a measured width or alternate saved geometry.
+- Mobile camera buttons and fractional-width presets have at least 44px CSS touch targets. Small viewports receive restrained layout adjustments and overflow checks without altering pointer handlers or map movement.
+- Unit tests cover physical-pixel thresholds, zoom extremes and unchanged saved data; Chromium adds 320px/393px viewport checks, selection zoom and touch-control dimensions. Physical Android QA is still required.

@@ -59,7 +59,7 @@ export function MapScene({garden,mode,tool,zoom,hidden,locked,selectedId,selecte
         opacity={garden.reference.opacity} preserveAspectRatio="none"
         pointerEvents="none" aria-label="Imported tracing reference" />}
       {!hidden.lines&&layout.lines.map(line=><MapLineArt key={line.id} line={line}
-        points={previewPoints({kind:'line',id:line.id},line.points)} pixelsPerMetre={ppu}/>)}
+        points={previewPoints({kind:'line',id:line.id},line.points)} pixelsPerMetre={ppu} zoom={zoom}/>)}
       {!hidden.boundary&&<polygon points={shape(outline)} fill="none" stroke="#fff3c1" strokeWidth={Math.max(1.5,3/zoom)} strokeDasharray={mode==='scale'?'10 6':undefined} pointerEvents="none" />}
       {!hidden.objects&&garden.objects.map(item=>{
         const original=item.position;if(!original)return null;

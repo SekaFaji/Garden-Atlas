@@ -1,3 +1,10 @@
+## P039 - Mobile visual consistency and zoom readability (2026-11-04)
+
+- Make SVG object selection outlines and focused name labels adapt to camera zoom, avoiding oversized text when zoomed in and unreadable captions at very distant zoom.
+- Add an optional faint dashed centreline visibility guide when a path/fence measured stroke would render below 1.25 screen pixels. Actual measured line widths and vertex data are unchanged.
+- Increase narrow-screen camera and line-width preset buttons to at least 44px and tighten 320px/393px layout behavior.
+- Expand unit/browser coverage for zoom extremes, responsive viewport overflow, selection feedback and unchanged garden format v6, storage, gestures and PWA assets.
+
 ## P038 - Paths, fences and garden-object pixel art (2026-11-03)
 
 - Render wider paths with restrained paving highlights, leaving narrow 5 cm widths readable and proportional.

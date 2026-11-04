@@ -311,3 +311,17 @@
 .line-width-presets button{padding:8px 9px;min-height:40px;color:#e6efd8;background:#315641;border:1px solid #749773;font:800 11px monospace}
 .line-width-presets button.active{background:#c5e2a0;color:#243c2c;border-color:#e6f2b7}
 .line-width-controls small{flex-basis:100%;color:#bed5b5;font:10px/1.4 monospace}
+
+/* P039: consistent narrow-phone map controls without touching pan/pinch layers. */
+@media(max-width:760px){
+ .viewport-tools button{min-width:46px;min-height:46px}
+ .line-width-chooser,.line-width-controls,.line-width-presets{min-width:0}
+ .line-width-presets button{min-height:44px}
+ .viewport-status{flex-wrap:wrap;max-width:calc(100% - 12px)}
+ .map-tool-guidance{min-width:0}
+}
+@media(max-width:360px){
+ .viewport-tools{right:6px;top:8px;gap:5px}
+ .drawing-controls{right:61px}
+ .map-toolbar{flex-wrap:wrap;min-width:0}
+}
