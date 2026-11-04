@@ -2,6 +2,7 @@ import { Sprite } from '../Sprite';
 import { showObjectMapLabel, type SelectionStyle } from '../editorVisuals';
 import { WORLD, type GardenObject, type Mode, type Point } from '../model';
 import { mapObjectVisualSize } from '../mapObjectGeometry';
+import { selectionZoomPaint } from '../mapZoomVisuals';
 import type { Tool } from '../MapView';
 
 interface Props {
@@ -21,14 +22,15 @@ interface Props {
 export function MapObject({item, point, dimensions, marker, tool, mode, selectedId, multiSelect, objectsLocked, zoom}: Props) {
   const ppu = WORLD.pixelsPerUnit;
   const {width, length, hitWidth, hitLength} = mapObjectVisualSize(dimensions, mode, zoom);
+  const paint = selectionZoomPaint(zoom);
 
   return <g data-object={item.id} className="map-object" transform={`translate(${point.x * ppu} ${point.y * ppu})`}>
     {marker !== null && <rect
-      data-selection={marker} x={-width / 2 - 7} y={-length / 2 - 7}
-      width={width + 14} height={length + 14} fill="none"
+      data-selection={marker} x={-width / 2 - paint.offset} y={-length / 2 - paint.offset}
+      width={width + 2 * paint.offset} height={length + 2 * paint.offset} fill="none"
       stroke={marker === 'multiple' ? '#8bd8f0' : marker === 'group' ? '#dbefac' : '#fff3ac'}
-      strokeWidth={marker === 'focused' ? '3.5' : '3'}
-      strokeDasharray={marker === 'group' ? '5 5' : marker === 'multiple' ? '3 3' : '7 4'}
+      strokeWidth={paint.strokeWidth}
+      strokeDasharray={marker === 'group' ? paint.groupDash : marker === 'multiple' ? paint.multipleDash : paint.focusedDash}
       pointerEvents="none" />}
     <svg x={-width / 2} y={-length / 2} width={width} height={length} viewBox="0 0 64 64" pointerEvents="none">
       <g transform={`rotate(${item.rotation ?? 0} 32 32)`}><Sprite kind={item.kind} presetId={item.presetId}/></g>
@@ -42,11 +44,13 @@ export function MapObject({item, point, dimensions, marker, tool, mode, selected
         width={Math.max(22, 36 / zoom)} height={Math.max(22, 36 / zoom)}
         fill="#f4df8e" stroke="#2a5442" strokeWidth={3 / zoom}/>
     </g>}
-    {showObjectMapLabel(marker, tool) && <g pointerEvents="none">
-      <rect x={-55} y={length / 2 + 6} width="110" height="20" fill="#1f382f" stroke="#f6dfa4" strokeWidth="1.5"/>
-      <text textAnchor="middle" x="0" y={length / 2 + 20} fontSize="11" fontFamily="monospace" fill="#fff7d4">
-        {item.name.slice(0, 15)}
-      </text>
-    </g>}
+    {showObjectMapLabel(marker, tool) && paint.showLabel &&
+      <g data-object-label="focused" pointerEvents="none"
+        transform={`translate(0 ${length / 2 + 6 / Math.max(0.06, zoom)}) scale(${paint.labelScale})`}>
+        <rect x={-55} y="0" width="110" height="20" fill="#1f382f" stroke="#f6dfa4" strokeWidth="1.5"/>
+        <text textAnchor="middle" x="0" y="14" fontSize="11" fontFamily="monospace" fill="#fff7d4">
+          {item.name.slice(0, 15)}
+        </text>
+      </g>}
   </g>;
 }
